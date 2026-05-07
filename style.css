@@ -219,6 +219,241 @@ header {
     animation: fadeIn 0.4s ease;
 }
 
+.damage-inspection {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 22px;
+    background: #fbfcfe;
+}
+
+.damage-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.damage-header h3 {
+    margin: 0 0 4px;
+    color: var(--primary-blue);
+    font-size: 1.05rem;
+}
+
+.damage-header p {
+    margin: 0;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+.btn-clear-damages,
+.damage-list button {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+    background: #fff;
+    border-radius: 4px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.damage-type-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.damage-type {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-dark);
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.damage-type.active {
+    color: #fff;
+    background: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+
+.vehicle-map {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.vehicle-view {
+    position: relative;
+    min-height: 160px;
+    border: 1px solid #cfd8e3;
+    border-radius: 8px;
+    background: #ffffff;
+    cursor: crosshair;
+    overflow: hidden;
+    padding: 10px;
+}
+
+.vehicle-photo {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: #fff;
+}
+
+.vehicle-view > span:first-child {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    color: var(--primary-blue);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    z-index: 2;
+}
+
+.vehicle-photo > span:first-child {
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid #dbe3ef;
+    border-radius: 4px;
+    padding: 4px 7px;
+}
+
+.vehicle-photo img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+
+.vehicle-view svg {
+    width: 100%;
+    height: 120px;
+    margin-top: 20px;
+    pointer-events: none;
+}
+
+.vehicle-body,
+.vehicle-cabin,
+.vehicle-bed,
+.vehicle-bedline {
+    fill: #e9eef5;
+    stroke: #315d85;
+    stroke-width: 3;
+}
+
+.vehicle-glass {
+    fill: #cfe8ff;
+    stroke: #315d85;
+    stroke-width: 2;
+}
+
+.vehicle-detail,
+.vehicle-grille {
+    fill: #315d85;
+}
+
+.rear-light {
+    fill: #dc3545;
+}
+
+.vehicle-wheel {
+    fill: #2f343a;
+    stroke: #111;
+    stroke-width: 3;
+}
+
+.vehicle-line {
+    stroke: #315d85;
+    stroke-width: 2;
+}
+
+.damage-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    cursor: pointer;
+}
+
+.damage-marker.arranhao { background: #f59f00; }
+.damage-marker.amassado { background: #7950f2; }
+.damage-marker.trincado { background: #1971c2; }
+.damage-marker.quebrado { background: #d6336c; }
+
+.damage-list-wrap {
+    margin-top: 16px;
+}
+
+.damage-list-wrap h4 {
+    margin: 0 0 8px;
+    color: var(--primary-blue);
+}
+
+.damage-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.damage-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.damage-list li.empty {
+    color: #777;
+    font-style: italic;
+    justify-content: center;
+}
+
+/* Admin Dashboard Styles */
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: var(--white);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    border-left: 5px solid var(--primary-blue);
+    transition: transform 0.2s;
+}
+
+.stat-card:hover { transform: translateY(-5px); }
+.stat-card h3 { margin: 0; font-size: 0.85rem; text-transform: uppercase; color: #666; letter-spacing: 1px; }
+.stat-card p { margin: 10px 0 0; font-size: 1.8rem; font-weight: bold; color: var(--primary-blue); }
+
+.admin-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+
 .placeholder {
     color: #888;
     font-style: italic;
@@ -253,4 +488,33 @@ h2 {
     }
 
     .header-info { flex-direction: column; gap: 10px; text-align: center; }
+
+    .damage-header {
+        flex-direction: column;
+    }
+
+    .btn-clear-damages {
+        width: 100%;
+    }
+
+    .damage-type {
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .vehicle-map {
+        grid-template-columns: 1fr;
+    }
+
+    .vehicle-view {
+        min-height: 150px;
+    }
+
+    .damage-list li {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .damage-list button {
+        width: 100%;
+    }
 }

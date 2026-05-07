@@ -6,6 +6,8 @@
     <title>Sistema Checklist 5S - DIGITAL</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        /* Botão Encerrar */
+        .btn-encerrar { display: none; background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; }
         /* Estilo para indicar conclusão no menu */
         .nav-links a.completed {
             color: #28a745 !important;
@@ -15,20 +17,87 @@
             content: " ✓";
             font-weight: bold;
         }
+        /* Estilos para Modal e Admin */
+        .admin-only { display: none; }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .history-table th, .history-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+        .history-table tr:hover { background-color: #f5f5f5; cursor: pointer; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-pendente { color: red; font-weight: bold; }
+        .login-box { max-width: 300px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        
+        /* Novos estilos para status de itens */
+        .status-options { display: flex; gap: 10px; margin-top: 5px; }
+        .status-opt { cursor: pointer; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; background: #f9f9f9; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+        .status-opt input { display: none; }
+        .status-opt:has(input:checked) { border-color: var(--primary-blue); background: var(--secondary-blue); font-weight: bold; }
+        
+        /* Cores específicas para cada estado quando selecionado */
+        .status-opt:has(input[value="ok"]:checked) { border-color: #28a745; background: #d4edda; color: #155724; }
+        .status-opt:has(input[value="pendente"]:checked) { border-color: #ffc107; background: #fff3cd; color: #856404; }
+        .status-opt:has(input[value="perdeu"]:checked), 
+        .status-opt:has(input[value="quebrou"]:checked) { border-color: #dc3545; background: #f8d7da; color: #721c24; }
+
+        /* Ajuste para itens do checklist */
+        .checklist-item { flex-direction: column; align-items: flex-start; }
+        .item-label { font-weight: 500; margin-bottom: 5px; }
+        .revisao-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .revisao-item textarea { width: 100%; margin-top: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; resize: vertical; }
+
+        /* Sinalização de item esquecido */
+        .checklist-item.error { background-color: #fff5f5; border-left: 4px solid #dc3545; transition: background 0.3s; }
+        .error-msg { color: #dc3545; font-size: 0.75rem; font-weight: bold; display: none; margin-left: 8px; }
+        .checklist-item.error .error-msg { display: inline; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; position: relative; }
+        .close-modal { position: absolute; right: 15px; top: 10px; font-size: 28px; cursor: pointer; }
+        .pending-list { list-style: none; padding: 0; }
+        .pending-list li { padding: 8px 0; border-bottom: 1px solid #eee; color: #d9534f; }
+        .pending-list li::before { content: "✖ "; }
+
+        /* Ajustes de layout para o cabeçalho do Painel Admin */
+        .admin-header-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+        .admin-buttons-container { display: flex; gap: 10px; flex-wrap: nowrap; }
+
+        /* Ajuste para Celular: Título ao lado do Sair, e PDF abaixo do Sair */
+        @media (max-width: 480px) {
+            .admin-header-actions { flex-wrap: nowrap; align-items: flex-start; }
+            .admin-header-actions h2 { font-size: 1.1rem; line-height: 1.2; flex: 1; margin-right: 10px; }
+            .admin-buttons-container { 
+                flex-direction: column-reverse; 
+                align-items: flex-end; 
+                gap: 8px; 
+                flex-shrink: 0;
+            }
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="logo">DIGITAL</div>
+        <div class="user-selector" style="margin-left: 20px;">
+            <select id="vistoriador-atual" style="padding: 5px; border-radius: 4px;">
+                <option value="">Selecione o Vistoriador</option>
+                <option value="Alisson">Alisson</option>
+                <option value="Berg">Berg</option>
+                <option value="Marcos">Marcos</option>
+            </select>
+        </div>
         <nav class="menu-container">
             <button class="menu-btn" onclick="toggleMenu()">☰ Menu</button>
             <ul id="menu-list" class="nav-links">
                 <li><a href="#" id="menu-ferramentas" onclick="showPage('ferramentas')">🔧 Ferramentas</a></li>
                 <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
+                <li style="border-top: 1px solid #eee;"><a href="#" onclick="showPage('admin')">🔐 Painel Admin</a></li>
             </ul>
         </nav>
     </header>
+
+    <!-- Biblioteca para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <main>
         <div class="container">
@@ -37,6 +106,7 @@
                 <div id="viaturas-grid" class="viaturas-grid">
                     <!-- Botões das viaturas gerados via JS -->
                 </div>
+                <button id="btn-encerrar-geral" class="btn-encerrar" onclick="encerrarVistoriaCompleta()">📁 Encerrar Vistoria e Gerar PDF</button>
             </div>
 
             <!-- Página 1: Ferramentas -->
@@ -69,14 +139,136 @@
                         <label for="km">KM Atual:</label>
                         <input type="number" id="km" placeholder="Km atual">
                     </div>
+                    <div class="damage-inspection">
+                        <div class="damage-header">
+                            <div>
+                                <h3>Fiat Strada - Inspeção Visual</h3>
+                                <p>Selecione o tipo de avaria e toque na região correspondente do veículo.</p>
+                            </div>
+                            <button type="button" class="btn-clear-damages" onclick="limparAvariasViatura()">Limpar marcações</button>
+                        </div>
+
+                        <div class="damage-type-selector" role="group" aria-label="Tipo de avaria">
+                            <button type="button" class="damage-type active" data-type="arranhao" onclick="setDamageType('arranhao')">Arranhão</button>
+                            <button type="button" class="damage-type" data-type="amassado" onclick="setDamageType('amassado')">Amassado</button>
+                            <button type="button" class="damage-type" data-type="trincado" onclick="setDamageType('trincado')">Trincado</button>
+                            <button type="button" class="damage-type" data-type="quebrado" onclick="setDamageType('quebrado')">Quebrado</button>
+                        </div>
+
+                        <div class="vehicle-map" id="vehicle-map">
+                            <button type="button" class="vehicle-view vehicle-photo" data-view="veiculo" onclick="marcarAvaria(event, 'veiculo')" aria-label="Marcar avaria na imagem da viatura">
+                                <span id="vehicle-map-title">Mapa visual da Strada</span>
+                                <img id="vehicle-map-image" src="assets/strada-mapa.png" alt="Vistas lateral, traseira e frontal da Fiat Strada">
+                            </button>
+                        </div>
+
+                        <div class="damage-list-wrap">
+                            <h4>Avarias marcadas</h4>
+                            <ul id="damage-list" class="damage-list">
+                                <li class="empty">Nenhuma avaria marcada.</li>
+                            </ul>
+                        </div>
+                    </div>
                     <div id="lista-viaturas" class="checklist-items">
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
                     <button class="btn-submit" onclick="finalizarVistoria('viaturas')" style="margin-top: 20px; width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Finalizar Vistoria Viatura</button>
                 </div>
             </section>
+
+            <!-- Página 4: Admin (Login) -->
+            <section id="admin" class="tab-content">
+                <div class="card" id="admin-login-section">
+                    <h2>Acesso Restrito</h2>
+                    <div class="login-box">
+                        <input type="email" id="admin-email" placeholder="E-mail" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+                        <input type="password" id="admin-password" placeholder="Senha" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+                        <button onclick="loginAdmin()" style="width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px;">Entrar</button>
+                    </div>
+                </div>
+
+                <div class="card admin-only" id="admin-panel-section">
+                    <div class="admin-header-actions">
+                        <div>
+                            <h2 style="margin:0;">🚀 Gestão de Vistorias</h2>
+                        </div>
+                    <div class="admin-buttons-container">
+                        <button onclick="exportarHistoricoPDF()" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px;">📄 Exportar PDF</button>
+                            <button onclick="logoutAdmin()" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px;">Sair</button>
+                        </div>
+                    </div>
+
+                    <!-- Estatísticas Rápidas -->
+                    <div class="admin-stats">
+                        <div class="stat-card"><h3>Total Vistorias</h3><p id="stat-total">0</p></div>
+                        <div class="stat-card" style="border-left-color: #28a745;"><h3>Tudo OK</h3><p id="stat-ok">0</p></div>
+                        <div class="stat-card" style="border-left-color: #dc3545;"><h3>Pendências</h3><p id="stat-pending">0</p></div>
+                        <div class="stat-card" style="border-left-color: #ffc107;"><h3>Vistoriadores</h3><p id="stat-users">3</p></div>
+                    </div>
+
+                    <!-- Filtros do Histórico -->
+                    <div class="filters-bar" style="display: flex; gap: 15px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Vistoriador</label>
+                            <select id="filter-vistoriador" onchange="aplicarFiltros()">
+                                <option value="">Todos</option>
+                                <option value="Alisson">Alisson</option>
+                                <option value="Berg">Berg</option>
+                                <option value="Marcos">Marcos</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 130px;">
+                            <label>Data Início</label>
+                            <input type="date" id="filter-data-inicio" onchange="aplicarFiltros()">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 130px;">
+                            <label>Data Fim</label>
+                            <input type="date" id="filter-data-fim" onchange="aplicarFiltros()">
+                        </div>
+                        <button onclick="carregarHistorico()" style="padding: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Atualizar Dados">🔄</button>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Vistoriador</th>
+                                    <th>Viatura</th>
+                                    <th>Categoria</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody">
+                                <!-- Dados virão do JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </div>
     </main>
-    <script src="script.js"></script>
+
+    <!-- Modal de Detalhes -->
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h3 id="modal-title">Detalhes da Vistoria</h3>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Revisão de Pendências -->
+    <div id="revisao-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3>⚠️ Detalhamento de Pendências</h3>
+            <p>Por favor, explique o motivo para cada item abaixo:</p>
+            <div id="revisao-body"></div>
+            <button class="btn-submit" onclick="confirmarEnvioFinal()" style="margin-top: 15px; width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Confirmar e Salvar Vistoria</button>
+            <button class="btn-submit" onclick="fecharModalRevisao()" style="margin-top: 10px; width: 100%; padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Retornar à Vistoria</button>
+        </div>
+    </div>
+
+    <script type="module" src="script.js?v=2"></script>
 </body>
 </html>
