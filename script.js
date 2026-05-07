@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, where, limit, deleteDoc, doc as firestoreDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // Configuração do Firebase do seu Web App
@@ -81,7 +81,8 @@ const checklistData = {
         "Bolsa EPI CG 445",
         "Pochete Carbografite"
     ],
-    viaturas: ["Nível de Óleo", "Reservatório do líquido de arrefecimento", "Pressão dos Pneus", "Luzes de Sinalização", "Limpeza Interna", "Estepe", "Macaco", "Triângulo"]
+    viaturas: ["Nível de Óleo", "Reservatório do líquido de arrefecimento", "Pressão dos Pneus", "Luzes de Sinalização", "Limpeza Interna", "Estepe", "Macaco", "Triângulo"],
+    tablets: ["Tela", "Carcaça", "Câmera", "Botões físicos", "Entrada de carregador", "Caneta", "Capa de proteção", "Carregador", "Funcionamento do toque", "Aplicativos de trabalho"]
 };
 
 /**
@@ -97,23 +98,28 @@ const totalViaturas = 9;
 let vistoriasCache = []; // Armazena dados para o modal e exportação
 let dadosTemporariosVistoria = null; // Armazena dados enquanto detalha pendências
 let selectedDamageType = "arranhao";
+let selectedTabletDamageType = "arranhao";
 const vehicleDamages = {};
+const tabletDamages = {};
+const selectedVistorias = new Set();
 
 /**
  * Inicializa o status para todas as viaturas
  */
 for (let i = 1; i <= totalViaturas; i++) {
-    surveyStatus[i.toString()] = { ferramentas: false, epis: false, viaturas: false };
+    surveyStatus[i.toString()] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
     vehicleDamages[i.toString()] = [];
+    tabletDamages[i.toString()] = [];
 }
 
 // Mapeamento para nomes amigáveis na exibição do status
-const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura" };
+const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet" };
 const damageTypeNames = {
     arranhao: "Arranhão",
     amassado: "Amassado",
     trincado: "Trincado",
-    quebrado: "Quebrado"
+    quebrado: "Quebrado",
+    sem_caneta: "Sem caneta"
 };
 const vehicleViewNames = {
     frente: "Frente",
@@ -187,7 +193,8 @@ function renderItems(pageId) {
     const containerMapping = {
         'ferramentas': 'lista-ferramentas',
         'epis': 'lista-epis',
-        'viaturas': 'lista-viaturas'
+        'viaturas': 'lista-viaturas',
+        'tablets': 'lista-tablets'
     };
     const containerId = containerMapping[pageId];
 
@@ -226,6 +233,12 @@ function renderItems(pageId) {
         renderDamageMarkers();
         renderDamageList();
     }
+
+    if (pageId === 'tablets') {
+        updateTabletInfo();
+        renderTabletDamageMarkers();
+        renderTabletDamageList();
+    }
 }
 
 /**
@@ -260,6 +273,7 @@ function renderViaturaDashboard() {
                 <span class="dot ${status.ferramentas ? 'done' : ''}" title="Ferramentas">🔧</span>
                 <span class="dot ${status.epis ? 'done' : ''}" title="EPIs">🦺</span>
                 <span class="dot ${status.viaturas ? 'done' : ''}" title="Viatura">🚗</span>
+                <span class="dot ${status.tablets ? 'done' : ''}" title="Tablet">📱</span>
             </div>
         `;
         grid.appendChild(card);
@@ -274,10 +288,16 @@ function selectViatura(id) {
     renderViaturaDashboard();
     updateMenuStatus();
     updateVehicleMapImage(id);
+    updateTabletInfo(id);
     
     // Recarrega os itens da aba atual para a nova viatura
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab) renderItems(activeTab.id);
+}
+
+function updateTabletInfo(viaturaId = selectedViatura) {
+    const label = document.getElementById('tablet-current-label');
+    if (label) label.innerText = `Tablet ${viaturaId.toString().padStart(2, '0')}`;
 }
 
 function updateVehicleMapImage(viaturaId = selectedViatura) {
@@ -379,6 +399,90 @@ function limparAvariasViatura() {
     renderDamageList();
 }
 
+function setTabletDamageType(type) {
+    selectedTabletDamageType = type;
+    document.querySelectorAll('.tablet-damage-type').forEach(button => {
+        button.classList.toggle('active', button.dataset.type === type);
+    });
+}
+
+function marcarAvariaTablet(event) {
+    const panel = event.currentTarget;
+    const rect = panel.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+    tabletDamages[selectedViatura].push({
+        view: detectarRegiaoTablet(x, y),
+        type: selectedTabletDamageType,
+        x: Number(x.toFixed(2)),
+        y: Number(y.toFixed(2))
+    });
+
+    renderTabletDamageMarkers();
+    renderTabletDamageList();
+}
+
+function detectarRegiaoTablet(x, y) {
+    if (x < 43) return "Frente";
+    if (x < 82) return "Traseira";
+    return "Lateral/caneta";
+}
+
+function renderTabletDamageMarkers() {
+    document.querySelectorAll('.tablet-damage-marker').forEach(marker => marker.remove());
+
+    const map = document.getElementById('tablet-map');
+    const viewPanel = map?.querySelector('[data-view="tablet"]');
+    if (!viewPanel) return;
+
+    tabletDamages[selectedViatura].forEach((damage, index) => {
+        const marker = document.createElement('span');
+        marker.className = `damage-marker tablet-damage-marker ${damage.type}`;
+        marker.style.left = `${damage.x}%`;
+        marker.style.top = `${damage.y}%`;
+        marker.title = `${damageTypeNames[damage.type]} - ${damage.view}`;
+        marker.textContent = String(index + 1);
+        marker.onclick = (event) => {
+            event.stopPropagation();
+            removerAvariaTablet(index);
+        };
+        viewPanel.appendChild(marker);
+    });
+}
+
+function renderTabletDamageList() {
+    const list = document.getElementById('tablet-damage-list');
+    if (!list) return;
+
+    const damages = tabletDamages[selectedViatura];
+    if (damages.length === 0) {
+        list.innerHTML = '<li class="empty">Nenhuma avaria marcada.</li>';
+        return;
+    }
+
+    list.innerHTML = damages.map((damage, index) => `
+        <li>
+            <span><strong>${index + 1}. ${damageTypeNames[damage.type]}</strong> - ${damage.view}</span>
+            <button type="button" onclick="removerAvariaTablet(${index})">Remover</button>
+        </li>
+    `).join('');
+}
+
+function removerAvariaTablet(index) {
+    tabletDamages[selectedViatura].splice(index, 1);
+    renderTabletDamageMarkers();
+    renderTabletDamageList();
+}
+
+function limparAvariasTablet() {
+    if (tabletDamages[selectedViatura].length === 0) return;
+    if (!confirm(`Deseja limpar todas as marcações do Tablet ${selectedViatura.padStart(2, '0')}?`)) return;
+    tabletDamages[selectedViatura] = [];
+    renderTabletDamageMarkers();
+    renderTabletDamageList();
+}
+
 /**
  * Atualiza visualmente o menu indicando quais vistorias foram concluídas para a viatura atual
  */
@@ -401,7 +505,7 @@ function updateMenuStatus() {
     // Mostrar botão de encerrar se as 3 estiverem prontas
     const btnEncerrar = document.getElementById('btn-encerrar-geral');
     if (btnEncerrar) {
-        btnEncerrar.style.display = (concluidas === 3) ? 'block' : 'none';
+        btnEncerrar.style.display = (concluidas === Object.keys(categoryNames).length) ? 'block' : 'none';
         btnEncerrar.innerText = `📁 Encerrar Vistoria Viatura ${selectedViatura} (Gerar PDF)`;
     }
 }
@@ -412,7 +516,9 @@ function updateMenuStatus() {
  */
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById('km');
-    const vistoriador = document.getElementById('vistoriador-atual').value;
+    const vistoriadorGeral = document.getElementById('vistoriador-atual').value;
+    const vistoriadorTablet = document.getElementById('tablet-vistoriador')?.value || "";
+    const vistoriador = category === 'tablets' ? vistoriadorTablet : vistoriadorGeral;
     
     // Validação: Se for a aba de viaturas, o KM é obrigatório
     if (category === 'viaturas' && (!kmInput || !kmInput.value)) {
@@ -421,7 +527,9 @@ async function finalizarVistoria(category) {
     }
 
     if (!vistoriador) {
-        alert("Por favor, selecione quem está realizando a vistoria no topo da página.");
+        alert(category === 'tablets'
+            ? "Por favor, selecione Matheus ou Italo como responsável pela vistoria do tablet."
+            : "Por favor, selecione quem está realizando a vistoria no topo da página.");
         return;
     }
 
@@ -453,11 +561,13 @@ async function finalizarVistoria(category) {
     // Prepara os dados temporários para o salvamento posterior
     dadosTemporariosVistoria = {
         viaturaId: selectedViatura,
+        tabletId: (category === 'tablets') ? selectedViatura : null,
         vistoriador: vistoriador,
         categoria: category,
         itens: checklistResults,
         km: (category === 'viaturas') ? kmInput.value : null,
-        avarias: (category === 'viaturas') ? [...vehicleDamages[selectedViatura]] : []
+        avarias: (category === 'viaturas') ? [...vehicleDamages[selectedViatura]] : [],
+        avariasTablet: (category === 'tablets') ? [...tabletDamages[selectedViatura]] : []
     };
 
     // Agora o modal abre APENAS para o status 'pendente'
@@ -518,12 +628,19 @@ async function enviarVistoriaAoFirebase() {
     try {
         const docData = { ...dadosTemporariosVistoria, dataEnvio: serverTimestamp() };
         await addDoc(collection(db, "vistorias"), docData);
+        const categoriaSalva = dadosTemporariosVistoria.categoria;
+        const viaturaSalva = selectedViatura;
         
         if (document.getElementById('km')) document.getElementById('km').value = '';
         if (dadosTemporariosVistoria.categoria === 'viaturas') {
             vehicleDamages[selectedViatura] = [];
             renderDamageMarkers();
             renderDamageList();
+        }
+        if (dadosTemporariosVistoria.categoria === 'tablets') {
+            tabletDamages[selectedViatura] = [];
+            renderTabletDamageMarkers();
+            renderTabletDamageList();
         }
         
         surveyStatus[selectedViatura][dadosTemporariosVistoria.categoria] = true;
@@ -533,12 +650,21 @@ async function enviarVistoriaAoFirebase() {
         // Limpa o cache para forçar recarregamento no histórico admin
         vistoriasCache = [];
         
-        alert("✅ Vistoria salva com sucesso!");
         dadosTemporariosVistoria = null;
+        alert("✅ Vistoria salva com sucesso!");
+
+        if (categoriaSalva === 'tablets' && todasEtapasConcluidas(viaturaSalva)) {
+            await gerarRelatorioComEscolha({ resetarStatus: true });
+        }
     } catch (error) {
         console.error("Erro ao salvar no Firestore: ", error);
         alert("Erro ao salvar dados no Firebase.");
     }
+}
+
+function todasEtapasConcluidas(viaturaId = selectedViatura) {
+    const status = surveyStatus[viaturaId];
+    return Boolean(status) && Object.keys(categoryNames).every(category => status[category]);
 }
 
 /**
@@ -560,7 +686,7 @@ async function logoutAdmin() {
 
 async function carregarHistorico() {
     const tbody = document.getElementById('history-tbody');
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
     
     try {
         const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
@@ -568,6 +694,8 @@ async function carregarHistorico() {
         
         tbody.innerHTML = '';
         vistoriasCache = [];
+        selectedVistorias.clear();
+        atualizarContadorSelecionadas();
 
         querySnapshot.forEach((doc) => {
             vistoriasCache.push({ id: doc.id, ...doc.data() });
@@ -576,7 +704,7 @@ async function carregarHistorico() {
         aplicarFiltros();
     } catch (error) {
         console.error("Erro ao buscar histórico:", error);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
     }
 }
 
@@ -616,7 +744,8 @@ function atualizarCardsEstatisticas(dados) {
     const pendentes = dados.filter(v => {
         const temItemPendente = v.itens.some(i => i.status !== 'ok');
         const temAvariaVisual = Array.isArray(v.avarias) && v.avarias.length > 0;
-        return temItemPendente || temAvariaVisual;
+        const temAvariaTablet = Array.isArray(v.avariasTablet) && v.avariasTablet.length > 0;
+        return temItemPendente || temAvariaVisual || temAvariaTablet;
     }).length;
     const ok = total - pendentes;
 
@@ -633,27 +762,99 @@ function renderHistoricoTable(dados) {
     tbody.innerHTML = '';
 
     if (dados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
         return;
     }
 
     dados.forEach((data) => {
         const dateObj = data.dataEnvio?.toDate() || new Date();
-        const temPendencia = data.itens.some(i => i.status !== 'ok') || (Array.isArray(data.avarias) && data.avarias.length > 0);
+        const temPendencia = data.itens.some(i => i.status !== 'ok') 
+            || (Array.isArray(data.avarias) && data.avarias.length > 0)
+            || (Array.isArray(data.avariasTablet) && data.avariasTablet.length > 0);
         const statusHTML = temPendencia 
             ? `<span class="status-pendente">Pendência</span>` 
             : `<span class="status-ok">Tudo OK</span>`;
+        const equipamento = data.categoria === 'tablets'
+            ? `Tablet ${data.tabletId || data.viaturaId}`
+            : `Viatura ${data.viaturaId}`;
 
         tbody.innerHTML += `
             <tr onclick="verDetalhes('${data.id}')">
+                <td onclick="event.stopPropagation();">
+                    <input type="checkbox" class="history-select" value="${data.id}" ${selectedVistorias.has(data.id) ? 'checked' : ''} onchange="toggleSelecionarVistoria('${data.id}', this.checked)">
+                </td>
                 <td>${dateObj.toLocaleString('pt-BR')}</td>
                 <td>${data.vistoriador}</td>
-                <td>Viatura ${data.viaturaId}</td>
+                <td>${equipamento}</td>
                 <td>${categoryNames[data.categoria] || data.categoria}</td>
                 <td>${statusHTML}</td>
             </tr>
         `;
     });
+    atualizarContadorSelecionadas();
+}
+
+function toggleSelecionarVistoria(id, checked) {
+    if (checked) {
+        selectedVistorias.add(id);
+    } else {
+        selectedVistorias.delete(id);
+    }
+    atualizarContadorSelecionadas();
+}
+
+function toggleSelecionarTodasVistorias(checked) {
+    document.querySelectorAll('.history-select').forEach(checkbox => {
+        checkbox.checked = checked;
+        toggleSelecionarVistoria(checkbox.value, checked);
+    });
+}
+
+function atualizarContadorSelecionadas() {
+    const count = selectedVistorias.size;
+    const label = document.getElementById('selected-count');
+    const selectAll = document.getElementById('select-all-vistorias');
+    if (label) label.innerText = `${count} selecionada${count === 1 ? '' : 's'}`;
+    if (selectAll) {
+        const visibleCheckboxes = document.querySelectorAll('.history-select');
+        selectAll.checked = visibleCheckboxes.length > 0 && [...visibleCheckboxes].every(checkbox => checkbox.checked);
+    }
+}
+
+async function excluirVistoriasSelecionadas() {
+    const ids = [...selectedVistorias];
+    if (ids.length === 0) {
+        alert("Selecione pelo menos uma vistoria para excluir.");
+        return;
+    }
+
+    if (!auth.currentUser) {
+        alert("Faça login no Painel Admin antes de excluir vistorias.");
+        return;
+    }
+
+    if (!confirm(`Deseja excluir ${ids.length} vistoria${ids.length === 1 ? '' : 's'} selecionada${ids.length === 1 ? '' : 's'}? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+
+    const deleteButton = document.querySelector('.btn-delete-selected');
+    try {
+        if (deleteButton) deleteButton.disabled = true;
+        for (const id of ids) {
+            await deleteDoc(firestoreDoc(db, "vistorias", id));
+        }
+        selectedVistorias.clear();
+        await carregarHistorico();
+        alert("Vistorias excluídas com sucesso.");
+    } catch (error) {
+        console.error("Erro ao excluir vistorias:", error);
+        const mensagem = error?.code === "permission-denied"
+            ? "Permissão negada pelo Firebase. Verifique se as regras do Firestore permitem delete para o usuário admin logado."
+            : `Erro ao excluir vistorias selecionadas: ${error?.message || error}`;
+        alert(mensagem);
+    } finally {
+        if (deleteButton) deleteButton.disabled = false;
+    }
 }
 
 /**
@@ -667,16 +868,29 @@ function verDetalhes(docId) {
     const body = document.getElementById('modal-body');
     const title = document.getElementById('modal-title');
 
-    title.innerText = `Detalhes: ${categoryNames[vistoria.categoria]} - Viatura ${vistoria.viaturaId}`;
+    const equipamentoTitulo = vistoria.categoria === 'tablets'
+        ? `Tablet ${vistoria.tabletId || vistoria.viaturaId}`
+        : `Viatura ${vistoria.viaturaId}`;
+    title.innerText = `Detalhes: ${categoryNames[vistoria.categoria]} - ${equipamentoTitulo}`;
     
     const pendentes = vistoria.itens.filter(i => i.status !== 'ok');
     
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
+    if (vistoria.categoria === 'tablets') {
+        html += `<p><strong>Tablet:</strong> ${String(vistoria.tabletId || vistoria.viaturaId).padStart(2, '0')} vinculado à Viatura ${String(vistoria.viaturaId).padStart(2, '0')}</p>`;
+    }
     if (vistoria.avarias && vistoria.avarias.length > 0) {
         html += `<h4>Avarias marcadas:</h4><ul class="pending-list">`;
         vistoria.avarias.forEach((avaria, index) => {
             html += `<li><strong>${index + 1}. ${damageTypeNames[avaria.type] || avaria.type}:</strong> ${vehicleViewNames[avaria.view] || avaria.view}</li>`;
+        });
+        html += `</ul>`;
+    }
+    if (vistoria.avariasTablet && vistoria.avariasTablet.length > 0) {
+        html += `<h4>Avarias do tablet:</h4><ul class="pending-list">`;
+        vistoria.avariasTablet.forEach((avaria, index) => {
+            html += `<li><strong>${index + 1}. ${damageTypeNames[avaria.type] || avaria.type}:</strong> ${avaria.view}</li>`;
         });
         html += `</ul>`;
     }
@@ -701,71 +915,171 @@ function closeModal() {
     document.getElementById('details-modal').style.display = 'none';
 }
 
+function ensurePdfSpace(pdf, currentY, neededSpace) {
+    if (currentY + neededSpace > 280) {
+        pdf.addPage();
+        return 20;
+    }
+    return currentY;
+}
+
+function addWrappedPdfText(pdf, text, x, y, width, lineHeight = 4) {
+    const lines = pdf.splitTextToSize(text, width);
+    lines.forEach((line) => {
+        y = ensurePdfSpace(pdf, y, lineHeight + 2);
+        pdf.text(line, x, y);
+        y += lineHeight;
+    });
+    return y;
+}
+
+function adicionarTermoResponsabilidade(pdf, startY) {
+    let y = ensurePdfSpace(pdf, startY, 60);
+    const termo = [
+        "TERMO DE RESPONSABILIDADE DE USO DE FERRAMENTAS",
+        "Na condição de funcionário da empresa DIGITAL, inscrita no CNPJ/MF sob o nº 07.578.965/0001-05, com sede na cidade de Belo Jardim, Estado de Pernambuco, declaro receber, neste ato, o equipamento de trabalho administrativo, neste ato designado de BEM, em perfeito estado de conservação e funcionamento, e comprometo-me, pelo presente TERMO DE RESPONSABILIDADE, a usá-lo, exclusivamente, no desempenho de minhas funções, bem como a conservá-lo no mesmo estado, e, ainda, a devolvê-lo à empresa, por sua solicitação ou quando vier a me desligar de seus quadros funcionais, ocasião em que será devolvida a via deste Termo por mim assinada, ora entregue à empresa.",
+        "Estou ciente de que o consumo em ligações ou o consumo de outros serviços da operadora realizado que não estejam no grupo de serviços gratuitos informados pela empresa, ou ainda, danos porventura causados ao BEM, decorrentes de culpa minha, autorizarão a empresa a proceder aos descontos de meus créditos salariais ou rescisórios, conforme autorizam os artigos 462 § 1º e 477, § 5º, ambos da CLT.",
+        "Comprometo-me assim especificamente a:",
+        "Não emprestar ou permitir o uso do BEM por terceiros;",
+        "A acionar de imediato o Departamento Responsável ao detectar qualquer problema no equipamento para prévia manutenção;",
+        "Em caso de furto ou roubo do equipamento, prestar queixa à delegacia policial e apresentar à empresa a cópia do Boletim de Ocorrência ou informar ao Departamento responsável o mais rápido possível."
+    ];
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(termo[0], 10, y);
+    y += 7;
+    pdf.setFont("helvetica", "normal");
+
+    termo.slice(1).forEach((paragraph) => {
+        y = ensurePdfSpace(pdf, y, 24);
+        y = addWrappedPdfText(pdf, paragraph, 10, y, 188, 4) + 4;
+    });
+
+    y = ensurePdfSpace(pdf, y, 36);
+    y += 8;
+    pdf.line(10, y, 92, y);
+    pdf.line(112, y, 194, y);
+    y += 5;
+    pdf.text("Técnico responsável da viatura", 17, y);
+    pdf.text("Auxiliar técnico", 137, y);
+    y += 8;
+    pdf.text("Nome:", 10, y);
+    pdf.text("Nome:", 112, y);
+
+    return y + 10;
+}
+
 /**
  * Gera PDF de uma vistoria específica ou do histórico
  */
-async function gerarPDF(titulo, dados) {
+async function gerarPDF(titulo, dados, options = {}) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    let y = 20;
+    const reportName = options.reportName || titulo.replace(/_/g, " ");
+    const columnWidth = 90;
+    const columns = [{ x: 10, y: 36 }, { x: 108, y: 36 }];
+    const cursor = { col: 0, y: 36 };
 
-    doc.setFontSize(16);
-    doc.text(titulo, 10, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 10, y);
-    y += 10;
-    doc.line(10, y, 200, y);
-    y += 10;
+    function addPdfHeader() {
+        doc.setFillColor(0, 86, 179);
+        doc.rect(0, 0, 210, 24, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("DIGITAL Vistoria", 10, 10);
+        doc.setFontSize(10);
+        doc.text(reportName, 10, 17);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 140, 10);
+        doc.setTextColor(51, 51, 51);
+    }
+
+    function nextColumn() {
+        if (cursor.col === 0) {
+            cursor.col = 1;
+            cursor.y = columns[1].y;
+            return;
+        }
+        doc.addPage();
+        addPdfHeader();
+        cursor.col = 0;
+        cursor.y = columns[0].y;
+    }
+
+    function ensureColumnSpace(height) {
+        if (cursor.y + height > 282) nextColumn();
+    }
+
+    function addColumnText(text, opts = {}) {
+        const x = columns[cursor.col].x;
+        const size = opts.size || 8;
+        const lineHeight = opts.lineHeight || 4;
+        doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(text, columnWidth);
+        lines.forEach((line) => {
+            ensureColumnSpace(lineHeight + 2);
+            doc.text(line, x, cursor.y);
+            cursor.y += lineHeight;
+        });
+    }
+
+    function addSectionDivider() {
+        ensureColumnSpace(8);
+        const x = columns[cursor.col].x;
+        doc.setDrawColor(220, 220, 220);
+        doc.line(x, cursor.y, x + columnWidth, cursor.y);
+        cursor.y += 6;
+    }
+
+    addPdfHeader();
 
     dados.forEach((v) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        
+        ensureColumnSpace(24);
         const dataObj = v.dataEnvio?.toDate() || new Date();
-        doc.setFont("helvetica", "bold");
-        doc.text(`Viatura ${v.viaturaId} - ${v.vistoriador}`, 10, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.text(`Data: ${dataObj.toLocaleString('pt-BR')} | Categoria: ${categoryNames[v.categoria] || v.categoria}`, 10, y);
-        y += 7;
+        const equipamento = v.categoria === 'tablets'
+            ? `Tablet ${v.tabletId || v.viaturaId} / Viatura ${v.viaturaId}`
+            : `Viatura ${v.viaturaId}`;
+        addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5 });
+        addColumnText(`Vistoriador: ${v.vistoriador}`);
+        addColumnText(`Data: ${dataObj.toLocaleString('pt-BR')}`);
 
         if (v.km) {
-            doc.text(`KM: ${v.km}`, 10, y);
-            y += 5;
+            addColumnText(`KM: ${v.km}`);
         }
 
         if (v.avarias && v.avarias.length > 0) {
-            doc.setFont("helvetica", "bold");
-            doc.text("Avarias visuais:", 10, y);
-            y += 5;
-            doc.setFont("helvetica", "normal");
+            addColumnText("Avarias visuais:", { bold: true });
             v.avarias.forEach((avaria, index) => {
-                if (y > 280) { doc.addPage(); y = 20; }
                 const linhaAvaria = `${index + 1}. ${damageTypeNames[avaria.type] || avaria.type} - ${vehicleViewNames[avaria.view] || avaria.view}`;
-                doc.text(linhaAvaria, 10, y);
-                y += 5;
+                addColumnText(linhaAvaria);
             });
-            y += 3;
         }
 
-        doc.setFontSize(8);
+        if (v.avariasTablet && v.avariasTablet.length > 0) {
+            addColumnText("Avarias do tablet:", { bold: true });
+            v.avariasTablet.forEach((avaria, index) => {
+                const linhaAvaria = `${index + 1}. ${damageTypeNames[avaria.type] || avaria.type} - ${avaria.view}`;
+                addColumnText(linhaAvaria);
+            });
+        }
+
+        addColumnText("Itens:", { bold: true });
         v.itens.forEach(item => {
-            if (y > 280) { doc.addPage(); y = 20; }
             const s = item.status || 'pendente';
             let statusLabel = s === 'ok' ? '[OK]' : `[${s.toUpperCase()}]`;
             let linha = `${statusLabel} ${item.item}`;
             if (item.observacao) linha += ` - Motivo: ${item.observacao}`;
-            
-            const textSplit = doc.splitTextToSize(linha, 180);
-            doc.text(textSplit, 10, y);
-            y += (textSplit.length * 4);
+            addColumnText(linha);
         });
 
-        doc.setFontSize(10);
-        y += 10;
-        doc.line(10, y, 100, y);
-        y += 10;
+        addSectionDivider();
     });
+
+    doc.addPage();
+    addPdfHeader();
+    adicionarTermoResponsabilidade(doc, 36);
 
     doc.save(`${titulo.replace(/\s+/g, '_')}.pdf`);
 }
@@ -773,52 +1087,140 @@ async function gerarPDF(titulo, dados) {
 /**
  * Encerrar a vistoria global da viatura e gerar PDF do que foi feito agora
  */
-async function encerrarVistoriaCompleta() {
-    const vistoriador = document.getElementById('vistoriador-atual').value;
-    if (!vistoriador) return alert("Por favor, selecione o vistoriador no topo da página.");
-
+async function gerarRelatorioViatura(viaturaId = selectedViatura, options = {}) {
+    const { confirmar = true, resetarStatus = true } = options;
     try {
-        // Busca as 3 categorias mais recentes enviadas para esta viatura diretamente do banco
+        // Busca pelo histórico já ordenado e filtra a viatura no navegador para evitar índice composto no Firestore.
         const q = query(
             collection(db, "vistorias"),
-            where("viaturaId", "==", selectedViatura),
             orderBy("dataEnvio", "desc"),
-            limit(3)
+            limit(200)
         );
         
         const querySnapshot = await getDocs(q);
-        const dadosViatura = [];
-        querySnapshot.forEach(doc => dadosViatura.push(doc.data()));
+        const porCategoria = {};
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            if (String(data.viaturaId) !== String(viaturaId)) return;
+            if (!porCategoria[data.categoria]) porCategoria[data.categoria] = data;
+        });
+        const dadosViatura = Object.keys(categoryNames)
+            .map(category => porCategoria[category])
+            .filter(Boolean);
 
-        if (dadosViatura.length === 0) {
-            alert("Nenhum dado encontrado para gerar o relatório. Realize as vistorias primeiro.");
+        if (dadosViatura.length < Object.keys(categoryNames).length) {
+            alert("Ainda não foram encontradas todas as etapas salvas para gerar o relatório completo.");
             return;
         }
 
-        if (confirm(`Deseja encerrar a vistoria da Viatura ${selectedViatura} e gerar o relatório PDF?`)) {
-            await gerarPDF(`Relatorio_Vistoria_Viatura_${selectedViatura}`, dadosViatura);
+        if (!confirmar || confirm(`Deseja gerar o relatório PDF da Viatura ${viaturaId}?`)) {
+            await gerarPDF(`Relatorio_Vistoria_Viatura_${viaturaId}`, dadosViatura, {
+                reportName: `Vistoria Viatura ${String(viaturaId).padStart(2, '0')}`
+            });
             
-            surveyStatus[selectedViatura] = { ferramentas: false, epis: false, viaturas: false };
-            vehicleDamages[selectedViatura] = [];
-            renderViaturaDashboard();
-            renderDamageMarkers();
-            renderDamageList();
-            updateMenuStatus();
+            if (resetarStatus) {
+                surveyStatus[viaturaId] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+                vehicleDamages[viaturaId] = [];
+                tabletDamages[viaturaId] = [];
+                renderViaturaDashboard();
+                renderDamageMarkers();
+                renderDamageList();
+                renderTabletDamageMarkers();
+                renderTabletDamageList();
+                updateMenuStatus();
+            }
             alert("Vistoria encerrada e PDF gerado!");
         }
     } catch (error) {
         console.error("Erro detalhado do Firebase:", error);
-        if (error.message.includes("index")) {
-            alert("⚠️ Atenção: O banco de dados precisa de um índice para gerar este relatório.\n\nComo resolver:\n1. Pressione F12 no seu teclado para abrir o Console.\n2. Clique no link azul (URL) que aparece na mensagem de erro.\n3. Clique no botão 'Criar Índice' na página que abrir.\n4. Aguarde 2 minutos e tente gerar o PDF novamente.");
-        } else {
-            alert("Erro ao buscar dados no Firebase: " + error.message);
-        }
+        alert("Erro ao buscar dados no Firebase: " + error.message);
     }
 }
 
-function exportarHistoricoPDF() {
-    if (vistoriasCache.length === 0) return alert("Nenhum dado para exportar.");
-    gerarPDF("Historico_Geral_Vistorias_5S", vistoriasCache);
+async function encerrarVistoriaCompleta() {
+    await gerarRelatorioComEscolha({ resetarStatus: true });
+}
+
+function getInicioFimHoje() {
+    const inicio = new Date();
+    inicio.setHours(0, 0, 0, 0);
+    const fim = new Date();
+    fim.setHours(23, 59, 59, 999);
+    return { inicio, fim };
+}
+
+async function buscarVistoriasDeHoje() {
+    const { inicio, fim } = getInicioFimHoje();
+    const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
+    const snapshot = await getDocs(q);
+    const dados = [];
+    snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const dataEnvio = data.dataEnvio?.toDate?.();
+        if (dataEnvio && dataEnvio >= inicio && dataEnvio <= fim) {
+            dados.push({ id: docSnap.id, ...data });
+        }
+    });
+    return dados;
+}
+
+async function gerarRelatorioTodasViaturasHoje() {
+    const dadosHoje = await buscarVistoriasDeHoje();
+    if (dadosHoje.length === 0) {
+        alert("Nenhuma vistoria salva hoje foi encontrada.");
+        return;
+    }
+
+    dadosHoje.sort((a, b) => {
+        const viaturaDiff = Number(a.viaturaId || 0) - Number(b.viaturaId || 0);
+        if (viaturaDiff !== 0) return viaturaDiff;
+        return Object.keys(categoryNames).indexOf(a.categoria) - Object.keys(categoryNames).indexOf(b.categoria);
+    });
+
+    await gerarPDF("Relatorio_5S_Todas_Viaturas_Hoje", dadosHoje, {
+        reportName: "Vistoria 5S - Todas as viaturas do dia"
+    });
+}
+
+async function gerarRelatorioComEscolha(options = {}) {
+    const resposta = prompt(
+        `Gerar PDF de qual vistoria?\n\nDigite o número da viatura, por exemplo: ${selectedViatura.padStart(2, '0')}\nOu digite TODAS para gerar todas as viaturas vistoriadas hoje.`,
+        selectedViatura.padStart(2, '0')
+    );
+
+    if (!resposta) return;
+
+    const valor = resposta.trim().toUpperCase();
+    if (valor === "TODAS" || valor === "TODOS") {
+        await gerarRelatorioTodasViaturasHoje();
+        return;
+    }
+
+    const viaturaId = String(Number(valor));
+    if (!viaturaId || viaturaId === "NaN" || Number(viaturaId) < 1 || Number(viaturaId) > totalViaturas) {
+        alert("Informe uma viatura válida ou digite TODAS.");
+        return;
+    }
+
+    await gerarRelatorioViatura(viaturaId, { confirmar: false, resetarStatus: options.resetarStatus && viaturaId === selectedViatura });
+}
+
+async function exportarHistoricoPDF() {
+    try {
+        if (!auth.currentUser) {
+            alert("Faça login no Painel Admin antes de exportar o PDF.");
+            return;
+        }
+
+        if (vistoriasCache.length === 0) {
+            await carregarHistorico();
+        }
+
+        await gerarRelatorioComEscolha({ resetarStatus: false });
+    } catch (error) {
+        console.error("Erro ao exportar PDF:", error);
+        alert(`Erro ao exportar PDF: ${error?.message || error}`);
+    }
 }
 
 onAuthStateChanged(auth, (user) => {
@@ -846,6 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderItems('ferramentas');
     renderViaturaDashboard();
     updateVehicleMapImage();
+    updateTabletInfo();
     updateMenuStatus();
 });
 
@@ -863,6 +1266,9 @@ window.encerrarVistoriaCompleta = encerrarVistoriaCompleta;
 window.exportarHistoricoPDF = exportarHistoricoPDF;
 window.aplicarFiltros = aplicarFiltros;
 window.carregarHistorico = carregarHistorico;
+window.toggleSelecionarVistoria = toggleSelecionarVistoria;
+window.toggleSelecionarTodasVistorias = toggleSelecionarTodasVistorias;
+window.excluirVistoriasSelecionadas = excluirVistoriasSelecionadas;
 window.confirmarEnvioFinal = confirmarEnvioFinal;
 window.abrirModalRevisao = abrirModalRevisao;
 window.limparErroItem = limparErroItem;
@@ -871,3 +1277,7 @@ window.setDamageType = setDamageType;
 window.marcarAvaria = marcarAvaria;
 window.removerAvaria = removerAvaria;
 window.limparAvariasViatura = limparAvariasViatura;
+window.setTabletDamageType = setTabletDamageType;
+window.marcarAvariaTablet = marcarAvariaTablet;
+window.removerAvariaTablet = removerAvariaTablet;
+window.limparAvariasTablet = limparAvariasTablet;

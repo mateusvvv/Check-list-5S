@@ -259,6 +259,34 @@ header {
     font-size: 0.9rem;
 }
 
+.tablet-meta {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 20px;
+}
+
+.tablet-association {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.tablet-association span {
+    color: var(--primary-blue);
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.tablet-association small {
+    color: #666;
+}
+
 .btn-clear-damages,
 .damage-list button {
     border: 1px solid #dc3545;
@@ -388,6 +416,7 @@ header {
 .damage-marker.amassado { background: #7950f2; }
 .damage-marker.trincado { background: #1971c2; }
 .damage-marker.quebrado { background: #d6336c; }
+.damage-marker.sem_caneta { background: #495057; }
 
 .damage-list-wrap {
     margin-top: 16px;
@@ -446,6 +475,29 @@ header {
 
 .admin-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+
+.bulk-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.btn-delete-selected {
+    border: none;
+    border-radius: 4px;
+    padding: 9px 12px;
+    background: #dc3545;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.btn-delete-selected:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
 
 .placeholder {
     color: #888;
@@ -514,6 +566,10 @@ h2 {
 
     .btn-clear-damages {
         width: 100%;
+    }
+
+    .tablet-meta {
+        grid-template-columns: 1fr;
     }
 
     .damage-type {

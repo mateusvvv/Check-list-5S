@@ -91,6 +91,7 @@
                 <li><a href="#" id="menu-ferramentas" onclick="showPage('ferramentas')">🔧 Ferramentas</a></li>
                 <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
+                <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
                 <li style="border-top: 1px solid #eee;"><a href="#" onclick="showPage('admin')">🔐 Painel Admin</a></li>
             </ul>
         </nav>
@@ -142,7 +143,7 @@
                     <div class="damage-inspection">
                         <div class="damage-header">
                             <div>
-                                <h3>Fiat Strada - Inspeção Visual</h3>
+                                <h3>Viatura - Inspeção Visual</h3>
                                 <p>Selecione o tipo de avaria e toque na região correspondente do veículo.</p>
                             </div>
                             <button type="button" class="btn-clear-damages" onclick="limparAvariasViatura()">Limpar marcações</button>
@@ -175,7 +176,63 @@
                 </div>
             </section>
 
-            <!-- Página 4: Admin (Login) -->
+            <!-- Página 4: Tablets -->
+            <section id="tablets" class="tab-content">
+                <div class="card">
+                    <h2>📱 Vistoria de Tablets</h2>
+                    <div class="tablet-meta">
+                        <div class="input-group">
+                            <label for="tablet-vistoriador">Responsável:</label>
+                            <select id="tablet-vistoriador">
+                                <option value="">Selecione o Responsável</option>
+                                <option value="Matheus">Matheus</option>
+                                <option value="Italo">Italo</option>
+                            </select>
+                        </div>
+                        <div class="tablet-association">
+                            <span id="tablet-current-label">Tablet 01</span>
+                            <small>Vinculado à Viatura selecionada</small>
+                        </div>
+                    </div>
+
+                    <div class="damage-inspection">
+                        <div class="damage-header">
+                            <div>
+                                <h3>Tablet - Inspeção Visual</h3>
+                                <p>Selecione o tipo de avaria e toque na região correspondente do tablet.</p>
+                            </div>
+                            <button type="button" class="btn-clear-damages" onclick="limparAvariasTablet()">Limpar marcações</button>
+                        </div>
+
+                        <div class="damage-type-selector" role="group" aria-label="Tipo de avaria no tablet">
+                            <button type="button" class="damage-type tablet-damage-type active" data-type="arranhao" onclick="setTabletDamageType('arranhao')">Arranhão</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="trincado" onclick="setTabletDamageType('trincado')">Trincado</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="quebrado" onclick="setTabletDamageType('quebrado')">Quebrado</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="sem_caneta" onclick="setTabletDamageType('sem_caneta')">Sem caneta</button>
+                        </div>
+
+                        <div class="vehicle-map" id="tablet-map">
+                            <button type="button" class="vehicle-view vehicle-photo tablet-photo" data-view="tablet" onclick="marcarAvariaTablet(event)" aria-label="Marcar avaria na imagem do tablet">
+                                <img id="tablet-map-image" src="assets/tablet-mapa.png" alt="Vistas frontal, traseira e lateral do tablet">
+                            </button>
+                        </div>
+
+                        <div class="damage-list-wrap">
+                            <h4>Avarias marcadas</h4>
+                            <ul id="tablet-damage-list" class="damage-list">
+                                <li class="empty">Nenhuma avaria marcada.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="lista-tablets" class="checklist-items">
+                        <p class="placeholder">Aguardando lista de itens...</p>
+                    </div>
+                    <button class="btn-submit" onclick="finalizarVistoria('tablets')" style="margin-top: 20px; width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Finalizar Vistoria Tablet</button>
+                </div>
+            </section>
+
+            <!-- Página 5: Admin (Login) -->
             <section id="admin" class="tab-content">
                 <div class="card" id="admin-login-section">
                     <h2>Acesso Restrito</h2>
@@ -202,7 +259,7 @@
                         <div class="stat-card"><h3>Total Vistorias</h3><p id="stat-total">0</p></div>
                         <div class="stat-card" style="border-left-color: #28a745;"><h3>Tudo OK</h3><p id="stat-ok">0</p></div>
                         <div class="stat-card" style="border-left-color: #dc3545;"><h3>Pendências</h3><p id="stat-pending">0</p></div>
-                        <div class="stat-card" style="border-left-color: #ffc107;"><h3>Vistoriadores</h3><p id="stat-users">3</p></div>
+                        <div class="stat-card" style="border-left-color: #ffc107;"><h3>Vistoriadores</h3><p id="stat-users">5</p></div>
                     </div>
 
                     <!-- Filtros do Histórico -->
@@ -214,6 +271,8 @@
                                 <option value="Alisson">Alisson</option>
                                 <option value="Berg">Berg</option>
                                 <option value="Marcos">Marcos</option>
+                                <option value="Matheus">Matheus</option>
+                                <option value="Italo">Italo</option>
                             </select>
                         </div>
                         <div class="input-group" style="flex: 1; min-width: 130px;">
@@ -227,13 +286,19 @@
                         <button onclick="carregarHistorico()" style="padding: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Atualizar Dados">🔄</button>
                     </div>
 
+                    <div class="bulk-actions-bar">
+                        <button onclick="excluirVistoriasSelecionadas()" class="btn-delete-selected">Excluir selecionadas</button>
+                        <span id="selected-count">0 selecionadas</span>
+                    </div>
+
                     <div style="overflow-x: auto;">
                         <table class="history-table">
                             <thead>
                                 <tr>
+                                    <th style="width: 42px;"><input type="checkbox" id="select-all-vistorias" onchange="toggleSelecionarTodasVistorias(this.checked)"></th>
                                     <th>Data</th>
                                     <th>Vistoriador</th>
-                                    <th>Viatura</th>
+                                    <th>Equipamento</th>
                                     <th>Categoria</th>
                                     <th>Status</th>
                                 </tr>
@@ -268,6 +333,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=3"></script>
+    <script type="module" src="script.js?v=8"></script>
 </body>
 </html>
