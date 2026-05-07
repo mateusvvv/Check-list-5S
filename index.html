@@ -77,8 +77,8 @@
 <body>
     <header>
         <div class="logo">DIGITAL</div>
-        <div class="user-selector" style="margin-left: 20px;">
-            <select id="vistoriador-atual" style="padding: 5px; border-radius: 4px;">
+        <div class="user-selector">
+            <select id="vistoriador-atual">
                 <option value="">Selecione o Vistoriador</option>
                 <option value="Alisson">Alisson</option>
                 <option value="Berg">Berg</option>
@@ -157,7 +157,6 @@
 
                         <div class="vehicle-map" id="vehicle-map">
                             <button type="button" class="vehicle-view vehicle-photo" data-view="veiculo" onclick="marcarAvaria(event, 'veiculo')" aria-label="Marcar avaria na imagem da viatura">
-                                <span id="vehicle-map-title">Mapa visual da Strada</span>
                                 <img id="vehicle-map-image" src="assets/strada-mapa.png" alt="Vistas lateral, traseira e frontal da Fiat Strada">
                             </button>
                         </div>
@@ -269,6 +268,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=2"></script>
+    <script type="module" src="script.js?v=3"></script>
 </body>
 </html>

@@ -125,12 +125,10 @@ const vehicleViewNames = {
 
 const vehicleMapConfig = {
     default: {
-        title: "Mapa visual da Strada",
         src: "assets/strada-mapa.png",
         alt: "Vistas lateral, traseira e frontal da Fiat Strada"
     },
     mobi: {
-        title: "Mapa visual do Mobi",
         src: "assets/mobi-mapa.png",
         alt: "Vistas lateral, traseira e frontal do Fiat Mobi"
     }
@@ -283,11 +281,9 @@ function selectViatura(id) {
 }
 
 function updateVehicleMapImage(viaturaId = selectedViatura) {
-    const title = document.getElementById('vehicle-map-title');
     const image = document.getElementById('vehicle-map-image');
     const config = getVehicleMapConfig(viaturaId);
 
-    if (title) title.innerText = config.title;
     if (image) {
         if (!image.src.endsWith(config.src)) image.src = config.src;
         image.alt = config.alt;
