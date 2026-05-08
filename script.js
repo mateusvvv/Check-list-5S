@@ -55,6 +55,10 @@ function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
 }
 
+function getChecklistItems(category) {
+    return (checklistData[category] || []).filter(item => typeof item === "string");
+}
+
 function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
     return vistoriadoresTablet.includes(vistoriador);
 }
@@ -220,29 +224,37 @@ function renderItems(pageId) {
     const items = checklistData[pageId];
     if (!container || !items) return;
 
-    container.innerHTML = items.map((item, index) => `
-        <div class="checklist-item" id="row-${pageId}-${index}">
-            <label class="item-label">${item}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
-            <div class="status-options">
-                <label class="status-opt">
-                    <input type="radio" name="status-${pageId}-${index}" value="ok" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>✅ OK</span>
-                </label>
-                <label class="status-opt">
-                    <input type="radio" name="status-${pageId}-${index}" value="pendente" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>⚠️ Pendente</span>
-                </label>
-                <label class="status-opt">
-                    <input type="radio" name="status-${pageId}-${index}" value="perdeu" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>❌ Perdeu</span>
-                </label>
-                <label class="status-opt">
-                    <input type="radio" name="status-${pageId}-${index}" value="quebrou" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>🛠️ Quebrou</span>
-                </label>
+    let itemIndex = 0;
+    container.innerHTML = items.map((item) => {
+        if (typeof item !== "string") {
+            return `<div class="checklist-section">${item.title}</div>`;
+        }
+
+        const index = itemIndex++;
+        return `
+            <div class="checklist-item" id="row-${pageId}-${index}">
+                <label class="item-label">${item}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
+                <div class="status-options">
+                    <label class="status-opt">
+                        <input type="radio" name="status-${pageId}-${index}" value="ok" onchange="limparErroItem('${pageId}', ${index})">
+                        <span>✅ OK</span>
+                    </label>
+                    <label class="status-opt">
+                        <input type="radio" name="status-${pageId}-${index}" value="pendente" onchange="limparErroItem('${pageId}', ${index})">
+                        <span>⚠️ Pendente</span>
+                    </label>
+                    <label class="status-opt">
+                        <input type="radio" name="status-${pageId}-${index}" value="perdeu" onchange="limparErroItem('${pageId}', ${index})">
+                        <span>❌ Perdeu</span>
+                    </label>
+                    <label class="status-opt">
+                        <input type="radio" name="status-${pageId}-${index}" value="quebrou" onchange="limparErroItem('${pageId}', ${index})">
+                        <span>🛠️ Quebrou</span>
+                    </label>
+                </div>
             </div>
-        </div>
-    `).join("");
+        `;
+    }).join("");
 
     if (pageId === "viaturas") {
         updateVehicleMapImage();
@@ -360,6 +372,11 @@ function updateMenuStatus() {
 
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById("km");
+    const nivelCombustivel = document.getElementById("nivel-combustivel")?.value || "";
+    const luzesAdvertencia = document.getElementById("luzes-advertencia")?.value || "";
+    const quaisLuzes = document.getElementById("quais-luzes")?.value.trim() || "";
+    const solicitarManutencao = document.getElementById("solicitar-manutencao")?.value || "";
+    const observacoesManutencao = document.getElementById("observacoes-manutencao")?.value.trim() || "";
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
     const vistoriador = category === "tablets" && !isTabletOnlyUser(vistoriadorGeral)
@@ -377,6 +394,31 @@ async function finalizarVistoria(category) {
         return;
     }
 
+    if (category === "viaturas" && !nivelCombustivel) {
+        alert("Por favor, informe o nível de combustível da viatura.");
+        return;
+    }
+
+    if (category === "viaturas" && !luzesAdvertencia) {
+        alert("Por favor, informe se há luzes de advertência no painel.");
+        return;
+    }
+
+    if (category === "viaturas" && luzesAdvertencia === "Sim" && !quaisLuzes) {
+        alert("Informe quais luzes de advertência estão acesas no painel.");
+        return;
+    }
+
+    if (category === "viaturas" && !solicitarManutencao) {
+        alert("Por favor, informe se deve solicitar manutenção.");
+        return;
+    }
+
+    if (category === "viaturas" && solicitarManutencao === "Sim" && !observacoesManutencao) {
+        alert("Descreva a manutenção que deve ser solicitada.");
+        return;
+    }
+
     if (!vistoriador) {
         alert(category === "tablets"
             ? "Por favor, selecione Matheus ou Italo como responsável pela vistoria do tablet."
@@ -384,7 +426,7 @@ async function finalizarVistoria(category) {
         return;
     }
 
-    const items = checklistData[category];
+    const items = getChecklistItems(category);
     const checklistResults = [];
     let temErro = false;
 
@@ -411,6 +453,11 @@ async function finalizarVistoria(category) {
         categoria: category,
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
+        nivelCombustivel: category === "viaturas" ? nivelCombustivel : null,
+        luzesAdvertencia: category === "viaturas" ? luzesAdvertencia : null,
+        quaisLuzes: category === "viaturas" ? quaisLuzes : "",
+        solicitarManutencao: category === "viaturas" ? solicitarManutencao : null,
+        observacoesManutencao: category === "viaturas" ? observacoesManutencao : "",
         avarias: category === "viaturas" ? [...state.vehicleDamages[state.selectedViatura]] : [],
         avariasTablet: category === "tablets" ? [...state.tabletDamages[state.selectedViatura]] : [],
         observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : ""
@@ -466,6 +513,16 @@ async function enviarVistoriaAoFirebase() {
 
         if (document.getElementById("km")) document.getElementById("km").value = "";
         if (categoriaSalva === "viaturas") {
+            const nivelCombustivel = document.getElementById("nivel-combustivel");
+            const luzesAdvertencia = document.getElementById("luzes-advertencia");
+            const quaisLuzes = document.getElementById("quais-luzes");
+            const solicitarManutencao = document.getElementById("solicitar-manutencao");
+            const observacoesManutencao = document.getElementById("observacoes-manutencao");
+            if (nivelCombustivel) nivelCombustivel.value = "";
+            if (luzesAdvertencia) luzesAdvertencia.value = "";
+            if (quaisLuzes) quaisLuzes.value = "";
+            if (solicitarManutencao) solicitarManutencao.value = "";
+            if (observacoesManutencao) observacoesManutencao.value = "";
             state.vehicleDamages[state.selectedViatura] = [];
             renderDamageMarkers();
             renderDamageList();

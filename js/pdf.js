@@ -287,6 +287,13 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText(`Data: ${dataObj.toLocaleString("pt-BR")}`);
 
         if (v.km) addColumnText(`KM: ${v.km}`);
+        if (v.categoria === "viaturas") {
+            if (v.nivelCombustivel) addColumnText(`Combustível: ${v.nivelCombustivel}`);
+            if (v.luzesAdvertencia) addColumnText(`Luzes de advertência: ${v.luzesAdvertencia}`);
+            if (v.quaisLuzes) addColumnText(`Quais luzes: ${v.quaisLuzes}`);
+            if (v.solicitarManutencao) addColumnText(`Solicitar manutenção: ${v.solicitarManutencao}`);
+            if (v.observacoesManutencao) addColumnText(`Observações da manutenção: ${v.observacoesManutencao}`);
+        }
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
 
         if (v.avarias && v.avarias.length > 0) {
