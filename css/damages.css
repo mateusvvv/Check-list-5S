@@ -1,0 +1,243 @@
+.damage-inspection {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 22px;
+    background: #fbfcfe;
+}
+
+.damage-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.damage-header h3 {
+    margin: 0 0 4px;
+    color: var(--primary-blue);
+    font-size: 1.05rem;
+}
+
+.damage-header p {
+    margin: 0;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+.tablet-meta {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 20px;
+}
+
+.tablet-association {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.tablet-association span {
+    color: var(--primary-blue);
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.tablet-association small {
+    color: #666;
+}
+
+.btn-clear-damages,
+.damage-list button {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+    background: #fff;
+    border-radius: 4px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.damage-type-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.damage-type {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-dark);
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.damage-type.active {
+    color: #fff;
+    background: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+
+.vehicle-map {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.vehicle-view {
+    position: relative;
+    min-height: 160px;
+    border: 1px solid #cfd8e3;
+    border-radius: 8px;
+    background: #ffffff;
+    cursor: crosshair;
+    overflow: hidden;
+    padding: 10px;
+}
+
+.vehicle-photo {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: #fff;
+}
+
+.vehicle-photo img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+
+.vehicle-view svg {
+    width: 100%;
+    height: 120px;
+    margin-top: 20px;
+    pointer-events: none;
+}
+
+.vehicle-body,
+.vehicle-cabin,
+.vehicle-bed,
+.vehicle-bedline {
+    fill: #e9eef5;
+    stroke: #315d85;
+    stroke-width: 3;
+}
+
+.vehicle-glass {
+    fill: #cfe8ff;
+    stroke: #315d85;
+    stroke-width: 2;
+}
+
+.vehicle-detail,
+.vehicle-grille {
+    fill: #315d85;
+}
+
+.rear-light {
+    fill: #dc3545;
+}
+
+.vehicle-wheel {
+    fill: #2f343a;
+    stroke: #111;
+    stroke-width: 3;
+}
+
+.vehicle-line {
+    stroke: #315d85;
+    stroke-width: 2;
+}
+
+.damage-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    cursor: pointer;
+}
+
+.damage-marker.arranhao { background: #f59f00; }
+.damage-marker.amassado { background: #7950f2; }
+.damage-marker.avariado { background: #495057; }
+.damage-marker.faltante { background: #1971c2; }
+.damage-marker.trincado { background: #1971c2; }
+.damage-marker.quebrado { background: #d6336c; }
+
+.damage-list-wrap {
+    margin-top: 16px;
+}
+
+.tablet-observacoes {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.tablet-observacoes label {
+    color: var(--primary-blue);
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+.tablet-observacoes textarea {
+    min-height: 72px;
+    resize: vertical;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 9px;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.damage-list-wrap h4 {
+    margin: 0 0 8px;
+    color: var(--primary-blue);
+}
+
+.damage-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.damage-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.damage-list li.empty {
+    color: #777;
+    font-style: italic;
+    justify-content: center;
+}

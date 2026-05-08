@@ -1,0 +1,102 @@
+@media (max-width: 600px) {
+    header {
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 0.75rem 12px;
+    }
+
+    .logo {
+        text-align: left;
+        font-size: 1.25rem;
+    }
+
+    .user-selector {
+        order: 3;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .user-selector select {
+        width: 100%;
+        font-size: 0.95rem;
+    }
+
+    .menu-container {
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    .menu-btn {
+        min-width: 86px;
+        padding: 8px 12px;
+        font-size: 0.95rem;
+        text-align: center;
+    }
+
+    .nav-links {
+        right: 0;
+        top: 42px;
+    }
+
+    .header-info {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .damage-header {
+        flex-direction: column;
+    }
+
+    .btn-clear-damages {
+        width: 100%;
+    }
+
+    .tablet-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .damage-type {
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .vehicle-map {
+        grid-template-columns: 1fr;
+    }
+
+    .vehicle-view {
+        min-height: 150px;
+    }
+
+    .damage-list li {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .damage-list button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .admin-header-actions {
+        flex-wrap: nowrap;
+        align-items: flex-start;
+    }
+
+    .admin-header-actions h2 {
+        font-size: 1.1rem;
+        line-height: 1.2;
+        flex: 1;
+        margin-right: 10px;
+    }
+
+    .admin-buttons-container {
+        flex-direction: column-reverse;
+        align-items: flex-end;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+}
