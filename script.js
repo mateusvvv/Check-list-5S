@@ -59,7 +59,20 @@ function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
 
 function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
     if (!categoryNames[category]) return true;
-    return !isTabletOnlyUser(vistoriador) || category === "tablets";
+    if (category === "tablets") return isTabletOnlyUser(vistoriador);
+    return !isTabletOnlyUser(vistoriador);
+}
+
+function getAccessDeniedMessage(category, vistoriador) {
+    if (category === "tablets") {
+        return "A vistoria de tablets só pode ser acessada por Italo ou Matheus.";
+    }
+
+    if (isTabletOnlyUser(vistoriador)) {
+        return `${vistoriador} pode realizar apenas vistorias de tablets.`;
+    }
+
+    return "Selecione um vistoriador autorizado para acessar esta vistoria.";
 }
 
 function updateVistoriadorLogado() {
@@ -92,7 +105,8 @@ function updateAccessByVistoriador() {
     Object.keys(categoryNames).forEach(category => {
         const link = document.getElementById(`menu-${category}`);
         if (!link) return;
-        link.classList.toggle("restricted", !podeAcessarCategoria(category, vistoriador));
+        const shouldRestrict = category !== "tablets" && !podeAcessarCategoria(category, vistoriador);
+        link.classList.toggle("restricted", shouldRestrict);
     });
 }
 
@@ -105,8 +119,8 @@ function selecionarVistoriadorAtivo(silent = false) {
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab && !podeAcessarCategoria(activeTab.id, vistoriador)) {
-        if (!silent) alert(`${vistoriador} pode realizar apenas vistorias de tablets.`);
-        showPage("tablets");
+        if (!silent) alert(getAccessDeniedMessage(activeTab.id, vistoriador));
+        showPage(isTabletOnlyUser(vistoriador) ? "tablets" : "ferramentas");
     }
 }
 
@@ -121,6 +135,29 @@ function selecionarResponsavelTablet() {
     selecionarVistoriadorAtivo(true);
 }
 
+function solicitarVistoriadorTablet() {
+    const atual = isTabletOnlyUser() ? getVistoriadorAtivo() : "";
+    const resposta = prompt(
+        "Para acessar a vistoria de tablets, informe o vistoriador logado: ITALO ou MATHEUS.",
+        atual
+    );
+
+    if (!resposta) return false;
+
+    const normalizado = resposta.trim().toLowerCase();
+    const vistoriador = vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
+
+    if (!vistoriador) {
+        alert("A vistoria de tablets só pode ser acessada por Italo ou Matheus.");
+        return false;
+    }
+
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    if (vistoriadorSelect) vistoriadorSelect.value = vistoriador;
+    selecionarVistoriadorAtivo(true);
+    return true;
+}
+
 function toggleMenu() {
     document.getElementById("menu-list").classList.toggle("show");
 }
@@ -130,9 +167,17 @@ function showHome() {
 }
 
 function showPage(pageId) {
-    const vistoriador = getVistoriadorAtivo();
+    let vistoriador = getVistoriadorAtivo();
+    if (pageId === "tablets" && !isTabletOnlyUser(vistoriador)) {
+        if (!solicitarVistoriadorTablet()) {
+            document.getElementById("menu-list").classList.remove("show");
+            return;
+        }
+        vistoriador = getVistoriadorAtivo();
+    }
+
     if (!podeAcessarCategoria(pageId, vistoriador)) {
-        alert(`${vistoriador} pode realizar apenas vistorias de tablets.`);
+        alert(getAccessDeniedMessage(pageId, vistoriador));
         document.getElementById("menu-list").classList.remove("show");
         return;
     }
