@@ -43,6 +43,9 @@
         .item-label { font-weight: 500; margin-bottom: 5px; }
         .revisao-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
         .revisao-item textarea { width: 100%; margin-top: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; resize: vertical; }
+        .revisao-modal-content { margin: 5vh auto; max-height: 90vh; display: flex; flex-direction: column; }
+        #revisao-body { max-height: 55vh; overflow-y: auto; padding-right: 8px; }
+        .revisao-actions { border-top: 1px solid #eee; background: #fff; padding-top: 12px; margin-top: 12px; display: grid; gap: 10px; }
 
         /* Sinalização de item esquecido */
         .checklist-item.error { background-color: #fff5f5; border-left: 4px solid #dc3545; transition: background 0.3s; }
@@ -78,16 +81,20 @@
     <header>
         <div class="logo">DIGITAL</div>
         <div class="user-selector">
-            <select id="vistoriador-atual">
+            <select id="vistoriador-atual" onchange="selecionarVistoriadorAtivo()">
                 <option value="">Selecione o Vistoriador</option>
                 <option value="Alisson">Alisson</option>
                 <option value="Berg">Berg</option>
                 <option value="Marcos">Marcos</option>
+                <option value="Matheus">Matheus</option>
+                <option value="Italo">Italo</option>
             </select>
+            <span id="vistoriador-logado" class="logged-user">Nenhum vistoriador selecionado</span>
         </div>
         <nav class="menu-container">
             <button class="menu-btn" onclick="toggleMenu()">☰ Menu</button>
             <ul id="menu-list" class="nav-links">
+                <li><a href="#" id="menu-inicio" onclick="showHome()">🏠 Início</a></li>
                 <li><a href="#" id="menu-ferramentas" onclick="showPage('ferramentas')">🔧 Ferramentas</a></li>
                 <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
@@ -106,6 +113,10 @@
                 <h1>Painel de Viaturas</h1>
                 <div id="viaturas-grid" class="viaturas-grid">
                     <!-- Botões das viaturas gerados via JS -->
+                </div>
+                <div class="vistoria-mode-bar">
+                    <span id="vistoria-mode-label">Modo: Vistoria completa</span>
+                    <button type="button" onclick="configurarModoVistoria()">Alterar modo</button>
                 </div>
                 <button id="btn-encerrar-geral" class="btn-encerrar" onclick="encerrarVistoriaCompleta()">📁 Encerrar Vistoria e Gerar PDF</button>
             </div>
@@ -150,10 +161,11 @@
                         </div>
 
                         <div class="damage-type-selector" role="group" aria-label="Tipo de avaria">
-                            <button type="button" class="damage-type active" data-type="arranhao" onclick="setDamageType('arranhao')">Arranhão</button>
-                            <button type="button" class="damage-type" data-type="amassado" onclick="setDamageType('amassado')">Amassado</button>
-                            <button type="button" class="damage-type" data-type="trincado" onclick="setDamageType('trincado')">Trincado</button>
-                            <button type="button" class="damage-type" data-type="quebrado" onclick="setDamageType('quebrado')">Quebrado</button>
+                            <button type="button" class="damage-type vehicle-damage-type active" data-type="amassado" onclick="setDamageType('amassado')">A - Amassado</button>
+                            <button type="button" class="damage-type vehicle-damage-type" data-type="arranhao" onclick="setDamageType('arranhao')">R - Riscado</button>
+                            <button type="button" class="damage-type vehicle-damage-type" data-type="avariado" onclick="setDamageType('avariado')">X - Avariado</button>
+                            <button type="button" class="damage-type vehicle-damage-type" data-type="faltante" onclick="setDamageType('faltante')">F - Faltante</button>
+                            <button type="button" class="damage-type vehicle-damage-type" data-type="quebrado" onclick="setDamageType('quebrado')">Q - Quebrado</button>
                         </div>
 
                         <div class="vehicle-map" id="vehicle-map">
@@ -183,7 +195,7 @@
                     <div class="tablet-meta">
                         <div class="input-group">
                             <label for="tablet-vistoriador">Responsável:</label>
-                            <select id="tablet-vistoriador">
+                            <select id="tablet-vistoriador" onchange="selecionarResponsavelTablet()">
                                 <option value="">Selecione o Responsável</option>
                                 <option value="Matheus">Matheus</option>
                                 <option value="Italo">Italo</option>
@@ -205,10 +217,11 @@
                         </div>
 
                         <div class="damage-type-selector" role="group" aria-label="Tipo de avaria no tablet">
-                            <button type="button" class="damage-type tablet-damage-type active" data-type="arranhao" onclick="setTabletDamageType('arranhao')">Arranhão</button>
-                            <button type="button" class="damage-type tablet-damage-type" data-type="trincado" onclick="setTabletDamageType('trincado')">Trincado</button>
-                            <button type="button" class="damage-type tablet-damage-type" data-type="quebrado" onclick="setTabletDamageType('quebrado')">Quebrado</button>
-                            <button type="button" class="damage-type tablet-damage-type" data-type="sem_caneta" onclick="setTabletDamageType('sem_caneta')">Sem caneta</button>
+                            <button type="button" class="damage-type tablet-damage-type active" data-type="amassado" onclick="setTabletDamageType('amassado')">A - Amassado</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="arranhao" onclick="setTabletDamageType('arranhao')">R - Riscado</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="avariado" onclick="setTabletDamageType('avariado')">X - Avariado</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="faltante" onclick="setTabletDamageType('faltante')">F - Faltante</button>
+                            <button type="button" class="damage-type tablet-damage-type" data-type="quebrado" onclick="setTabletDamageType('quebrado')">Q - Quebrado</button>
                         </div>
 
                         <div class="vehicle-map" id="tablet-map">
@@ -218,6 +231,10 @@
                         </div>
 
                         <div class="damage-list-wrap">
+                            <div class="tablet-observacoes">
+                                <label for="tablet-observacoes">Observações</label>
+                                <textarea id="tablet-observacoes" placeholder="Escreva alguma observação, se necessário..."></textarea>
+                            </div>
                             <h4>Avarias marcadas</h4>
                             <ul id="tablet-damage-list" class="damage-list">
                                 <li class="empty">Nenhuma avaria marcada.</li>
@@ -324,12 +341,14 @@
 
     <!-- Modal de Revisão de Pendências -->
     <div id="revisao-modal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content revisao-modal-content" style="max-width: 600px;">
             <h3>⚠️ Detalhamento de Pendências</h3>
             <p>Por favor, explique o motivo para cada item abaixo:</p>
             <div id="revisao-body"></div>
-            <button class="btn-submit" onclick="confirmarEnvioFinal()" style="margin-top: 15px; width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Confirmar e Salvar Vistoria</button>
-            <button class="btn-submit" onclick="fecharModalRevisao()" style="margin-top: 10px; width: 100%; padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Retornar à Vistoria</button>
+            <div class="revisao-actions">
+                <button class="btn-submit" onclick="confirmarEnvioFinal()" style="width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Confirmar e Salvar Vistoria</button>
+                <button class="btn-submit" onclick="fecharModalRevisao()" style="width: 100%; padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Retornar à Vistoria</button>
+            </div>
         </div>
     </div>
 
