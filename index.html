@@ -229,6 +229,15 @@
                             <label>Data Fim</label>
                             <input type="date" id="filter-data-fim" onchange="aplicarFiltros()">
                         </div>
+                        <div class="input-group filter-field">
+                            <label>Status</label>
+                            <select id="filter-status" onchange="aplicarFiltros()">
+                                <option value="">Todos</option>
+                                <option value="pendente">Pendência</option>
+                                <option value="resolvida">Resolvida</option>
+                                <option value="ok">Tudo OK</option>
+                            </select>
+                        </div>
                         <button class="btn-refresh" onclick="carregarHistorico()" title="Atualizar Dados">🔄</button>
                     </div>
 

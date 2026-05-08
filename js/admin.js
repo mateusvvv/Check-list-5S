@@ -74,6 +74,7 @@ export function aplicarFiltros() {
     const vistoriador = document.getElementById("filter-vistoriador").value;
     const dataInicio = document.getElementById("filter-data-inicio").value;
     const dataFim = document.getElementById("filter-data-fim").value;
+    const status = document.getElementById("filter-status")?.value || "";
 
     if (vistoriador) window.sincronizarVistoriadorLogado?.(vistoriador);
 
@@ -82,15 +83,34 @@ export function aplicarFiltros() {
     if (vistoriador) filtrados = filtrados.filter(v => v.vistoriador === vistoriador);
     if (dataInicio) {
         const dInicio = new Date(dataInicio + "T00:00:00");
-        filtrados = filtrados.filter(v => (v.dataEnvio?.toDate() || new Date()) >= dInicio);
+        filtrados = filtrados.filter(v => getDataReferenciaFiltro(v) >= dInicio);
     }
     if (dataFim) {
         const dFim = new Date(dataFim + "T23:59:59");
-        filtrados = filtrados.filter(v => (v.dataEnvio?.toDate() || new Date()) <= dFim);
+        filtrados = filtrados.filter(v => getDataReferenciaFiltro(v) <= dFim);
+    }
+    if (status) {
+        filtrados = filtrados.filter(v => getStatusVistoria(v) === status);
     }
 
     atualizarCardsEstatisticas(filtrados);
     renderHistoricoTable(filtrados);
+}
+
+function getDataReferenciaFiltro(vistoria) {
+    if (vistoria.pendenciaResolvida?.resolvida) {
+        return vistoria.pendenciaResolvida.dataResolucao?.toDate?.()
+            || vistoria.dataEnvio?.toDate?.()
+            || new Date();
+    }
+
+    return vistoria.dataEnvio?.toDate?.() || new Date();
+}
+
+function getStatusVistoria(vistoria) {
+    if (vistoria.pendenciaResolvida?.resolvida) return "resolvida";
+    if (vistoriaTemPendencia(vistoria)) return "pendente";
+    return "ok";
 }
 
 function vistoriaTemPendencia(vistoria) {
@@ -154,11 +174,11 @@ function renderHistoricoTable(dados) {
     }
 
     dados.forEach((data) => {
-        const dateObj = data.dataEnvio?.toDate() || new Date();
-        const temPendencia = vistoriaTemPendencia(data);
-        const statusHTML = temPendencia
+        const dateObj = getDataReferenciaFiltro(data);
+        const status = getStatusVistoria(data);
+        const statusHTML = status === "pendente"
             ? '<span class="status-pendente">Pendência</span>'
-            : data.pendenciaResolvida?.resolvida
+            : status === "resolvida"
                 ? '<span class="status-resolvida">Resolvida</span>'
             : '<span class="status-ok">Tudo OK</span>';
         const equipamento = data.categoria === "tablets"
