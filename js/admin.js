@@ -1,0 +1,255 @@
+import { categoryNames, damageTypeNames, formatTwoDigits, vehicleViewNames } from "./config.js";
+import { auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, signInWithEmailAndPassword, signOut } from "./firebase.js";
+import { getDamageMarkerLabel } from "./damages.js";
+import { gerarRelatorioComEscolha } from "./pdf.js";
+import { state } from "./state.js";
+
+export async function loginAdmin() {
+    const email = document.getElementById("admin-email").value;
+    const pass = document.getElementById("admin-password").value;
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+        alert("Erro no login: " + error.message);
+    }
+}
+
+export async function logoutAdmin() {
+    await signOut(auth);
+}
+
+export async function carregarHistorico() {
+    const tbody = document.getElementById("history-tbody");
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+
+    try {
+        const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        tbody.innerHTML = "";
+        state.vistoriasCache = [];
+        state.selectedVistorias.clear();
+        atualizarContadorSelecionadas();
+
+        querySnapshot.forEach((doc) => {
+            state.vistoriasCache.push({ id: doc.id, ...doc.data() });
+        });
+
+        aplicarFiltros();
+    } catch (error) {
+        console.error("Erro ao buscar histórico:", error);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
+    }
+}
+
+export function aplicarFiltros() {
+    const vistoriador = document.getElementById("filter-vistoriador").value;
+    const dataInicio = document.getElementById("filter-data-inicio").value;
+    const dataFim = document.getElementById("filter-data-fim").value;
+
+    let filtrados = state.vistoriasCache;
+
+    if (vistoriador) filtrados = filtrados.filter(v => v.vistoriador === vistoriador);
+    if (dataInicio) {
+        const dInicio = new Date(dataInicio + "T00:00:00");
+        filtrados = filtrados.filter(v => (v.dataEnvio?.toDate() || new Date()) >= dInicio);
+    }
+    if (dataFim) {
+        const dFim = new Date(dataFim + "T23:59:59");
+        filtrados = filtrados.filter(v => (v.dataEnvio?.toDate() || new Date()) <= dFim);
+    }
+
+    atualizarCardsEstatisticas(filtrados);
+    renderHistoricoTable(filtrados);
+}
+
+function atualizarCardsEstatisticas(dados) {
+    const total = dados.length;
+    const pendentes = dados.filter(v => {
+        const temItemPendente = v.itens.some(i => i.status !== "ok");
+        const temAvariaVisual = Array.isArray(v.avarias) && v.avarias.length > 0;
+        const temAvariaTablet = Array.isArray(v.avariasTablet) && v.avariasTablet.length > 0;
+        return temItemPendente || temAvariaVisual || temAvariaTablet;
+    }).length;
+
+    document.getElementById("stat-total").innerText = total;
+    document.getElementById("stat-pending").innerText = pendentes;
+    document.getElementById("stat-ok").innerText = total - pendentes;
+}
+
+function renderHistoricoTable(dados) {
+    const tbody = document.getElementById("history-tbody");
+    tbody.innerHTML = "";
+
+    if (dados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
+        return;
+    }
+
+    dados.forEach((data) => {
+        const dateObj = data.dataEnvio?.toDate() || new Date();
+        const temPendencia = data.itens.some(i => i.status !== "ok")
+            || (Array.isArray(data.avarias) && data.avarias.length > 0)
+            || (Array.isArray(data.avariasTablet) && data.avariasTablet.length > 0);
+        const statusHTML = temPendencia
+            ? '<span class="status-pendente">Pendência</span>'
+            : '<span class="status-ok">Tudo OK</span>';
+        const equipamento = data.categoria === "tablets"
+            ? `Tablet ${data.tabletId || data.viaturaId}`
+            : `Viatura ${data.viaturaId}`;
+
+        tbody.innerHTML += `
+            <tr onclick="verDetalhes('${data.id}')">
+                <td onclick="event.stopPropagation();">
+                    <input type="checkbox" class="history-select" value="${data.id}" ${state.selectedVistorias.has(data.id) ? "checked" : ""} onchange="toggleSelecionarVistoria('${data.id}', this.checked)">
+                </td>
+                <td>${dateObj.toLocaleString("pt-BR")}</td>
+                <td>${data.vistoriador}</td>
+                <td>${equipamento}</td>
+                <td>${categoryNames[data.categoria] || data.categoria}</td>
+                <td>${statusHTML}</td>
+            </tr>
+        `;
+    });
+    atualizarContadorSelecionadas();
+}
+
+export function toggleSelecionarVistoria(id, checked) {
+    if (checked) state.selectedVistorias.add(id);
+    else state.selectedVistorias.delete(id);
+    atualizarContadorSelecionadas();
+}
+
+export function toggleSelecionarTodasVistorias(checked) {
+    document.querySelectorAll(".history-select").forEach(checkbox => {
+        checkbox.checked = checked;
+        toggleSelecionarVistoria(checkbox.value, checked);
+    });
+}
+
+function atualizarContadorSelecionadas() {
+    const count = state.selectedVistorias.size;
+    const label = document.getElementById("selected-count");
+    const selectAll = document.getElementById("select-all-vistorias");
+    if (label) label.innerText = `${count} selecionada${count === 1 ? "" : "s"}`;
+    if (selectAll) {
+        const visibleCheckboxes = document.querySelectorAll(".history-select");
+        selectAll.checked = visibleCheckboxes.length > 0 && [...visibleCheckboxes].every(checkbox => checkbox.checked);
+    }
+}
+
+export async function excluirVistoriasSelecionadas() {
+    const ids = [...state.selectedVistorias];
+    if (ids.length === 0) {
+        alert("Selecione pelo menos uma vistoria para excluir.");
+        return;
+    }
+
+    if (!auth.currentUser) {
+        alert("Faça login no Painel Admin antes de excluir vistorias.");
+        return;
+    }
+
+    if (!confirm(`Deseja excluir ${ids.length} vistoria${ids.length === 1 ? "" : "s"} selecionada${ids.length === 1 ? "" : "s"}? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+
+    const deleteButton = document.querySelector(".btn-delete-selected");
+    try {
+        if (deleteButton) deleteButton.disabled = true;
+        for (const id of ids) {
+            await deleteDoc(firestoreDoc(db, "vistorias", id));
+        }
+        state.selectedVistorias.clear();
+        await carregarHistorico();
+        alert("Vistorias excluídas com sucesso.");
+    } catch (error) {
+        console.error("Erro ao excluir vistorias:", error);
+        const mensagem = error?.code === "permission-denied"
+            ? "Permissão negada pelo Firebase. Verifique se as regras do Firestore permitem delete para o usuário admin logado."
+            : `Erro ao excluir vistorias selecionadas: ${error?.message || error}`;
+        alert(mensagem);
+    } finally {
+        if (deleteButton) deleteButton.disabled = false;
+    }
+}
+
+export function verDetalhes(docId) {
+    const vistoria = state.vistoriasCache.find(v => v.id === docId);
+    if (!vistoria) return;
+
+    const modal = document.getElementById("details-modal");
+    const body = document.getElementById("modal-body");
+    const title = document.getElementById("modal-title");
+
+    const equipamentoTitulo = vistoria.categoria === "tablets"
+        ? `Tablet ${vistoria.tabletId || vistoria.viaturaId}`
+        : `Viatura ${vistoria.viaturaId}`;
+    title.innerText = `Detalhes: ${categoryNames[vistoria.categoria]} - ${equipamentoTitulo}`;
+
+    const pendentes = vistoria.itens.filter(i => i.status !== "ok");
+    let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
+    if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
+    if (vistoria.categoria === "tablets") {
+        html += `<p><strong>Tablet:</strong> ${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)} vinculado à Viatura ${formatTwoDigits(vistoria.viaturaId)}</p>`;
+        if (vistoria.observacoesTablet) html += `<p><strong>Observações:</strong> ${vistoria.observacoesTablet}</p>`;
+    }
+    if (vistoria.avarias && vistoria.avarias.length > 0) {
+        html += '<h4>Avarias marcadas:</h4><ul class="pending-list">';
+        vistoria.avarias.forEach((avaria) => {
+            html += `<li><strong>${getDamageMarkerLabel(avaria.type)} - ${damageTypeNames[avaria.type] || avaria.type}:</strong> ${vehicleViewNames[avaria.view] || avaria.view}</li>`;
+        });
+        html += "</ul>";
+    }
+    if (vistoria.avariasTablet && vistoria.avariasTablet.length > 0) {
+        html += '<h4>Avarias do tablet:</h4><ul class="pending-list">';
+        vistoria.avariasTablet.forEach((avaria) => {
+            html += `<li><strong>${getDamageMarkerLabel(avaria.type)} - ${damageTypeNames[avaria.type] || avaria.type}:</strong> ${avaria.view}</li>`;
+        });
+        html += "</ul>";
+    }
+
+    if (pendentes.length > 0) {
+        html += '<h4>Itens Pendentes:</h4><ul class="pending-list">';
+        pendentes.forEach(p => {
+            const iconMap = { pendente: "⚠️", perdeu: "❌", quebrou: "🛠️" };
+            const labelStatus = iconMap[p.status] || "❓";
+            html += `<li><strong>${labelStatus} ${p.item}:</strong> ${p.observacao || "Sem observação"}</li>`;
+        });
+        html += "</ul>";
+    } else {
+        html += '<p class="status-ok details-ok">✅ Nenhum item pendente encontrado.</p>';
+    }
+
+    body.innerHTML = html;
+    modal.style.display = "block";
+}
+
+export function closeModal() {
+    document.getElementById("details-modal").style.display = "none";
+}
+
+export async function exportarHistoricoPDF() {
+    try {
+        if (!auth.currentUser) {
+            alert("Faça login no Painel Admin antes de exportar o PDF.");
+            return;
+        }
+
+        if (state.vistoriasCache.length === 0) await carregarHistorico();
+        await gerarRelatorioComEscolha({ resetarStatus: false });
+    } catch (error) {
+        console.error("Erro ao exportar PDF:", error);
+        alert(`Erro ao exportar PDF: ${error?.message || error}`);
+    }
+}
+
+export function initAdminAuthListener() {
+    onAuthStateChanged(auth, (user) => {
+        const loginSec = document.getElementById("admin-login-section");
+        const panelSec = document.getElementById("admin-panel-section");
+        loginSec.style.display = user ? "none" : "block";
+        panelSec.style.display = user ? "block" : "none";
+        if (user) carregarHistorico();
+    });
+}
