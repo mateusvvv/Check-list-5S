@@ -1,7 +1,7 @@
 import { categoryNames, damageTypeNames, formatTwoDigits, vehicleViewNames } from "./config.js";
-import { auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, signInWithEmailAndPassword, signOut } from "./firebase.js";
+import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
-import { gerarRelatorioComEscolha } from "./pdf.js";
+import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
 import { state } from "./state.js";
 
 export async function loginAdmin() {
@@ -31,8 +31,36 @@ export async function carregarHistorico() {
         state.selectedVistorias.clear();
         atualizarContadorSelecionadas();
 
+        const vistorias = [];
+        const resolucoes = [];
+
         querySnapshot.forEach((doc) => {
-            state.vistoriasCache.push({ id: doc.id, ...doc.data() });
+            const data = { id: doc.id, ...doc.data() };
+            if (data.tipoRegistro === "resolucaoPendencia") {
+                resolucoes.push(data);
+                return;
+            }
+            vistorias.push(data);
+        });
+
+        const resolucoesPorVistoria = {};
+        resolucoes.forEach((resolucao) => {
+            if (!resolucao.vistoriaOrigemId) return;
+            const atual = resolucoesPorVistoria[resolucao.vistoriaOrigemId];
+            const dataAtual = atual?.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
+            const dataResolucao = resolucao.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
+            if (!atual || dataResolucao >= dataAtual) {
+                resolucoesPorVistoria[resolucao.vistoriaOrigemId] = resolucao;
+            }
+        });
+
+        state.vistoriasCache = vistorias.map((vistoria) => {
+            const resolucao = resolucoesPorVistoria[vistoria.id];
+            if (!resolucao) return vistoria;
+            return {
+                ...vistoria,
+                pendenciaResolvida: resolucao.pendenciaResolvida
+            };
         });
 
         aplicarFiltros();
@@ -46,6 +74,8 @@ export function aplicarFiltros() {
     const vistoriador = document.getElementById("filter-vistoriador").value;
     const dataInicio = document.getElementById("filter-data-inicio").value;
     const dataFim = document.getElementById("filter-data-fim").value;
+
+    if (vistoriador) window.sincronizarVistoriadorLogado?.(vistoriador);
 
     let filtrados = state.vistoriasCache;
 
@@ -63,14 +93,51 @@ export function aplicarFiltros() {
     renderHistoricoTable(filtrados);
 }
 
+function vistoriaTemPendencia(vistoria) {
+    if (vistoria.pendenciaResolvida?.resolvida) return false;
+
+    const temItemPendente = vistoria.itens.some(i => i.status !== "ok");
+    const temAvariaVisual = Array.isArray(vistoria.avarias) && vistoria.avarias.length > 0;
+    const temAvariaTablet = Array.isArray(vistoria.avariasTablet) && vistoria.avariasTablet.length > 0;
+    return temItemPendente || temAvariaVisual || temAvariaTablet;
+}
+
+function montarResolucaoPendencia(vistoria, observacao) {
+    return {
+        resolvida: true,
+        observacao: observacao.trim(),
+        resolvidoPor: auth.currentUser.email || "Admin",
+        dataResolucao: serverTimestamp(),
+        vistoriaOrigemId: vistoria.id
+    };
+}
+
+async function salvarResolucaoPendencia(vistoria, observacao) {
+    const pendenciaResolvida = montarResolucaoPendencia(vistoria, observacao);
+
+    try {
+        await updateDoc(firestoreDoc(db, "vistorias", vistoria.id), { pendenciaResolvida });
+        return;
+    } catch (error) {
+        if (error?.code !== "permission-denied") throw error;
+
+        await addDoc(collection(db, "vistorias"), {
+            tipoRegistro: "resolucaoPendencia",
+            vistoriaOrigemId: vistoria.id,
+            viaturaId: vistoria.viaturaId || null,
+            tabletId: vistoria.tabletId || null,
+            vistoriador: vistoria.vistoriador || auth.currentUser.email || "Admin",
+            categoria: vistoria.categoria || "resolucao",
+            itens: [],
+            dataEnvio: serverTimestamp(),
+            pendenciaResolvida
+        });
+    }
+}
+
 function atualizarCardsEstatisticas(dados) {
     const total = dados.length;
-    const pendentes = dados.filter(v => {
-        const temItemPendente = v.itens.some(i => i.status !== "ok");
-        const temAvariaVisual = Array.isArray(v.avarias) && v.avarias.length > 0;
-        const temAvariaTablet = Array.isArray(v.avariasTablet) && v.avariasTablet.length > 0;
-        return temItemPendente || temAvariaVisual || temAvariaTablet;
-    }).length;
+    const pendentes = dados.filter(vistoriaTemPendencia).length;
 
     document.getElementById("stat-total").innerText = total;
     document.getElementById("stat-pending").innerText = pendentes;
@@ -88,11 +155,11 @@ function renderHistoricoTable(dados) {
 
     dados.forEach((data) => {
         const dateObj = data.dataEnvio?.toDate() || new Date();
-        const temPendencia = data.itens.some(i => i.status !== "ok")
-            || (Array.isArray(data.avarias) && data.avarias.length > 0)
-            || (Array.isArray(data.avariasTablet) && data.avariasTablet.length > 0);
+        const temPendencia = vistoriaTemPendencia(data);
         const statusHTML = temPendencia
             ? '<span class="status-pendente">Pendência</span>'
+            : data.pendenciaResolvida?.resolvida
+                ? '<span class="status-resolvida">Resolvida</span>'
             : '<span class="status-ok">Tudo OK</span>';
         const equipamento = data.categoria === "tablets"
             ? `Tablet ${data.tabletId || data.viaturaId}`
@@ -174,6 +241,105 @@ export async function excluirVistoriasSelecionadas() {
     }
 }
 
+export async function resolverPendenciasSelecionadas() {
+    try {
+        if (!auth.currentUser) {
+            alert("Faça login no Painel Admin antes de marcar pendências como resolvidas.");
+            return;
+        }
+
+        const ids = [...state.selectedVistorias];
+        if (ids.length === 0) {
+            alert("Selecione pelo menos uma vistoria com pendência.");
+            return;
+        }
+
+        const selecionadas = ids
+            .map(id => state.vistoriasCache.find(vistoria => vistoria.id === id))
+            .filter(Boolean);
+        const pendentes = selecionadas.filter(vistoriaTemPendencia);
+
+        if (pendentes.length === 0) {
+            alert("As vistorias selecionadas não possuem pendências abertas.");
+            return;
+        }
+
+        const observacao = prompt(
+            `Descreva como ${pendentes.length === 1 ? "a pendência foi resolvida" : "as pendências foram resolvidas"}:`,
+            ""
+        );
+
+        if (!observacao || !observacao.trim()) {
+            alert("Informe uma observação para registrar a resolução.");
+            return;
+        }
+
+        const resolveButton = document.querySelector(".btn-resolve-selected");
+        if (resolveButton) resolveButton.disabled = true;
+
+        for (const vistoria of pendentes) {
+            await salvarResolucaoPendencia(vistoria, observacao);
+        }
+
+        state.selectedVistorias.clear();
+        await carregarHistorico();
+        alert(`${pendentes.length} pendência${pendentes.length === 1 ? "" : "s"} marcada${pendentes.length === 1 ? "" : "s"} como resolvida${pendentes.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+        console.error("Erro ao resolver pendências:", error);
+        alert(`Erro ao resolver pendências: ${error?.message || error}`);
+    } finally {
+        const resolveButton = document.querySelector(".btn-resolve-selected");
+        if (resolveButton) resolveButton.disabled = false;
+    }
+}
+
+export async function exportarVistoriasSelecionadasPDF() {
+    try {
+        if (!auth.currentUser) {
+            alert("Faça login no Painel Admin antes de baixar os PDFs selecionados.");
+            return;
+        }
+
+        const ids = [...state.selectedVistorias];
+        if (ids.length === 0) {
+            alert("Selecione pelo menos uma vistoria para baixar em PDF.");
+            return;
+        }
+
+        const selecionadas = ids
+            .map(id => state.vistoriasCache.find(vistoria => vistoria.id === id))
+            .filter(Boolean);
+
+        if (selecionadas.length === 0) {
+            alert("Nenhuma vistoria selecionada foi encontrada no histórico carregado.");
+            return;
+        }
+
+        const exportButton = document.querySelector(".btn-export-selected");
+        if (exportButton) exportButton.disabled = true;
+
+        for (const vistoria of selecionadas) {
+            const equipamento = vistoria.categoria === "tablets"
+                ? `Tablet_${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)}_Viatura_${formatTwoDigits(vistoria.viaturaId)}`
+                : `Viatura_${formatTwoDigits(vistoria.viaturaId)}`;
+            const categoria = categoryNames[vistoria.categoria] || vistoria.categoria;
+            const data = (vistoria.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
+
+            await gerarPDF(`Relatorio_${equipamento}_${categoria}_${data}`, [vistoria], {
+                reportName: `${equipamento.replace(/_/g, " ")} - ${categoria}`
+            });
+        }
+
+        alert(`${selecionadas.length} PDF${selecionadas.length === 1 ? "" : "s"} baixado${selecionadas.length === 1 ? "" : "s"} com sucesso.`);
+    } catch (error) {
+        console.error("Erro ao baixar PDFs selecionados:", error);
+        alert(`Erro ao baixar PDFs selecionados: ${error?.message || error}`);
+    } finally {
+        const exportButton = document.querySelector(".btn-export-selected");
+        if (exportButton) exportButton.disabled = false;
+    }
+}
+
 export function verDetalhes(docId) {
     const vistoria = state.vistoriasCache.find(v => v.id === docId);
     if (!vistoria) return;
@@ -219,6 +385,16 @@ export function verDetalhes(docId) {
         html += "</ul>";
     } else {
         html += '<p class="status-ok details-ok">✅ Nenhum item pendente encontrado.</p>';
+    }
+
+    if (vistoria.pendenciaResolvida?.resolvida) {
+        const dataResolucao = vistoria.pendenciaResolvida.dataResolucao?.toDate?.();
+        html += '<div class="resolution-box">';
+        html += '<h4>Pendência Resolvida</h4>';
+        html += `<p><strong>Observação:</strong> ${vistoria.pendenciaResolvida.observacao || "Sem observação"}</p>`;
+        html += `<p><strong>Resolvido por:</strong> ${vistoria.pendenciaResolvida.resolvidoPor || "Admin"}</p>`;
+        if (dataResolucao) html += `<p><strong>Data:</strong> ${dataResolucao.toLocaleString("pt-BR")}</p>`;
+        html += "</div>";
     }
 
     body.innerHTML = html;

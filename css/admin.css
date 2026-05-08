@@ -182,8 +182,26 @@
     font-weight: bold;
 }
 
+.status-resolvida {
+    color: #0f766e;
+    font-weight: bold;
+}
+
 .details-ok {
     margin-top: 15px;
+}
+
+.resolution-box {
+    margin-top: 15px;
+    padding: 12px;
+    border-left: 4px solid #0f766e;
+    background: #ecfdf5;
+    border-radius: 4px;
+}
+
+.resolution-box h4 {
+    margin: 0 0 8px;
+    color: #0f766e;
 }
 
 .bulk-actions-bar {
@@ -194,16 +212,31 @@
     margin-bottom: 12px;
 }
 
+.btn-export-selected,
+.btn-resolve-selected,
 .btn-delete-selected {
     border: none;
     border-radius: 4px;
     padding: 9px 12px;
-    background: #dc3545;
     color: #fff;
     cursor: pointer;
     font-weight: 700;
 }
 
+.btn-export-selected {
+    background: #198754;
+}
+
+.btn-resolve-selected {
+    background: #0f766e;
+}
+
+.btn-delete-selected {
+    background: #dc3545;
+}
+
+.btn-export-selected:disabled,
+.btn-resolve-selected:disabled,
 .btn-delete-selected:disabled {
     opacity: 0.55;
     cursor: not-allowed;

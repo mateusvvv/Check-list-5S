@@ -27,10 +27,12 @@ import {
     carregarHistorico,
     closeModal,
     excluirVistoriasSelecionadas,
+    exportarVistoriasSelecionadasPDF,
     exportarHistoricoPDF,
     initAdminAuthListener,
     loginAdmin,
     logoutAdmin,
+    resolverPendenciasSelecionadas,
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
@@ -122,6 +124,14 @@ function selecionarVistoriadorAtivo(silent = false) {
         if (!silent) alert(getAccessDeniedMessage(activeTab.id, vistoriador));
         showPage(isTabletOnlyUser(vistoriador) ? "tablets" : "ferramentas");
     }
+}
+
+function sincronizarVistoriadorLogado(vistoriador) {
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    if (!vistoriadorSelect || vistoriadorSelect.value === vistoriador) return;
+
+    vistoriadorSelect.value = vistoriador;
+    selecionarVistoriadorAtivo(true);
 }
 
 function selecionarResponsavelTablet() {
@@ -504,6 +514,8 @@ function bindWindowFunctions() {
         closeModal,
         encerrarVistoriaCompleta,
         exportarHistoricoPDF,
+        exportarVistoriasSelecionadasPDF,
+        resolverPendenciasSelecionadas,
         aplicarFiltros,
         carregarHistorico,
         toggleSelecionarVistoria,
@@ -513,6 +525,7 @@ function bindWindowFunctions() {
         abrirModalRevisao,
         limparErroItem,
         fecharModalRevisao,
+        sincronizarVistoriadorLogado,
         setDamageType,
         marcarAvaria,
         removerAvaria,

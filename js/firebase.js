@@ -10,7 +10,8 @@ import {
     limit,
     orderBy,
     query,
-    serverTimestamp
+    serverTimestamp,
+    updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
     getAuth,
@@ -46,5 +47,6 @@ export {
     query,
     serverTimestamp,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    updateDoc
 };
