@@ -376,13 +376,6 @@ export function verDetalhes(docId) {
     const pendentes = vistoria.itens.filter(i => i.status !== "ok");
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
-    if (vistoria.categoria === "viaturas") {
-        if (vistoria.nivelCombustivel) html += `<p><strong>Combustível:</strong> ${vistoria.nivelCombustivel}</p>`;
-        if (vistoria.luzesAdvertencia) html += `<p><strong>Luzes de advertência:</strong> ${vistoria.luzesAdvertencia}</p>`;
-        if (vistoria.quaisLuzes) html += `<p><strong>Quais luzes:</strong> ${vistoria.quaisLuzes}</p>`;
-        if (vistoria.solicitarManutencao) html += `<p><strong>Solicitar manutenção:</strong> ${vistoria.solicitarManutencao}</p>`;
-        if (vistoria.observacoesManutencao) html += `<p><strong>Observações da manutenção:</strong> ${vistoria.observacoesManutencao}</p>`;
-    }
     if (vistoria.categoria === "tablets") {
         html += `<p><strong>Tablet:</strong> ${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)} vinculado à Viatura ${formatTwoDigits(vistoria.viaturaId)}</p>`;
         if (vistoria.observacoesTablet) html += `<p><strong>Observações:</strong> ${vistoria.observacoesTablet}</p>`;

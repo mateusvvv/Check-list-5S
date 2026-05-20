@@ -100,35 +100,3 @@
     cursor: pointer;
     font-weight: bold;
 }
-
-.checklist-section {
-    margin-top: 18px;
-    padding: 10px 12px;
-    background: #eef5ff;
-    border-left: 4px solid var(--primary-blue);
-    border-radius: 4px;
-    font-weight: 700;
-    color: var(--primary-blue);
-}
-
-.vehicle-notes {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 12px;
-    margin-bottom: 18px;
-}
-
-.vehicle-notes-wide {
-    grid-column: span 2;
-}
-
-.vehicle-notes textarea {
-    min-height: 72px;
-    resize: vertical;
-}
-
-@media (max-width: 640px) {
-    .vehicle-notes-wide {
-        grid-column: span 1;
-    }
-}
