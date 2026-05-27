@@ -1,10 +1,11 @@
-import { categoryNames, damageTypeNames, formatTwoDigits, getVehicleMapConfig, totalViaturas, vehicleViewNames } from "./config.js";
+import { categoryNames, damageTypeNames, formatTwoDigits, getVehicleMapConfig, vehicleViewNames } from "./config.js";
 import { collection, db, getDocs, limit, orderBy, query } from "./firebase.js";
 import { getDamageColor, getDamageMarkerLabel, renderDamageList, renderDamageMarkers, renderTabletDamageList, renderTabletDamageMarkers } from "./damages.js";
 import {
     buscarVistoriasLocaisHoje,
     buscarVistoriasLocaisViatura,
     getCategoriasConcluidas,
+    getActiveViaturas,
     isVistoriaParcial,
     state,
     todasEtapasConcluidas
@@ -452,8 +453,9 @@ export async function gerarRelatorioComEscolha(options = {}) {
     const valor = resposta.trim().toUpperCase();
     const gerarTodas = valor === "TODAS" || valor === "TODOS";
     const viaturaId = gerarTodas ? null : String(Number(valor));
-    if (!gerarTodas && (!viaturaId || viaturaId === "NaN" || Number(viaturaId) < 1 || Number(viaturaId) > totalViaturas)) {
-        alert("Informe uma viatura válida ou digite TODAS.");
+    const viaturaValida = getActiveViaturas().some(viatura => viatura.id === viaturaId);
+    if (!gerarTodas && (!viaturaId || viaturaId === "NaN" || !viaturaValida)) {
+        alert("Informe uma viatura ativa válida ou digite TODAS.");
         return;
     }
 

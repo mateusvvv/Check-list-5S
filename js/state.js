@@ -1,7 +1,8 @@
-import { categoryNames, totalViaturas } from "./config.js";
+import { categoryNames, defaultViaturas } from "./config.js";
 
 export const state = {
     selectedViatura: "1",
+    viaturas: [...defaultViaturas],
     surveyStatus: {},
     vehicleDamages: {},
     tabletDamages: {},
@@ -14,16 +15,44 @@ export const state = {
     selectedTabletDamageType: "amassado"
 };
 
-for (let i = 1; i <= totalViaturas; i++) {
-    const id = i.toString();
-    state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
-    state.vehicleDamages[id] = [];
-    state.tabletDamages[id] = [];
-    state.vistoriaMode[id] = "completa";
+export function ensureViaturaState(id) {
+    id = String(id);
+    if (!state.surveyStatus[id]) state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+    if (!state.vehicleDamages[id]) state.vehicleDamages[id] = [];
+    if (!state.tabletDamages[id]) state.tabletDamages[id] = [];
+    if (!state.vistoriaMode[id]) state.vistoriaMode[id] = "completa";
+}
+
+defaultViaturas.forEach(viatura => ensureViaturaState(viatura.id));
+
+export function setViaturas(viaturas) {
+    state.viaturas = viaturas.length > 0 ? viaturas.map(viatura => ({
+        id: String(viatura.id),
+        nome: viatura.nome || `Viatura ${String(viatura.id).padStart(2, "0")}`,
+        ativa: viatura.ativa !== false
+    })) : [...defaultViaturas];
+
+    state.viaturas.forEach(viatura => {
+        if (!state.surveyStatus[viatura.id]) ensureViaturaState(viatura.id);
+    });
+
+    const selecionada = state.viaturas.find(viatura => viatura.id === state.selectedViatura && viatura.ativa);
+    if (!selecionada) {
+        state.selectedViatura = getActiveViaturas()[0]?.id || state.viaturas[0]?.id || "1";
+    }
+}
+
+export function getActiveViaturas() {
+    return state.viaturas.filter(viatura => viatura.ativa !== false);
+}
+
+export function getViaturaById(id) {
+    return state.viaturas.find(viatura => viatura.id === String(id));
 }
 
 export function setSelectedViatura(id) {
     state.selectedViatura = String(id);
+    if (!state.surveyStatus[state.selectedViatura]) ensureViaturaState(state.selectedViatura);
 }
 
 export function getCategoriasConcluidas(viaturaId = state.selectedViatura) {

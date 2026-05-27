@@ -5,12 +5,14 @@ import {
     collection,
     deleteDoc,
     doc as firestoreDoc,
+    getDoc,
     getDocs,
     getFirestore,
     limit,
     orderBy,
     query,
     serverTimestamp,
+    setDoc,
     updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -40,12 +42,14 @@ export {
     collection,
     deleteDoc,
     firestoreDoc,
+    getDoc,
     getDocs,
     limit,
     onAuthStateChanged,
     orderBy,
     query,
     serverTimestamp,
+    setDoc,
     signInWithEmailAndPassword,
     signOut,
     updateDoc

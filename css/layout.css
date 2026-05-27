@@ -11,6 +11,11 @@ header {
     z-index: 1000;
 }
 
+body > header,
+body > main {
+    display: none;
+}
+
 .user-selector {
     margin-left: 20px;
     display: flex;

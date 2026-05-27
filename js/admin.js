@@ -1,8 +1,48 @@
-import { categoryNames, damageTypeNames, formatTwoDigits, vehicleViewNames } from "./config.js";
+import { categoryNames, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItems, getItemName, normalizeChecklistItem, vehicleViewNames } from "./config.js";
 import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
-import { state } from "./state.js";
+import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
+import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
+
+let authReadyCallback = async () => {};
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function formatDateBR(date = new Date()) {
+    return date.toLocaleDateString("pt-BR");
+}
+
+function isValidDateBR(value) {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return false;
+    const [day, month, year] = value.split("/").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+export function setAuthReadyCallback(callback) {
+    authReadyCallback = callback;
+}
+
+export async function loginApp() {
+    const email = document.getElementById("app-login-email")?.value || "";
+    const pass = document.getElementById("app-login-password")?.value || "";
+    const errorLabel = document.getElementById("app-login-error");
+    if (errorLabel) errorLabel.innerText = "";
+
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+        if (errorLabel) errorLabel.innerText = "E-mail ou senha inválidos.";
+        else alert("Erro no login: " + error.message);
+    }
+}
 
 export async function loginAdmin() {
     const email = document.getElementById("admin-email").value;
@@ -16,6 +56,190 @@ export async function loginAdmin() {
 
 export async function logoutAdmin() {
     await signOut(auth);
+}
+
+function renderAdminConfig() {
+    renderAdminViaturas();
+    renderAdminViaturaOptions();
+    renderAdminChecklist();
+}
+
+export function showAdminConfigTab(tab) {
+    const targetButton = document.getElementById(`admin-tab-${tab}`);
+    const isAlreadyOpen = targetButton?.classList.contains("active");
+    if (isAlreadyOpen) {
+        document.getElementById("admin-tab-viaturas")?.classList.remove("active");
+        document.getElementById("admin-tab-itens")?.classList.remove("active");
+        document.getElementById("admin-config-viaturas")?.classList.remove("active");
+        document.getElementById("admin-config-itens")?.classList.remove("active");
+        return;
+    }
+
+    const isItens = tab === "itens";
+    document.getElementById("admin-tab-viaturas")?.classList.toggle("active", !isItens);
+    document.getElementById("admin-tab-itens")?.classList.toggle("active", isItens);
+    document.getElementById("admin-config-viaturas")?.classList.toggle("active", !isItens);
+    document.getElementById("admin-config-itens")?.classList.toggle("active", isItens);
+}
+
+function refreshAppAfterConfigChange() {
+    window.refreshAppAfterConfigChange?.();
+    renderAdminConfig();
+}
+
+export function renderAdminViaturas() {
+    const container = document.getElementById("admin-viaturas-list");
+    if (!container) return;
+
+    container.innerHTML = state.viaturas.map((viatura) => `
+        <div class="admin-config-row ${viatura.ativa === false ? "inactive" : ""}">
+            <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)">
+            <span>ID ${formatTwoDigits(viatura.id)}</span>
+            <div class="admin-config-actions">
+                <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+export async function adicionarViatura() {
+    const proximoId = String(Math.max(0, ...state.viaturas.map(viatura => Number(viatura.id) || 0)) + 1);
+    state.viaturas.push({ id: proximoId, nome: `Viatura ${formatTwoDigits(proximoId)}`, ativa: true });
+    ensureViaturaState(proximoId);
+    ensureChecklistForViatura(proximoId);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function editarNomeViatura(id, nome) {
+    const viatura = state.viaturas.find(item => item.id === String(id));
+    if (!viatura) return;
+    viatura.nome = nome.trim() || `Viatura ${formatTwoDigits(id)}`;
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function alternarViaturaAtiva(id) {
+    const viatura = state.viaturas.find(item => item.id === String(id));
+    if (!viatura) return;
+    viatura.ativa = viatura.ativa === false;
+    if (state.selectedViatura === String(id) && viatura.ativa === false) {
+        setSelectedViatura(getActiveViaturas()[0]?.id || id);
+    }
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export function renderAdminChecklist() {
+    const container = document.getElementById("admin-checklist-list");
+    const select = document.getElementById("admin-item-category");
+    const viaturaSelect = document.getElementById("admin-item-viatura");
+    if (!container || !select || !viaturaSelect) return;
+
+    const category = select.value || "ferramentas";
+    const viaturaId = viaturaSelect.value || state.selectedViatura;
+    const items = getChecklistItems(category, viaturaId);
+    items.splice(0, items.length, ...items.map((item, index) => normalizeChecklistItem(item, index)));
+
+    container.innerHTML = items.map((item, index) => {
+        const ultimaSubstituicao = item.substituicoes?.at?.(-1);
+        const nota = ultimaSubstituicao
+            ? `<span class="substitution-note">Substituiu "${escapeHtml(ultimaSubstituicao.itemAnterior)}" em ${escapeHtml(ultimaSubstituicao.data)}</span>`
+            : "";
+
+        return `
+            <div class="admin-config-row ${item.ativo === false ? "inactive" : ""}">
+                <input type="text" value="${escapeHtml(getItemName(item))}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, this.value)">
+                <div class="admin-config-actions">
+                    <button type="button" onclick="substituirItemChecklist('${viaturaId}', '${category}', ${index})">Substituir</button>
+                    <button type="button" class="btn-muted" onclick="alternarItemChecklist('${viaturaId}', '${category}', ${index})">${item.ativo === false ? "Ativar" : "Desativar"}</button>
+                    <button type="button" class="btn-danger" onclick="removerItemChecklist('${viaturaId}', '${category}', ${index})">Remover</button>
+                </div>
+                ${nota}
+            </div>
+        `;
+    }).join("");
+}
+
+export function renderAdminViaturaOptions() {
+    const select = document.getElementById("admin-item-viatura");
+    if (!select) return;
+
+    const valorAtual = select.value || state.selectedViatura;
+    select.innerHTML = state.viaturas.map(viatura => `
+        <option value="${viatura.id}">${escapeHtml(viatura.nome)}${viatura.ativa === false ? " (desativada)" : ""}</option>
+    `).join("");
+    select.value = state.viaturas.some(viatura => viatura.id === valorAtual) ? valorAtual : state.selectedViatura;
+}
+
+export async function adicionarItemChecklist() {
+    const category = document.getElementById("admin-item-category")?.value || "ferramentas";
+    const viaturaId = document.getElementById("admin-item-viatura")?.value || state.selectedViatura;
+    const input = document.getElementById("admin-item-name");
+    const nome = input?.value.trim();
+    if (!nome) {
+        alert("Informe o nome do item.");
+        return;
+    }
+
+    getChecklistItems(category, viaturaId).push(normalizeChecklistItem({
+        id: `item-${Date.now()}`,
+        nome,
+        ativo: true,
+        substituicoes: []
+    }));
+    if (input) input.value = "";
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function editarItemChecklist(viaturaId, category, index, nome) {
+    const items = getChecklistItems(category, viaturaId);
+    items[index] = normalizeChecklistItem(items[index], index);
+    items[index].nome = nome.trim() || items[index].nome;
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function alternarItemChecklist(viaturaId, category, index) {
+    const items = getChecklistItems(category, viaturaId);
+    items[index] = normalizeChecklistItem(items[index], index);
+    items[index].ativo = items[index].ativo === false;
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function removerItemChecklist(viaturaId, category, index) {
+    if (!confirm("Deseja remover este item do checklist?")) return;
+    getChecklistItems(category, viaturaId).splice(index, 1);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function substituirItemChecklist(viaturaId, category, index) {
+    const items = getChecklistItems(category, viaturaId);
+    items[index] = normalizeChecklistItem(items[index], index);
+    const item = items[index];
+    const novoNome = prompt("Informe o nome do novo item:", item.nome);
+    if (!novoNome || !novoNome.trim()) return;
+
+    const data = prompt("Informe a data da substituição (dd/mm/aaaa):", formatDateBR());
+    if (!data || !data.trim()) return;
+    if (!isValidDateBR(data.trim())) {
+        alert("Informe a data no formato brasileiro: dd/mm/aaaa.");
+        return;
+    }
+
+    item.substituicoes.push({
+        itemAnterior: item.nome,
+        itemNovo: novoNome.trim(),
+        data: data.trim(),
+        registradoEm: new Date().toISOString()
+    });
+    item.nome = novoNome.trim();
+    item.ativo = true;
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
 }
 
 export async function carregarHistorico() {
@@ -441,11 +665,26 @@ export async function exportarHistoricoPDF() {
 }
 
 export function initAdminAuthListener() {
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
+        const loginScreen = document.getElementById("app-login-screen");
+        const header = document.querySelector("header");
+        const main = document.querySelector("main");
         const loginSec = document.getElementById("admin-login-section");
         const panelSec = document.getElementById("admin-panel-section");
-        loginSec.style.display = user ? "none" : "block";
-        panelSec.style.display = user ? "block" : "none";
-        if (user) carregarHistorico();
+        if (loginScreen) loginScreen.style.display = user ? "none" : "grid";
+        if (header) header.style.display = user ? "flex" : "none";
+        if (main) main.style.display = user ? "block" : "none";
+        if (loginSec) loginSec.style.display = user ? "none" : "block";
+        if (panelSec) panelSec.style.display = user ? "block" : "none";
+        if (!user) {
+            const vistoriadorSelect = document.getElementById("vistoriador-atual");
+            if (vistoriadorSelect) vistoriadorSelect.disabled = false;
+        }
+        if (user) {
+            await carregarConfiguracoes();
+            await authReadyCallback();
+            renderAdminConfig();
+            carregarHistorico();
+        }
     });
 }

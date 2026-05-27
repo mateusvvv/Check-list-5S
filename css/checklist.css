@@ -89,6 +89,17 @@
     color: #721c24;
 }
 
+.substitution-status {
+    border-color: #f59f00;
+    background: #fff8e1;
+    color: #7a5200;
+    font-family: inherit;
+}
+
+.substitution-status:hover {
+    background: #ffec99;
+}
+
 .btn-submit {
     margin-top: 20px;
     width: 100%;

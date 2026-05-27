@@ -7,18 +7,31 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <section id="app-login-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="logo auth-logo">DIGITAL</div>
+            <h1>Checklist 5S</h1>
+            <div class="login-box">
+                <input type="email" id="app-login-email" placeholder="E-mail">
+                <input type="password" id="app-login-password" placeholder="Senha">
+                <button class="btn-login" onclick="loginApp()">Entrar</button>
+                <p id="app-login-error" class="login-error"></p>
+            </div>
+        </div>
+    </section>
+
     <header>
         <div class="logo">DIGITAL</div>
         <div class="user-selector">
             <select id="vistoriador-atual" onchange="selecionarVistoriadorAtivo()">
                 <option value="">Selecione o Vistoriador</option>
                 <option value="Alisson">Alisson</option>
-                <option value="Berg">Berg</option>
                 <option value="Marcos">Marcos</option>
                 <option value="Matheus">Matheus</option>
                 <option value="Italo">Italo</option>
             </select>
             <span id="vistoriador-logado" class="logged-user">Nenhum vistoriador selecionado</span>
+            <button type="button" class="btn-header-logout" onclick="logoutAdmin()">Sair</button>
         </div>
         <nav class="menu-container">
             <button class="menu-btn" onclick="toggleMenu()">☰ Menu</button>
@@ -200,12 +213,45 @@
                         </div>
                     </div>
 
+                    <div class="admin-config-tabs">
+                        <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
+                        <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
+                    </div>
+
+                    <div class="admin-config-grid">
+                        <div class="admin-config-panel admin-config-section" id="admin-config-viaturas">
+                            <div class="admin-config-header">
+                                <h3>Viaturas</h3>
+                                <button type="button" onclick="adicionarViatura()">Adicionar viatura</button>
+                            </div>
+                            <div id="admin-viaturas-list" class="admin-config-list"></div>
+                        </div>
+
+                        <div class="admin-config-panel admin-config-section" id="admin-config-itens">
+                            <div class="admin-config-header">
+                                <h3>Itens de checklist</h3>
+                            </div>
+                            <div class="admin-item-form">
+                                <select id="admin-item-viatura" onchange="renderAdminChecklist()"></select>
+                                <select id="admin-item-category" onchange="renderAdminChecklist()">
+                                    <option value="ferramentas">Ferramentas</option>
+                                    <option value="epis">EPIs</option>
+                                    <option value="viaturas">Viatura</option>
+                                    <option value="tablets">Tablet</option>
+                                </select>
+                                <input type="text" id="admin-item-name" placeholder="Nome do novo item">
+                                <button type="button" onclick="adicionarItemChecklist()">Adicionar item</button>
+                            </div>
+                            <div id="admin-checklist-list" class="admin-config-list"></div>
+                        </div>
+                    </div>
+
                     <!-- Estatísticas Rápidas -->
                     <div class="admin-stats">
                         <div class="stat-card"><h3>Total Vistorias</h3><p id="stat-total">0</p></div>
                         <div class="stat-card stat-card-ok"><h3>Tudo OK</h3><p id="stat-ok">0</p></div>
                         <div class="stat-card stat-card-pending"><h3>Pendências</h3><p id="stat-pending">0</p></div>
-                        <div class="stat-card stat-card-users"><h3>Vistoriadores</h3><p id="stat-users">5</p></div>
+                        <div class="stat-card stat-card-users"><h3>Vistoriadores</h3><p id="stat-users">4</p></div>
                     </div>
 
                     <!-- Filtros do Histórico -->
@@ -215,7 +261,6 @@
                             <select id="filter-vistoriador" onchange="aplicarFiltros()">
                                 <option value="">Todos</option>
                                 <option value="Alisson">Alisson</option>
-                                <option value="Berg">Berg</option>
                                 <option value="Marcos">Marcos</option>
                                 <option value="Matheus">Matheus</option>
                                 <option value="Italo">Italo</option>

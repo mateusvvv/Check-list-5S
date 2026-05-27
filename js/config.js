@@ -79,7 +79,13 @@ export const checklistData = {
     ]
 };
 
+export const checklistDataByViatura = {};
+
 export const totalViaturas = 9;
+export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) => {
+    const id = String(index + 1);
+    return { id, nome: `Viatura ${formatTwoDigits(id)}`, ativa: true };
+});
 export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet" };
 export const vistoriadoresTablet = ["Matheus", "Italo"];
 
@@ -118,4 +124,53 @@ export function getVehicleMapConfig(viaturaId) {
 
 export function formatTwoDigits(value) {
     return String(value || "").padStart(2, "0");
+}
+
+export function getItemName(item) {
+    return typeof item === "string" ? item : item?.nome || "";
+}
+
+export function normalizeChecklistItem(item, index = 0) {
+    if (typeof item === "string") {
+        return {
+            id: `item-${Date.now()}-${index}`,
+            nome: item,
+            ativo: true,
+            substituicoes: []
+        };
+    }
+
+    return {
+        id: item.id || `item-${Date.now()}-${index}`,
+        nome: item.nome || "",
+        ativo: item.ativo !== false,
+        substituicoes: Array.isArray(item.substituicoes) ? item.substituicoes : []
+    };
+}
+
+export function cloneChecklistItems(items = []) {
+    return items.map((item, index) => {
+        const normalized = normalizeChecklistItem(item, index);
+        return {
+            ...normalized,
+            substituicoes: normalized.substituicoes.map(substituicao => ({ ...substituicao }))
+        };
+    });
+}
+
+export function ensureChecklistForViatura(viaturaId) {
+    const id = String(viaturaId || "");
+    if (!id) return checklistData;
+
+    if (!checklistDataByViatura[id]) checklistDataByViatura[id] = {};
+    Object.keys(categoryNames).forEach(category => {
+        if (!checklistDataByViatura[id][category]) {
+            checklistDataByViatura[id][category] = cloneChecklistItems(checklistData[category]);
+        }
+    });
+    return checklistDataByViatura[id];
+}
+
+export function getChecklistItems(category, viaturaId) {
+    return ensureChecklistForViatura(viaturaId)[category] || [];
 }

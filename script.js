@@ -1,4 +1,4 @@
-import { checklistData, categoryNames, totalViaturas, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, getChecklistItems, getItemName, vistoriadoresTablet } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -30,8 +30,20 @@ import {
     exportarVistoriasSelecionadasPDF,
     exportarHistoricoPDF,
     initAdminAuthListener,
+    loginApp,
     loginAdmin,
     logoutAdmin,
+    adicionarItemChecklist,
+    adicionarViatura,
+    alternarItemChecklist,
+    alternarViaturaAtiva,
+    editarItemChecklist,
+    editarNomeViatura,
+    removerItemChecklist,
+    renderAdminChecklist,
+    setAuthReadyCallback,
+    showAdminConfigTab,
+    substituirItemChecklist,
     resolverPendenciasSelecionadas,
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
@@ -44,6 +56,8 @@ import {
 } from "./js/pdf.js";
 import {
     getCategoriasConcluidas,
+    getActiveViaturas,
+    getViaturaById,
     isVistoriaParcial,
     salvarVistoriaLocal,
     setSelectedViatura,
@@ -53,6 +67,36 @@ import {
 
 function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
+}
+
+const vistoriadorPorEmail = {
+    "alisson.tavares@digitalonline.com.br": "Alisson",
+    "marcos@digitalonline.com.br": "Marcos",
+    "italo@digitalonline.com.br": "Italo",
+    "matheus@digitalonline.com.br": "Matheus"
+};
+
+function getVistoriadorPorEmail(email) {
+    return vistoriadorPorEmail[String(email || "").trim().toLowerCase()] || "";
+}
+
+function getVistoriadorAutenticado() {
+    return getVistoriadorPorEmail(auth.currentUser?.email);
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function escapeJsString(value) {
+    return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, "\\n");
 }
 
 function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
@@ -113,6 +157,12 @@ function updateAccessByVistoriador() {
 }
 
 function selecionarVistoriadorAtivo(silent = false) {
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    const vistoriadorAutenticado = getVistoriadorAutenticado();
+    if (vistoriadorAutenticado && vistoriadorSelect && vistoriadorSelect.value !== vistoriadorAutenticado) {
+        vistoriadorSelect.value = vistoriadorAutenticado;
+    }
+
     const vistoriador = getVistoriadorAtivo();
     localStorage.setItem("vistoriadorAtivo", vistoriador);
     updateVistoriadorLogado();
@@ -124,6 +174,16 @@ function selecionarVistoriadorAtivo(silent = false) {
         if (!silent) alert(getAccessDeniedMessage(activeTab.id, vistoriador));
         showPage(isTabletOnlyUser(vistoriador) ? "tablets" : "ferramentas");
     }
+}
+
+function selecionarVistoriadorPorLogin() {
+    const vistoriador = getVistoriadorAutenticado();
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    if (!vistoriador || !vistoriadorSelect) return;
+
+    vistoriadorSelect.value = vistoriador;
+    vistoriadorSelect.disabled = true;
+    selecionarVistoriadorAtivo(true);
 }
 
 function sincronizarVistoriadorLogado(vistoriador) {
@@ -146,6 +206,12 @@ function selecionarResponsavelTablet() {
 }
 
 function solicitarVistoriadorTablet() {
+    const vistoriadorAutenticado = getVistoriadorAutenticado();
+    if (vistoriadorAutenticado && !isTabletOnlyUser(vistoriadorAutenticado)) {
+        alert("A vistoria de tablets só pode ser acessada por Italo ou Matheus.");
+        return false;
+    }
+
     const atual = isTabletOnlyUser() ? getVistoriadorAtivo() : "";
     const resposta = prompt(
         "Para acessar a vistoria de tablets, informe o vistoriador logado: ITALO ou MATHEUS.",
@@ -217,12 +283,18 @@ function renderItems(pageId) {
         tablets: "lista-tablets"
     };
     const container = document.getElementById(containerMapping[pageId]);
-    const items = checklistData[pageId];
+    const items = getChecklistItems(pageId, state.selectedViatura).filter(item => item.ativo !== false);
     if (!container || !items) return;
 
-    container.innerHTML = items.map((item, index) => `
+    container.innerHTML = items.map((item, index) => {
+        const ultimaSubstituicao = item.substituicoes?.at?.(-1);
+        const descricaoSubstituicao = ultimaSubstituicao
+            ? `${ultimaSubstituicao.itemAnterior} foi substituído por ${ultimaSubstituicao.itemNovo || getItemName(item)}.`
+            : "";
+
+        return `
         <div class="checklist-item" id="row-${pageId}-${index}">
-            <label class="item-label">${item}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
+            <label class="item-label">${escapeHtml(getItemName(item))}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
             <div class="status-options">
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="ok" onchange="limparErroItem('${pageId}', ${index})">
@@ -240,9 +312,15 @@ function renderItems(pageId) {
                     <input type="radio" name="status-${pageId}-${index}" value="quebrou" onchange="limparErroItem('${pageId}', ${index})">
                     <span>🛠️ Quebrou</span>
                 </label>
+                ${ultimaSubstituicao ? `
+                    <button type="button" class="status-opt substitution-status" onclick="mostrarSubstituicaoItem('${escapeJsString(ultimaSubstituicao.data)}', '${escapeJsString(descricaoSubstituicao)}')">
+                        <span>Substituição</span>
+                    </button>
+                ` : ""}
             </div>
         </div>
-    `).join("");
+    `;
+    }).join("");
 
     if (pageId === "viaturas") {
         updateVehicleMapImage();
@@ -262,14 +340,18 @@ function limparErroItem(pageId, index) {
     document.getElementById(`row-${pageId}-${index}`)?.classList.remove("error");
 }
 
+function mostrarSubstituicaoItem(data, descricao) {
+    alert(`Data: ${data}\nDescrição: ${descricao}`);
+}
+
 function renderViaturaDashboard() {
     const grid = document.getElementById("viaturas-grid");
     if (!grid) return;
 
     grid.innerHTML = "";
 
-    for (let i = 1; i <= totalViaturas; i++) {
-        const id = i.toString();
+    getActiveViaturas().forEach((viatura) => {
+        const id = viatura.id;
         const status = state.surveyStatus[id];
         const isActive = state.selectedViatura === id;
 
@@ -277,7 +359,7 @@ function renderViaturaDashboard() {
         card.className = `viatura-card ${isActive ? "active" : ""}`;
         card.onclick = () => selectViatura(id);
         card.innerHTML = `
-            <span class="viatura-name">Viatura ${id.padStart(2, "0")}</span>
+            <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
             <div class="status-dots">
                 <span class="dot ${status.ferramentas ? "done" : ""}" title="Ferramentas">🔧</span>
                 <span class="dot ${status.epis ? "done" : ""}" title="EPIs">🦺</span>
@@ -286,10 +368,15 @@ function renderViaturaDashboard() {
             </div>
         `;
         grid.appendChild(card);
-    }
+    });
 }
 
 function selectViatura(id) {
+    const viatura = getViaturaById(id);
+    if (viatura?.ativa === false) {
+        alert("Esta viatura está desativada.");
+        return;
+    }
     setSelectedViatura(id);
     renderViaturaDashboard();
     updateMenuStatus();
@@ -384,7 +471,7 @@ async function finalizarVistoria(category) {
         return;
     }
 
-    const items = checklistData[category];
+    const items = getChecklistItems(category, state.selectedViatura).filter(item => item.ativo !== false);
     const checklistResults = [];
     let temErro = false;
 
@@ -396,7 +483,7 @@ async function finalizarVistoria(category) {
             temErro = true;
             continue;
         }
-        checklistResults.push({ item: items[i], status: radio.value, observacao: "" });
+        checklistResults.push({ item: getItemName(items[i]), status: radio.value, observacao: "" });
     }
 
     if (temErro) {
@@ -501,6 +588,7 @@ async function enviarVistoriaAoFirebase() {
 function bindWindowFunctions() {
     Object.assign(window, {
         toggleMenu,
+        loginApp,
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
         configurarModoVistoria,
@@ -521,9 +609,20 @@ function bindWindowFunctions() {
         toggleSelecionarVistoria,
         toggleSelecionarTodasVistorias,
         excluirVistoriasSelecionadas,
+        adicionarViatura,
+        editarNomeViatura,
+        alternarViaturaAtiva,
+        renderAdminChecklist,
+        showAdminConfigTab,
+        adicionarItemChecklist,
+        editarItemChecklist,
+        alternarItemChecklist,
+        removerItemChecklist,
+        substituirItemChecklist,
         confirmarEnvioFinal,
         abrirModalRevisao,
         limparErroItem,
+        mostrarSubstituicaoItem,
         fecharModalRevisao,
         sincronizarVistoriadorLogado,
         setDamageType,
@@ -550,14 +649,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
+    setAuthReadyCallback(async () => {
+        selecionarVistoriadorPorLogin();
+        renderItems("ferramentas");
+        renderViaturaDashboard();
+        updateVehicleMapImage();
+        updateTabletInfo();
+        updateMenuStatus();
+        updateVistoriaModeUI();
+        selecionarVistoriadorAtivo(true);
+    });
     initAdminAuthListener();
-    renderItems("ferramentas");
-    renderViaturaDashboard();
-    updateVehicleMapImage();
-    updateTabletInfo();
-    updateMenuStatus();
-    updateVistoriaModeUI();
-    selecionarVistoriadorAtivo(true);
 });
 
 bindWindowFunctions();
+
+window.refreshAppAfterConfigChange = function() {
+    renderViaturaDashboard();
+    updateMenuStatus();
+    const activeTab = document.querySelector(".tab-content.active");
+    if (activeTab) renderItems(activeTab.id);
+};
