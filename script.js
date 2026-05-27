@@ -1,4 +1,4 @@
-import { categoryNames, getChecklistItems, getItemName, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, getChecklistItems, getItemName, getChecklistItemDefaults, vistoriadoresTablet } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -33,12 +33,14 @@ import {
     loginApp,
     loginAdmin,
     logoutAdmin,
+    limparHistoricoConfig,
     adicionarItemChecklist,
     adicionarViatura,
     alternarItemChecklist,
     alternarViaturaAtiva,
     editarItemChecklist,
     editarNomeViatura,
+    removerViatura,
     removerItemChecklist,
     renderAdminChecklist,
     setAuthReadyCallback,
@@ -287,14 +289,33 @@ function renderItems(pageId) {
     if (!container || !items) return;
 
     container.innerHTML = items.map((item, index) => {
+        const itemName = getItemName(item);
+        const defaults = getChecklistItemDefaults(pageId, itemName);
+        const quantidade = Number(defaults.quantidade || 1);
+        const valor = Number(defaults.valor || 0);
+        const total = quantidade * valor;
         const ultimaSubstituicao = item.substituicoes?.at?.(-1);
         const descricaoSubstituicao = ultimaSubstituicao
-            ? `${ultimaSubstituicao.itemAnterior} foi substituído por ${ultimaSubstituicao.itemNovo || getItemName(item)}.`
+            ? `${ultimaSubstituicao.itemAnterior} foi substituído por ${ultimaSubstituicao.itemNovo || itemName}.`
             : "";
 
         return `
         <div class="checklist-item" id="row-${pageId}-${index}">
-            <label class="item-label">${escapeHtml(getItemName(item))}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
+            <div class="checklist-item-header">
+                <div class="item-quantity-field">
+                    <label for="qtd-${pageId}-${index}">QTD</label>
+                    <input type="number" id="qtd-${pageId}-${index}" min="0" step="1" value="${quantidade}" oninput="atualizarTotalItem('${pageId}', ${index})">
+                </div>
+                <label class="item-label">${escapeHtml(itemName)}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
+                <div class="item-value-field">
+                    <label for="valor-${pageId}-${index}">Valor</label>
+                    <input type="number" id="valor-${pageId}-${index}" min="0" step="0.01" value="${valor.toFixed(2)}" oninput="atualizarTotalItem('${pageId}', ${index})">
+                </div>
+                <div class="item-total-field">
+                    <label for="total-${pageId}-${index}">Total</label>
+                    <input type="text" id="total-${pageId}-${index}" value="${formatCurrency(total)}" readonly>
+                </div>
+            </div>
             <div class="status-options">
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="ok" onchange="limparErroItem('${pageId}', ${index})">
@@ -318,6 +339,12 @@ function renderItems(pageId) {
                     </button>
                 ` : ""}
             </div>
+            <div class="checklist-extra-fields">
+                <label>
+                    <span>OBS</span>
+                    <textarea id="obs-${pageId}-${index}" rows="1" placeholder="Observação do item">${escapeHtml(defaults.observacao || "")}</textarea>
+                </label>
+            </div>
         </div>
     `;
     }).join("");
@@ -338,6 +365,20 @@ function renderItems(pageId) {
 
 function limparErroItem(pageId, index) {
     document.getElementById(`row-${pageId}-${index}`)?.classList.remove("error");
+}
+
+function formatCurrency(value) {
+    return Number(value || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+    });
+}
+
+function atualizarTotalItem(pageId, index) {
+    const quantidade = Number(document.getElementById(`qtd-${pageId}-${index}`)?.value || 0);
+    const valor = Number(document.getElementById(`valor-${pageId}-${index}`)?.value || 0);
+    const totalInput = document.getElementById(`total-${pageId}-${index}`);
+    if (totalInput) totalInput.value = formatCurrency(quantidade * valor);
 }
 
 function mostrarSubstituicaoItem(data, descricao) {
@@ -447,6 +488,10 @@ function updateMenuStatus() {
 
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById("km");
+    const dataVistoriaInput = document.getElementById("checking-date");
+    const tecnicoCpfInput = document.getElementById("tecnico-cpf");
+    const auxiliarNomeInput = document.getElementById("auxiliar-nome");
+    const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
     const vistoriador = category === "tablets" && !isTabletOnlyUser(vistoriadorGeral)
@@ -483,7 +528,18 @@ async function finalizarVistoria(category) {
             temErro = true;
             continue;
         }
-        checklistResults.push({ item: getItemName(items[i]), status: radio.value, observacao: "" });
+        const quantidade = Number(document.getElementById(`qtd-${category}-${i}`)?.value || 0);
+        const valorUnitario = Number(document.getElementById(`valor-${category}-${i}`)?.value || 0);
+        const observacao = document.getElementById(`obs-${category}-${i}`)?.value.trim() || "";
+
+        checklistResults.push({
+            item: getItemName(items[i]),
+            quantidade,
+            valorUnitario,
+            total: quantidade * valorUnitario,
+            status: radio.value,
+            observacao
+        });
     }
 
     if (temErro) {
@@ -495,6 +551,10 @@ async function finalizarVistoria(category) {
         viaturaId: state.selectedViatura,
         tabletId: category === "tablets" ? state.selectedViatura : null,
         vistoriador,
+        dataVistoria: dataVistoriaInput?.value || new Date().toLocaleDateString("sv-SE"),
+        tecnicoCpf: tecnicoCpfInput?.value.trim() || "",
+        auxiliarTecnico: auxiliarNomeInput?.value.trim() || "",
+        auxiliarCpf: auxiliarCpfInput?.value.trim() || "",
         categoria: category,
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
@@ -513,7 +573,7 @@ function abrirModalRevisao(pendentes) {
     revisaoBody.innerHTML = pendentes.map((p, index) => `
         <div class="revisao-item">
             <label><strong>${p.item}</strong> (${p.status.toUpperCase()})</label>
-            <textarea id="rev-obs-${index}" placeholder="Descreva o motivo (obrigatório)..." required></textarea>
+            <textarea id="rev-obs-${index}" placeholder="Descreva o motivo (obrigatório)..." required>${escapeHtml(p.observacao || "")}</textarea>
         </div>
     `).join("");
     document.getElementById("revisao-modal").style.display = "block";
@@ -598,6 +658,7 @@ function bindWindowFunctions() {
         selectViatura,
         loginAdmin,
         logoutAdmin,
+        limparHistoricoConfig,
         verDetalhes,
         closeModal,
         encerrarVistoriaCompleta,
@@ -612,6 +673,7 @@ function bindWindowFunctions() {
         adicionarViatura,
         editarNomeViatura,
         alternarViaturaAtiva,
+        removerViatura,
         renderAdminChecklist,
         showAdminConfigTab,
         adicionarItemChecklist,
@@ -621,6 +683,7 @@ function bindWindowFunctions() {
         substituirItemChecklist,
         confirmarEnvioFinal,
         abrirModalRevisao,
+        atualizarTotalItem,
         limparErroItem,
         mostrarSubstituicaoItem,
         fecharModalRevisao,
@@ -647,6 +710,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
+    const checkingDate = document.getElementById("checking-date");
+    if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
     setAuthReadyCallback(async () => {

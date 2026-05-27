@@ -9,7 +9,9 @@
 <body>
     <section id="app-login-screen" class="auth-screen">
         <div class="auth-card">
-            <div class="logo auth-logo">DIGITAL</div>
+            <div class="logo auth-logo">
+                <img src="assets/logo.png" alt="Logo">
+            </div>
             <h1>Checklist 5S</h1>
             <div class="login-box">
                 <input type="email" id="app-login-email" placeholder="E-mail">
@@ -20,8 +22,21 @@
         </div>
     </section>
 
+    <section id="app-splash-screen" class="splash-screen" aria-live="polite">
+        <div class="splash-content">
+            <img src="assets/logo.png" alt="Logo">
+            <p>Não basta ter fibra, tem que ser Digital</p>
+            <div class="splash-loading" role="status">
+                <span class="splash-spinner" aria-hidden="true"></span>
+                <span>Carregando sistema...</span>
+            </div>
+        </div>
+    </section>
+
     <header>
-        <div class="logo">DIGITAL</div>
+        <div class="logo">
+            <img src="assets/logo.png" alt="Logo">
+        </div>
         <div class="user-selector">
             <select id="vistoriador-atual" onchange="selecionarVistoriadorAtivo()">
                 <option value="">Selecione o Vistoriador</option>
@@ -30,7 +45,6 @@
                 <option value="Matheus">Matheus</option>
                 <option value="Italo">Italo</option>
             </select>
-            <span id="vistoriador-logado" class="logged-user">Nenhum vistoriador selecionado</span>
             <button type="button" class="btn-header-logout" onclick="logoutAdmin()">Sair</button>
         </div>
         <nav class="menu-container">
@@ -59,6 +73,24 @@
                 <div class="vistoria-mode-bar">
                     <span id="vistoria-mode-label">Modo: Vistoria completa</span>
                     <button type="button" onclick="configurarModoVistoria()">Alterar modo</button>
+                </div>
+                <div class="checking-meta">
+                    <div class="input-group">
+                        <label for="checking-date">Data da vistoria:</label>
+                        <input type="date" id="checking-date">
+                    </div>
+                    <div class="input-group">
+                        <label for="tecnico-cpf">CPF do técnico:</label>
+                        <input type="text" id="tecnico-cpf" placeholder="000.000.000-00">
+                    </div>
+                    <div class="input-group">
+                        <label for="auxiliar-nome">Auxiliar técnico:</label>
+                        <input type="text" id="auxiliar-nome" placeholder="Nome do auxiliar técnico">
+                    </div>
+                    <div class="input-group">
+                        <label for="auxiliar-cpf">CPF do auxiliar:</label>
+                        <input type="text" id="auxiliar-cpf" placeholder="000.000.000-00">
+                    </div>
                 </div>
                 <button id="btn-encerrar-geral" class="btn-encerrar" onclick="encerrarVistoriaCompleta()">📁 Encerrar Vistoria e Gerar PDF</button>
             </div>
@@ -216,6 +248,7 @@
                     <div class="admin-config-tabs">
                         <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
                         <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
+                        <button type="button" id="admin-tab-historico" onclick="showAdminConfigTab('historico')">Histórico</button>
                     </div>
 
                     <div class="admin-config-grid">
@@ -243,6 +276,14 @@
                                 <button type="button" onclick="adicionarItemChecklist()">Adicionar item</button>
                             </div>
                             <div id="admin-checklist-list" class="admin-config-list"></div>
+                        </div>
+
+                        <div class="admin-config-panel admin-config-section" id="admin-config-historico">
+                            <div class="admin-config-header">
+                                <h3>Histórico de alterações</h3>
+                                <button type="button" class="btn-danger" onclick="limparHistoricoConfig()">Limpar histórico</button>
+                            </div>
+                            <div id="admin-config-history-list" class="admin-history-list"></div>
                         </div>
                     </div>
 

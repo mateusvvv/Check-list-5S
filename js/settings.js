@@ -33,6 +33,21 @@ function ensureChecklistForAllViaturas() {
     state.viaturas.forEach(viatura => ensureChecklistForViatura(viatura.id));
 }
 
+function applyConfigHistory(history = []) {
+    state.configHistory = Array.isArray(history)
+        ? history
+            .filter(item => item && item.tipo && item.descricao)
+            .map(item => ({
+                id: String(item.id || `hist-${Date.now()}`),
+                tipo: String(item.tipo || ""),
+                descricao: String(item.descricao || ""),
+                vistoriador: String(item.vistoriador || "Não identificado"),
+                email: String(item.email || ""),
+                data: String(item.data || new Date().toISOString())
+            }))
+        : [];
+}
+
 export async function carregarConfiguracoes() {
     try {
         const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
@@ -42,18 +57,21 @@ export async function carregarConfiguracoes() {
             applyChecklistData(data.checklistData || checklistData);
             setViaturas(data.viaturas || defaultViaturas);
             applyChecklistDataByViatura(data.checklistDataByViatura || {});
+            applyConfigHistory(data.configHistory || []);
             ensureChecklistForAllViaturas();
             return;
         }
 
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
+        applyConfigHistory([]);
         ensureChecklistForAllViaturas();
         await salvarConfiguracoes();
     } catch (error) {
         console.warn("Não foi possível carregar configurações remotas. Usando configuração local.", error);
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
+        applyConfigHistory([]);
         ensureChecklistForAllViaturas();
     }
 }
@@ -74,6 +92,7 @@ export async function salvarConfiguracoes() {
             ])
         ),
         viaturas: state.viaturas,
+        configHistory: state.configHistory.slice(0, 200),
         atualizadoEm: serverTimestamp()
     }, { merge: true });
 }

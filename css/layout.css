@@ -1,10 +1,11 @@
 header {
     background-color: var(--primary-blue);
     color: var(--white);
-    padding: 1rem 5%;
+    padding: 0.75rem 5%;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 18px;
     box-shadow: var(--shadow);
     position: sticky;
     top: 0;
@@ -17,47 +18,60 @@ body > main {
 }
 
 .user-selector {
-    margin-left: 20px;
+    margin-left: auto;
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    min-width: 0;
 }
 
 .user-selector select {
-    padding: 6px;
+    width: 210px;
+    min-height: 36px;
+    padding: 7px 10px;
     border-radius: 4px;
-    border: 1px solid var(--border-color);
-    max-width: 100%;
-}
-
-.logged-user {
-    color: #e7f1ff;
-    font-size: 0.78rem;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background: #ffffff;
+    color: var(--primary-blue);
     font-weight: 700;
-}
-
-.logged-user.active {
-    color: #ffffff;
+    outline-color: #ffffff;
 }
 
 .logo {
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 170px;
+    height: 42px;
+    overflow: hidden;
+}
+
+.logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .menu-container {
     position: relative;
+    flex-shrink: 0;
 }
 
 .menu-btn {
-    background: transparent;
+    min-height: 40px;
+    background: rgba(255, 255, 255, 0.1);
     color: var(--white);
-    border: 1px solid var(--white);
-    padding: 8px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    padding: 8px 18px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: bold;
     transition: all 0.3s;
     white-space: nowrap;
@@ -174,6 +188,24 @@ body > main {
     padding: 8px 10px;
 }
 
+.checking-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 14px 0;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #f8fafc;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.checking-meta .input-group {
+    margin: 0;
+    min-width: 0;
+}
+
 .btn-encerrar {
     display: none;
     background-color: #007bff;
@@ -253,6 +285,9 @@ body > main {
 
 .input-group select,
 .input-group input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
     padding: 8px;
     border-radius: 4px;
     border: 1px solid var(--border-color);

@@ -1,4 +1,4 @@
-import { categoryNames, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItems, getItemName, normalizeChecklistItem, vehicleViewNames } from "./config.js";
+import { categoryNames, checklistDataByViatura, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItems, getItemName, normalizeChecklistItem, vehicleViewNames } from "./config.js";
 import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
@@ -6,6 +6,8 @@ import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
 import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
 
 let authReadyCallback = async () => {};
+const splashDelayMs = 3000;
+let splashTimer = null;
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -17,6 +19,38 @@ function escapeHtml(value) {
 
 function formatDateBR(date = new Date()) {
     return date.toLocaleDateString("pt-BR");
+}
+
+function formatDateTimeBR(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Data indisponível" : date.toLocaleString("pt-BR");
+}
+
+const vistoriadorPorEmail = {
+    "alisson.tavares@digitalonline.com.br": "Alisson",
+    "marcos@digitalonline.com.br": "Marcos",
+    "italo@digitalonline.com.br": "Italo",
+    "matheus@digitalonline.com.br": "Matheus"
+};
+
+function getVistoriadorResponsavel() {
+    const email = String(auth.currentUser?.email || "").trim().toLowerCase();
+    return document.getElementById("vistoriador-atual")?.value
+        || vistoriadorPorEmail[email]
+        || auth.currentUser?.email
+        || "Não identificado";
+}
+
+function registrarHistoricoConfig(tipo, descricao) {
+    state.configHistory.unshift({
+        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        tipo,
+        descricao,
+        vistoriador: getVistoriadorResponsavel(),
+        email: auth.currentUser?.email || "",
+        data: new Date().toISOString()
+    });
+    state.configHistory = state.configHistory.slice(0, 200);
 }
 
 function isValidDateBR(value) {
@@ -62,24 +96,24 @@ function renderAdminConfig() {
     renderAdminViaturas();
     renderAdminViaturaOptions();
     renderAdminChecklist();
+    renderAdminHistory();
 }
 
 export function showAdminConfigTab(tab) {
     const targetButton = document.getElementById(`admin-tab-${tab}`);
     const isAlreadyOpen = targetButton?.classList.contains("active");
     if (isAlreadyOpen) {
-        document.getElementById("admin-tab-viaturas")?.classList.remove("active");
-        document.getElementById("admin-tab-itens")?.classList.remove("active");
-        document.getElementById("admin-config-viaturas")?.classList.remove("active");
-        document.getElementById("admin-config-itens")?.classList.remove("active");
+        ["viaturas", "itens", "historico"].forEach(item => {
+            document.getElementById(`admin-tab-${item}`)?.classList.remove("active");
+            document.getElementById(`admin-config-${item}`)?.classList.remove("active");
+        });
         return;
     }
 
-    const isItens = tab === "itens";
-    document.getElementById("admin-tab-viaturas")?.classList.toggle("active", !isItens);
-    document.getElementById("admin-tab-itens")?.classList.toggle("active", isItens);
-    document.getElementById("admin-config-viaturas")?.classList.toggle("active", !isItens);
-    document.getElementById("admin-config-itens")?.classList.toggle("active", isItens);
+    ["viaturas", "itens", "historico"].forEach(item => {
+        document.getElementById(`admin-tab-${item}`)?.classList.toggle("active", tab === item);
+        document.getElementById(`admin-config-${item}`)?.classList.toggle("active", tab === item);
+    });
 }
 
 function refreshAppAfterConfigChange() {
@@ -97,16 +131,52 @@ export function renderAdminViaturas() {
             <span>ID ${formatTwoDigits(viatura.id)}</span>
             <div class="admin-config-actions">
                 <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
+                <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
             </div>
         </div>
     `).join("");
 }
 
+export function renderAdminHistory() {
+    const container = document.getElementById("admin-config-history-list");
+    if (!container) return;
+
+    if (!state.configHistory.length) {
+        container.innerHTML = '<p class="admin-history-empty">Nenhuma alteração registrada.</p>';
+        return;
+    }
+
+    container.innerHTML = state.configHistory.map(item => `
+        <div class="admin-history-row">
+            <div>
+                <strong>${escapeHtml(item.tipo)}</strong>
+                <p>${escapeHtml(item.descricao)}</p>
+            </div>
+            <div class="admin-history-meta">
+                <span>${escapeHtml(item.vistoriador || "Não identificado")}</span>
+                <small>${escapeHtml(formatDateTimeBR(item.data))}</small>
+            </div>
+        </div>
+    `).join("");
+}
+
+export async function limparHistoricoConfig() {
+    if (!state.configHistory.length) return;
+    if (!confirm("Deseja limpar todo o histórico de alterações?")) return;
+
+    state.configHistory = [];
+    await salvarConfiguracoes();
+    renderAdminHistory();
+}
+
 export async function adicionarViatura() {
     const proximoId = String(Math.max(0, ...state.viaturas.map(viatura => Number(viatura.id) || 0)) + 1);
-    state.viaturas.push({ id: proximoId, nome: `Viatura ${formatTwoDigits(proximoId)}`, ativa: true });
+    const nome = `Viatura ${formatTwoDigits(proximoId)}`;
+    state.viaturas.push({ id: proximoId, nome, ativa: true });
     ensureViaturaState(proximoId);
     ensureChecklistForViatura(proximoId);
+    setSelectedViatura(proximoId);
+    registrarHistoricoConfig("Viatura adicionada", `${nome} foi adicionada.`);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -126,6 +196,35 @@ export async function alternarViaturaAtiva(id) {
     if (state.selectedViatura === String(id) && viatura.ativa === false) {
         setSelectedViatura(getActiveViaturas()[0]?.id || id);
     }
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function removerViatura(id) {
+    const viaturaId = String(id);
+    const viatura = state.viaturas.find(item => item.id === viaturaId);
+    if (!viatura) return;
+
+    if (!confirm(`Deseja remover ${viatura.nome}?`)) return;
+
+    registrarHistoricoConfig("Viatura removida", `${viatura.nome} foi removida.`);
+    state.viaturas = state.viaturas.filter(item => item.id !== viaturaId);
+    delete state.surveyStatus[viaturaId];
+    delete state.vehicleDamages[viaturaId];
+    delete state.tabletDamages[viaturaId];
+    delete state.vistoriaMode[viaturaId];
+    delete state.vistoriasLocais[viaturaId];
+    delete checklistDataByViatura[viaturaId];
+
+    if (state.viaturas.length === 0) {
+        await adicionarViatura();
+        return;
+    }
+
+    if (state.selectedViatura === viaturaId) {
+        setSelectedViatura(getActiveViaturas()[0]?.id || state.viaturas[0]?.id || "1");
+    }
+
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -230,14 +329,21 @@ export async function substituirItemChecklist(viaturaId, category, index) {
         return;
     }
 
+    const itemAnterior = item.nome;
+    const itemNovo = novoNome.trim();
     item.substituicoes.push({
-        itemAnterior: item.nome,
-        itemNovo: novoNome.trim(),
+        itemAnterior,
+        itemNovo,
         data: data.trim(),
         registradoEm: new Date().toISOString()
     });
-    item.nome = novoNome.trim();
+    item.nome = itemNovo;
     item.ativo = true;
+    const viatura = state.viaturas.find(item => item.id === String(viaturaId));
+    registrarHistoricoConfig(
+        "Item substituído",
+        `${categoryNames[category] || category}: "${itemAnterior}" foi substituído por "${itemNovo}" em ${viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`}.`
+    );
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -599,6 +705,10 @@ export function verDetalhes(docId) {
 
     const pendentes = vistoria.itens.filter(i => i.status !== "ok");
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
+    if (vistoria.dataVistoria) html += `<p><strong>Data da vistoria:</strong> ${String(vistoria.dataVistoria).split("-").reverse().join("/")}</p>`;
+    if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
+    if (vistoria.auxiliarTecnico) html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
+    if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
     if (vistoria.categoria === "tablets") {
         html += `<p><strong>Tablet:</strong> ${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)} vinculado à Viatura ${formatTwoDigits(vistoria.viaturaId)}</p>`;
@@ -624,7 +734,10 @@ export function verDetalhes(docId) {
         pendentes.forEach(p => {
             const iconMap = { pendente: "⚠️", perdeu: "❌", quebrou: "🛠️" };
             const labelStatus = iconMap[p.status] || "❓";
-            html += `<li><strong>${labelStatus} ${p.item}:</strong> ${p.observacao || "Sem observação"}</li>`;
+            const quantidade = Number(p.quantidade || 0);
+            const valor = Number(p.valorUnitario || 0);
+            const total = Number(p.total || quantidade * valor);
+            html += `<li><strong>${labelStatus} ${quantidade || "-"}x ${p.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)}:</strong> ${p.observacao || "Sem observação"}</li>`;
         });
         html += "</ul>";
     } else {
@@ -667,13 +780,21 @@ export async function exportarHistoricoPDF() {
 export function initAdminAuthListener() {
     onAuthStateChanged(auth, async (user) => {
         const loginScreen = document.getElementById("app-login-screen");
+        const splashScreen = document.getElementById("app-splash-screen");
         const header = document.querySelector("header");
         const main = document.querySelector("main");
         const loginSec = document.getElementById("admin-login-section");
         const panelSec = document.getElementById("admin-panel-section");
+
+        if (splashTimer) {
+            clearTimeout(splashTimer);
+            splashTimer = null;
+        }
+
         if (loginScreen) loginScreen.style.display = user ? "none" : "grid";
-        if (header) header.style.display = user ? "flex" : "none";
-        if (main) main.style.display = user ? "block" : "none";
+        if (splashScreen) splashScreen.style.display = user ? "grid" : "none";
+        if (header) header.style.display = "none";
+        if (main) main.style.display = "none";
         if (loginSec) loginSec.style.display = user ? "none" : "block";
         if (panelSec) panelSec.style.display = user ? "block" : "none";
         if (!user) {
@@ -681,10 +802,23 @@ export function initAdminAuthListener() {
             if (vistoriadorSelect) vistoriadorSelect.disabled = false;
         }
         if (user) {
-            await carregarConfiguracoes();
-            await authReadyCallback();
-            renderAdminConfig();
-            carregarHistorico();
+            const splashWait = new Promise(resolve => {
+                splashTimer = setTimeout(resolve, splashDelayMs);
+            });
+            await Promise.all([
+                (async () => {
+                    await carregarConfiguracoes();
+                    await authReadyCallback();
+                    renderAdminConfig();
+                    carregarHistorico();
+                })(),
+                splashWait
+            ]);
+            if (auth.currentUser !== user) return;
+            if (splashScreen) splashScreen.style.display = "none";
+            if (header) header.style.display = "flex";
+            if (main) main.style.display = "block";
+            splashTimer = null;
         }
     });
 }

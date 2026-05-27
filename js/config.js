@@ -81,6 +81,50 @@ export const checklistData = {
 
 export const checklistDataByViatura = {};
 
+export const checklistItemDefaults = {
+    ferramentas: {
+        "Controle de Portão do Estacionamento": { quantidade: 1, valor: 60 },
+        "Tablet Active 3 Samsung + capa + bolsa": { quantidade: 1, valor: 3500 },
+        "Telefone Gôndola com fio Intelbras TC20 Preto": { quantidade: 1, valor: 70 },
+        "Optical Power Meter G10": { quantidade: 2, valor: 250, observacao: "04/04/2024" },
+        "Bolsa para KIT de CONECTOR FAST": { quantidade: 2, valor: 60 },
+        "Caneta Laser": { quantidade: 2, valor: 180, observacao: "01/02/2025" },
+        "Clivador de Alta Precisão Aua-S2": { quantidade: 2, valor: 600, observacao: "04/04/2024" },
+        "Alicate Decapador 3 Furos Cfs-2": { quantidade: 2, valor: 140, observacao: "25/03/2026" },
+        "Alicate Flat": { quantidade: 2, valor: 140, observacao: "NOVO 10/04/2026" },
+        "Estilete Profissional": { quantidade: 1, valor: 15 },
+        "Multímetro/Teste de Cabo": { quantidade: 1, valor: 180, observacao: "01/11/2025" },
+        "Pincel Retrátil para Detalhamento": { quantidade: 1, valor: 20 },
+        "Caneta para Limpeza de Conectores SC": { quantidade: 2, valor: 120, observacao: "01/11/2025" },
+        "Bolsa para Ferramentas CG460": { quantidade: 1, valor: 120 },
+        "Alicate de Bico": { quantidade: 1, valor: 31 },
+        "Alicate de Corte": { quantidade: 2, valor: 35 },
+        "Alicate de Crimpar": { quantidade: 1, valor: 39 },
+        "Alicate Universal": { quantidade: 1, valor: 15 },
+        "Broca de 06mm Concreto Curta": { quantidade: 1, valor: 7.80 },
+        "Broca de 08mm Concreto Curta": { quantidade: 1, valor: 8 },
+        "Broca de 06mm de ferro": { quantidade: 1, valor: 6 },
+        "Broca de 10mm Concreto Longa": { quantidade: 1, valor: 12.50 },
+        "Chave de fenda 1/4 x 4\"": { quantidade: 1, valor: 5 },
+        "Chave Philips 3/16 x 4\"": { quantidade: 1, valor: 22, observacao: "NOVA" },
+        "Chave de boca 10/11\"": { quantidade: 1, valor: 10 },
+        "Martelo Nº 20": { quantidade: 1, valor: 19.50 },
+        "Ponteira Estrela PH2": { quantidade: 1, valor: 2.50 },
+        "Furadeira Elétrica Bosch impacto 850W": { quantidade: 1, valor: 700 },
+        "Arco de Serra F.G": { quantidade: 1, valor: 10.50 },
+        "Baú Madeira Ferramentas (Caixote)": { quantidade: 1, valor: 240 },
+        "Passa Fio Alma de Aço 15M": { quantidade: 1, valor: 22 },
+        "Extensão 15 metros cabo PP": { quantidade: 1, valor: 35 },
+        "Escada 6 Metros": { quantidade: 1, valor: 800 },
+        "Cinta (catraca) da Escada /6m": { quantidade: 1, valor: 36, observacao: "18/03/2025" },
+        "Carrinho dobrável para bobina DROP": { quantidade: 1, valor: 400 },
+        "Escada tesoura cogumelo RF-5": { quantidade: 1, valor: 700 },
+        "Carretel recolhedor com fita de sinalização": { quantidade: 1, valor: 280 },
+        "Cone Sinalização Flexível 75cm Laranja e Branco": { quantidade: 4, valor: 80 },
+        "Garrafa Térmica 5L Cor Azul": { quantidade: 1, valor: 40 }
+    }
+};
+
 export const totalViaturas = 9;
 export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) => {
     const id = String(index + 1);
@@ -128,6 +172,10 @@ export function formatTwoDigits(value) {
 
 export function getItemName(item) {
     return typeof item === "string" ? item : item?.nome || "";
+}
+
+export function getChecklistItemDefaults(category, itemName) {
+    return checklistItemDefaults[category]?.[itemName] || { quantidade: 1, valor: 0, observacao: "" };
 }
 
 export function normalizeChecklistItem(item, index = 0) {

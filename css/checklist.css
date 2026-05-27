@@ -2,7 +2,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding: 12px;
+    padding: 10px;
     border-bottom: 1px solid var(--border-color);
     transition: background 0.2s;
 }
@@ -25,8 +25,75 @@
 }
 
 .item-label {
-    font-weight: 500;
-    margin-bottom: 5px;
+    font-weight: 700;
+    margin-bottom: 0;
+    align-self: start;
+    line-height: 1.25;
+    min-width: 0;
+}
+
+.checklist-item-header {
+    display: grid;
+    grid-template-columns: 58px 92px 108px minmax(0, 1fr);
+    grid-template-areas:
+        "name name name name"
+        "qtd valor total .";
+    gap: 6px 8px;
+    width: 100%;
+    align-items: end;
+}
+
+.checklist-item-header .item-label {
+    grid-area: name;
+}
+
+.item-quantity-field {
+    grid-area: qtd;
+}
+
+.item-value-field {
+    grid-area: valor;
+}
+
+.item-total-field {
+    grid-area: total;
+}
+
+.item-quantity-field,
+.item-value-field,
+.item-total-field,
+.checklist-extra-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+}
+
+.item-quantity-field input,
+.item-value-field input,
+.item-total-field input,
+.checklist-extra-fields input,
+.checklist-extra-fields textarea {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 7px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font: 0.82rem/1.2 inherit;
+    background: #fff;
+}
+
+.item-total-field input {
+    background: #f5f7fb;
+    font-weight: 700;
+}
+
+.checklist-extra-fields {
+    width: 100%;
+    margin-top: 8px;
 }
 
 .error-msg {
@@ -43,16 +110,17 @@
 
 .status-options {
     display: flex;
-    gap: 10px;
-    margin-top: 5px;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 .status-opt {
     cursor: pointer;
-    padding: 5px 10px;
+    padding: 5px 8px;
     border: 1px solid #dddddd;
     border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     background: #f9f9f9;
     transition: all 0.2s;
     display: flex;

@@ -285,6 +285,10 @@ export async function gerarPDF(titulo, dados, options = {}) {
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
         addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5 });
         addColumnText(`Vistoriador: ${v.vistoriador}`);
+        if (v.tecnicoCpf) addColumnText(`CPF Técnico: ${v.tecnicoCpf}`);
+        if (v.auxiliarTecnico) addColumnText(`Auxiliar Técnico: ${v.auxiliarTecnico}`);
+        if (v.auxiliarCpf) addColumnText(`CPF Auxiliar: ${v.auxiliarCpf}`);
+        if (v.dataVistoria) addColumnText(`Data da vistoria: ${String(v.dataVistoria).split("-").reverse().join("/")}`);
         addColumnText(`Data: ${dataObj.toLocaleString("pt-BR")}`);
 
         if (v.km) addColumnText(`KM: ${v.km}`);
@@ -313,7 +317,10 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText("Itens:", { bold: true });
         v.itens.forEach(item => {
             const s = item.status || "pendente";
-            let linha = `${item.item} ${s === "ok" ? "[OK]" : `[${s.toUpperCase()}]`}`;
+            const quantidade = Number(item.quantidade || 0);
+            const valor = Number(item.valorUnitario || 0);
+            const total = Number(item.total || quantidade * valor);
+            let linha = `${quantidade || "-"}x ${item.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)} - ${s === "ok" ? "[OK]" : `[${s.toUpperCase()}]`}`;
             if (item.observacao) linha += ` - Motivo: ${item.observacao}`;
             addColumnText(linha);
         });

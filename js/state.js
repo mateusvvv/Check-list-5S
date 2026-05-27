@@ -10,6 +10,7 @@ export const state = {
     vistoriasLocais: {},
     selectedVistorias: new Set(),
     vistoriasCache: [],
+    configHistory: [],
     dadosTemporariosVistoria: null,
     selectedDamageType: "amassado",
     selectedTabletDamageType: "amassado"

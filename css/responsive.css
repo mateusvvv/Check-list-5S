@@ -8,17 +8,26 @@
     }
 
     .logo {
-        text-align: left;
-        font-size: 1.25rem;
+        width: 132px;
+        height: 34px;
+    }
+
+    .logo img {
+        width: 100%;
+        height: 100%;
     }
 
     .user-selector {
         order: 3;
         width: 100%;
         margin-left: 0;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        padding: 8px;
     }
 
     .user-selector select {
+        flex: 1 1 100%;
         width: 100%;
         font-size: 0.95rem;
     }
@@ -99,5 +108,156 @@
         align-items: flex-end;
         gap: 8px;
         flex-shrink: 0;
+    }
+}
+@media (max-width: 900px) {
+    .checking-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+    .auth-screen {
+        padding: 16px;
+        align-items: center;
+    }
+
+    .auth-card {
+        width: 100%;
+        padding: 30px 20px;
+    }
+
+    .auth-card h1 {
+        font-size: 1.75rem;
+    }
+
+    .auth-logo {
+        width: 210px;
+        height: 64px;
+    }
+
+    .login-box {
+        max-width: 100%;
+        padding: 14px;
+    }
+
+    .login-box input {
+        padding: 9px 8px;
+        font-size: 0.88rem;
+    }
+
+    .admin-history-row {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-history-meta {
+        justify-items: start;
+        white-space: normal;
+    }
+
+    .checking-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 10px 0;
+    }
+
+    .checking-meta .input-group label,
+    .item-quantity-field,
+    .item-value-field,
+    .item-total-field,
+    .checklist-extra-fields label {
+        font-size: 0.58rem;
+    }
+
+    .checking-meta .input-group input {
+        min-height: 34px;
+        padding: 6px;
+        font-size: 0.82rem;
+    }
+
+    .checklist-item {
+        padding: 9px 8px;
+    }
+
+    .checklist-item-header {
+        grid-template-columns: 48px minmax(74px, 1fr) minmax(82px, 1fr);
+        grid-template-areas:
+            "name name name"
+            "qtd valor total";
+        gap: 5px;
+    }
+
+    .item-label {
+        grid-area: name;
+        font-size: 0.92rem;
+        align-self: start;
+        margin-bottom: 2px;
+    }
+
+    .item-quantity-field {
+        grid-area: qtd;
+    }
+
+    .item-value-field {
+        grid-area: valor;
+    }
+
+    .item-total-field {
+        grid-area: total;
+    }
+
+    .item-quantity-field input,
+    .item-value-field input,
+    .item-total-field input,
+    .checklist-extra-fields input,
+    .checklist-extra-fields textarea {
+        min-height: 30px;
+        padding: 5px 6px;
+        font-size: 0.78rem;
+    }
+
+    .checklist-extra-fields {
+        margin-top: 7px;
+    }
+
+    .status-options {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+        width: 100%;
+    }
+
+    .status-opt {
+        justify-content: center;
+        padding: 6px 3px;
+        font-size: 0.64rem;
+        min-height: 32px;
+        text-align: center;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 420px) {
+    .checking-meta {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 380px) {
+    .checklist-item-header {
+        grid-template-columns: 46px minmax(68px, 1fr) minmax(76px, 1fr);
+    }
+
+    .item-quantity-field input,
+    .item-value-field input,
+    .item-total-field input,
+    .checklist-extra-fields input,
+    .checklist-extra-fields textarea {
+        font-size: 0.72rem;
+    }
+
+    .status-options {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
