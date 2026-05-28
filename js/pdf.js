@@ -289,6 +289,9 @@ export async function gerarPDF(titulo, dados, options = {}) {
         if (v.tecnicoCpf) addColumnText(`CPF Técnico: ${v.tecnicoCpf}`);
         if (v.auxiliarTecnico) addColumnText(`Auxiliar Técnico: ${v.auxiliarTecnico}`);
         if (v.auxiliarCpf) addColumnText(`CPF Auxiliar: ${v.auxiliarCpf}`);
+        if (v.categoria === "epis" && v.epiResponsavelNome) {
+            addColumnText(`EPIs vistoriados: ${v.epiResponsavelTipo || "Funcionário"} - ${v.epiResponsavelNome}`);
+        }
         if (v.dataVistoria) addColumnText(`Data da vistoria: ${String(v.dataVistoria).split("-").reverse().join("/")}`);
         addColumnText(`Data: ${dataObj.toLocaleString("pt-BR")}`);
 

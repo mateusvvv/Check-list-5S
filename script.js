@@ -1,4 +1,4 @@
-import { categoryNames, formatTwoDigits, funcionariosData, getChecklistItems, getItemName, getChecklistItemDefaults, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, formatTwoDigits, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionariosData, getItemName, getChecklistItemDefaults, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js?v=epis-pessoa-20260527";
 import {
     addDoc,
     auth,
@@ -40,6 +40,7 @@ import {
     alternarViaturaAtiva,
     editarItemChecklist,
     editarNomeViatura,
+    editarResponsavelViatura,
     removerViatura,
     removerItemChecklist,
     renderAdminChecklist,
@@ -288,8 +289,8 @@ function normalizeSearch(value) {
 function getFuncionarioStatusClass(status) {
     const normalized = normalizeSearch(status);
     if (normalized.includes("ferias")) return "vacation";
+    if (normalized.includes("atestado") || normalized.includes("falta")) return "danger";
     if (normalized.includes("folga")) return "dayoff";
-    if (normalized.includes("atestado")) return "medical";
     return "active";
 }
 
@@ -325,18 +326,19 @@ function alterarStatusFuncionario(key, status) {
 function renderFuncionarioCard(funcionario) {
     const status = getFuncionarioStatus(funcionario);
     const key = getFuncionarioKey(funcionario);
+    const statusClass = getFuncionarioStatusClass(status);
     const statusControl = getVistoriadorAtivo() === "Alisson"
         ? `
             <label class="employee-status-control">
                 <span>Situação</span>
-                <select onchange="alterarStatusFuncionario('${escapeJsString(key)}', this.value)">
-                    ${["Ativo", "Férias", "Folga", "Atestado"].map(option => `
+                <select class="employee-status-select ${statusClass}" onchange="alterarStatusFuncionario('${escapeJsString(key)}', this.value)">
+                    ${["Ativo", "Férias", "Folga", "Atestado", "Falta"].map(option => `
                         <option value="${option}" ${status === option ? "selected" : ""}>${option}</option>
                     `).join("")}
                 </select>
             </label>
         `
-        : `<span class="employee-status ${getFuncionarioStatusClass(status)}">${escapeHtml(status)}</span>`;
+        : `<span class="employee-status ${statusClass}">${escapeHtml(status)}</span>`;
     const episHtml = funcionario.epis?.length
         ? `
             <div class="employee-epi-table-wrap">
@@ -353,11 +355,11 @@ function renderFuncionarioCard(funcionario) {
                     <tbody>
                         ${funcionario.epis.map(epi => `
                             <tr>
-                                <td>${Number(epi.quantidade || 1)}</td>
-                                <td>${escapeHtml(epi.nome)}</td>
-                                <td>${escapeHtml(epi.ca || "-")}</td>
-                                <td>${escapeHtml(epi.dataEntrega || "-")}</td>
-                                <td>${escapeHtml(epi.observacao || "")}</td>
+                                <td data-label="Qtd">${Number(epi.quantidade || 1)}</td>
+                                <td data-label="Descrição">${escapeHtml(epi.nome)}</td>
+                                <td data-label="C.A.">${escapeHtml(epi.ca || "-")}</td>
+                                <td data-label="Entrega">${escapeHtml(epi.dataEntrega || "-")}</td>
+                                <td data-label="OBS">${escapeHtml(epi.observacao || "")}</td>
                             </tr>
                         `).join("")}
                     </tbody>
@@ -386,10 +388,12 @@ function renderFuncionarioCard(funcionario) {
 
 function renderFuncionariosPage() {
     const list = document.getElementById("funcionarios-list");
+    const totalLabel = document.getElementById("funcionarios-total");
     const search = document.getElementById("funcionario-search")?.value || "";
     const status = document.getElementById("funcionario-status-filter")?.value || "";
     if (!list) return;
 
+    const funcionariosData = getFuncionariosData();
     const termo = normalizeSearch(search);
     const filtrados = funcionariosData.filter(funcionario => {
         const matchesSearch = !termo
@@ -399,6 +403,12 @@ function renderFuncionariosPage() {
         const matchesStatus = !status || getFuncionarioStatus(funcionario) === status;
         return matchesSearch && matchesStatus;
     });
+
+    if (totalLabel) {
+        totalLabel.textContent = filtrados.length === funcionariosData.length
+            ? String(funcionariosData.length)
+            : `${filtrados.length}/${funcionariosData.length}`;
+    }
 
     list.innerHTML = filtrados.length
         ? filtrados.map(renderFuncionarioCard).join("")
@@ -421,6 +431,29 @@ function preencherResponsaveisViatura() {
     if (tecnicoCpfInput) tecnicoCpfInput.value = responsaveis?.tecnicoCpf || "";
     if (auxiliarNomeInput) auxiliarNomeInput.value = responsaveis?.auxiliar || "";
     if (auxiliarCpfInput) auxiliarCpfInput.value = responsaveis?.auxiliarCpf || "";
+    renderEpiPessoaOptions();
+}
+
+function getSelectedEpiPessoaKey() {
+    return document.getElementById("epi-pessoa")?.value || "";
+}
+
+function renderEpiPessoaOptions() {
+    const select = document.getElementById("epi-pessoa");
+    if (!select) return;
+
+    const valorAtual = select.value;
+    const pessoas = getEpiPessoaOptions(state.selectedViatura);
+    select.innerHTML = pessoas.length
+        ? pessoas.map(pessoa => `
+            <option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}</option>
+        `).join("")
+        : `<option value="">Nenhum técnico ou auxiliar cadastrado</option>`;
+    select.value = pessoas.some(pessoa => pessoa.key === valorAtual) ? valorAtual : (pessoas[0]?.key || "");
+}
+
+function selecionarPessoaEpi() {
+    renderItems("epis");
 }
 
 function renderItems(pageId) {
@@ -431,12 +464,13 @@ function renderItems(pageId) {
         tablets: "lista-tablets"
     };
     const container = document.getElementById(containerMapping[pageId]);
-    const items = getChecklistItems(pageId, state.selectedViatura).filter(item => item.ativo !== false);
+    if (pageId === "epis") renderEpiPessoaOptions();
+    const items = getChecklistItemsForPessoa(pageId, state.selectedViatura, getSelectedEpiPessoaKey()).filter(item => item.ativo !== false);
     if (!container || !items) return;
 
     container.innerHTML = items.map((item, index) => {
         const itemName = getItemName(item);
-        const defaults = getChecklistItemDefaults(pageId, itemName, state.selectedViatura);
+        const defaults = pageId === "epis" ? item : getChecklistItemDefaults(pageId, itemName, state.selectedViatura);
         const quantidade = Number(defaults.quantidade || 1);
         const valor = Number(defaults.valor || 0);
         const total = quantidade * valor;
@@ -675,7 +709,8 @@ async function finalizarVistoria(category) {
         return;
     }
 
-    const items = getChecklistItems(category, state.selectedViatura).filter(item => item.ativo !== false);
+    const epiPessoa = category === "epis" ? getEpiPessoaByKey(state.selectedViatura, getSelectedEpiPessoaKey()) : null;
+    const items = getChecklistItemsForPessoa(category, state.selectedViatura, getSelectedEpiPessoaKey()).filter(item => item.ativo !== false);
     const checklistResults = [];
     let temErro = false;
 
@@ -719,6 +754,9 @@ async function finalizarVistoria(category) {
         tecnicoCpf: tecnicoCpfInput?.value.trim() || "",
         auxiliarTecnico: auxiliarNomeInput?.value.trim() || "",
         auxiliarCpf: auxiliarCpfInput?.value.trim() || "",
+        epiResponsavelTipo: epiPessoa?.tipo || null,
+        epiResponsavelNome: epiPessoa?.nome || null,
+        epiResponsavelCpf: epiPessoa?.cpf || null,
         categoria: category,
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
@@ -818,6 +856,7 @@ function bindWindowFunctions() {
         configurarModoVistoria,
         showHome,
         showPage,
+        selecionarPessoaEpi,
         finalizarVistoria,
         selectViatura,
         loginAdmin,
@@ -836,6 +875,7 @@ function bindWindowFunctions() {
         excluirVistoriasSelecionadas,
         adicionarViatura,
         editarNomeViatura,
+        editarResponsavelViatura,
         alternarViaturaAtiva,
         removerViatura,
         renderAdminChecklist,
@@ -903,8 +943,13 @@ document.addEventListener("DOMContentLoaded", () => {
 bindWindowFunctions();
 
 window.refreshAppAfterConfigChange = function() {
+    preencherResponsaveisViatura();
     renderViaturaDashboard();
     updateMenuStatus();
     const activeTab = document.querySelector(".tab-content.active");
-    if (activeTab) renderItems(activeTab.id);
+    if (activeTab?.id === "funcionarios") {
+        renderFuncionariosPage();
+    } else if (activeTab) {
+        renderItems(activeTab.id);
+    }
 };

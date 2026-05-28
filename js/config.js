@@ -647,6 +647,153 @@ const episAdrianMatheus = [
     "BOLSA EPI CG 445"
 ];
 
+const episRicksonSantos = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02 PARAQUEDISTA",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 40",
+    "LUVAS FLEX CUT",
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445"
+];
+
+const episJoseEmerson = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 39",
+    "LUVAS FLEX CUT P",
+    "CANETA DETECÇÃO DE TENSÃO KA-1789 CAT III 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445"
+];
+
+const episJoseEmersonDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "17.098", dataEntrega: "21/05/2026" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "-", dataEntrega: "11/07/2025" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "30.645", dataEntrega: "11/07/2025" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "078.468", dataEntrega: "11/07/2025" },
+    "BOTINA DE SEG. Nº 39": { quantidade: 1, ca: "-", dataEntrega: "11/07/2025", observacao: "NOVA" },
+    "LUVAS FLEX CUT P": { quantidade: 1, ca: "33.997", dataEntrega: "23/04/2026", observacao: "NOVA" },
+    "CANETA DETECÇÃO DE TENSÃO KA-1789 CAT III 1000V": { quantidade: 1, ca: "-", dataEntrega: "28/10/2025", observacao: "SUBSTITUIDA" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35790", dataEntrega: "11/07/2025", observacao: "NOVA" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "11/07/2025" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-", dataEntrega: "11/07/2025" }
+};
+
+const episViniciusJose = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 42",
+    "LUVAS FLEX CUT",
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445"
+];
+
+const episViniciusJoseDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "21609", dataEntrega: "07/10/2025" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "-", dataEntrega: "13/01/2026", observacao: "NOVO" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "47405", dataEntrega: "07/10/2025" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "078.468", dataEntrega: "07/10/2025" },
+    "BOTINA DE SEG. Nº 42": { quantidade: 1, ca: "35841", dataEntrega: "07/10/2025" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "33.997", dataEntrega: "07/10/2025" },
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V": { quantidade: 1, ca: "-", dataEntrega: "07/10/2025" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35790", dataEntrega: "12/11/2025", observacao: "NOVO" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "07/10/2025" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "", dataEntrega: "07/10/2025" }
+};
+
+const episAndresonRocha = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 39",
+    "LUVAS FLEX CUT",
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445",
+    "OCULOS DE SEG.",
+    "OCULOS DE SOBREPOR"
+];
+
+const episAndresonRochaDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "N.S 0032698", dataEntrega: "26/02/2026" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "34.601", dataEntrega: "26/02/2026" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "078.468", dataEntrega: "26/02/2026" },
+    "BOTINA DE SEG. Nº 39": { quantidade: 1, ca: "35.841", dataEntrega: "26/02/2026" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "33997", dataEntrega: "26/02/2026" },
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35790", dataEntrega: "26/02/2026" },
+    "OCULOS DE SOBREPOR": { quantidade: 1, ca: "", dataEntrega: "26/02/2026" }
+};
+
+const episJoseEdivanilson = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO CG 251",
+    "CINTURÃO DE SEG.TAM02",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 40",
+    "LUVAS FLEX CUT",
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445",
+    "OCULOS DE SOBREPOR"
+];
+
+const episJoseEdivanilsonDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "17.098", dataEntrega: "26/02/2026" },
+    "TALABART DE POSICIONAMENTO CG 251": { quantidade: 1, ca: "30645", dataEntrega: "26/02/2026" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "14041", dataEntrega: "26/02/2026" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "34601", dataEntrega: "26/02/2026" },
+    "BOTINA DE SEG. Nº 40": { quantidade: 1, ca: "35841", dataEntrega: "26/02/2026" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "33.997", dataEntrega: "26/02/2026" },
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35790", dataEntrega: "26/02/2026" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "OCULOS DE SOBREPOR": { quantidade: 1, ca: "", dataEntrega: "26/02/2026" }
+};
+
+const episIsaelFortunato = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02 PARAQUEDISTA",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "BOTINA DE SEG. Nº 40",
+    "LUVAS FLEX CUT",
+    "CANETA DETECTORA DE TENSAO MVT100 - AFR 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOLSA EPI CG 445"
+];
+
+const episIsaelFortunatoDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "17098", dataEntrega: "26/02/2026" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "30645", dataEntrega: "26/02/2026" },
+    "CINTURÃO DE SEG.TAM02 PARAQUEDISTA": { quantidade: 1, ca: "14041", dataEntrega: "26/02/2026" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "078.468", dataEntrega: "26/02/2026" },
+    "BOTINA DE SEG. Nº 40": { quantidade: 1, ca: "11972", dataEntrega: "26/02/2026" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "33997", dataEntrega: "26/02/2026" },
+    "CANETA DETECTORA DE TENSAO MVT100 - AFR 1000V": { quantidade: 1, ca: "-", dataEntrega: "25/04/2026", observacao: "NOVA" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35138", dataEntrega: "26/02/2026" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-", dataEntrega: "26/02/2026" }
+};
+
 function mapChecklistItems(viaturaId, category, items) {
     return items.map((nome, index) => ({
         id: `v${viaturaId}-${category}-${index + 1}`,
@@ -689,7 +836,8 @@ export const checklistDataByViatura = {
         ferramentas: mapVehicleTools("7", ferramentasViatura07)
     },
     "8": {
-        ferramentas: mapVehicleTools("8", ferramentasViatura08)
+        ferramentas: mapVehicleTools("8", ferramentasViatura08),
+        epis: mapChecklistItems("8", "epis", episRicksonSantos)
     },
     "9": {
         ferramentas: mapVehicleTools("9", ferramentasViatura09)
@@ -726,7 +874,8 @@ export function getDefaultChecklistDataByViatura() {
             ferramentas: mapVehicleTools("7", ferramentasViatura07)
         },
         "8": {
-            ferramentas: mapVehicleTools("8", ferramentasViatura08)
+            ferramentas: mapVehicleTools("8", ferramentasViatura08),
+            epis: mapChecklistItems("8", "epis", episRicksonSantos)
         },
         "9": {
             ferramentas: mapVehicleTools("9", ferramentasViatura09)
@@ -1288,6 +1437,18 @@ export const checklistItemDefaultsByViatura = {
             "10 metros de cordas sobressalente": { quantidade: 1, valor: 20 },
             "Kir localizador de cabos SKU LK806R": { quantidade: 1, valor: 150 },
             "Trava quedas para corda": { quantidade: 1, valor: 310 }
+        },
+        epis: {
+            "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, valor: 0, ca: "17098", dataEntrega: "07/12/2023" },
+            "TALABART DE POSICIONAMENTO": { quantidade: 1, valor: 0, ca: "30645", dataEntrega: "07/12/2023" },
+            "CINTURÃO DE SEG.TAM02 PARAQUEDISTA": { quantidade: 1, valor: 0, ca: "14041", dataEntrega: "07/12/2023" },
+            "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, valor: 0, ca: "078.468", dataEntrega: "07/12/2023" },
+            "BOTINA DE SEG. Nº 40": { quantidade: 1, valor: 0, ca: "11972", dataEntrega: "07/12/2023" },
+            "LUVAS FLEX CUT": { quantidade: 1, valor: 0, ca: "33997", dataEntrega: "07/12/2023" },
+            "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V": { quantidade: 1, valor: 0, ca: "-", dataEntrega: "13/01/2024" },
+            "OCULOS DE SEG.": { quantidade: 1, valor: 0, ca: "35138", dataEntrega: "07/12/2023" },
+            "POCHETE CARBOGRAFITE": { quantidade: 1, valor: 0, ca: "-", dataEntrega: "07/12/2023" },
+            "BOLSA EPI CG 445": { quantidade: 1, valor: 0, ca: "-", dataEntrega: "07/12/2023" }
         }
     },
     "9": {
@@ -1419,18 +1580,122 @@ const funcionariosExtras = [
     }
 ];
 
+function normalizePessoaKey(value) {
+    return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+export function getFuncionarioKeyFromFields(nome, cpf) {
+    const cpfLimpo = String(cpf || "").trim();
+    return cpfLimpo ? `cpf:${cpfLimpo}` : `nome:${normalizePessoaKey(nome)}`;
+}
+
+export function normalizeEmployeeEpiItem(item, index = 0) {
+    const normalized = normalizeChecklistItem(item, index);
+    return {
+        ...normalized,
+        quantidade: Number(item?.quantidade || 1),
+        valor: Number(item?.valor || 0),
+        ca: String(item?.ca || ""),
+        dataEntrega: String(item?.dataEntrega || ""),
+        observacao: String(item?.observacao || "")
+    };
+}
+
+function buildFuncionarioEpisFromDefaults(items, defaultsByItem) {
+    return items.map((nome, index) => normalizeEmployeeEpiItem({
+        id: `epi-${normalizePessoaKey(nome)}-${index + 1}`,
+        nome,
+        ...(defaultsByItem[nome] || {})
+    }, index));
+}
+
+export const employeeEpisByPerson = {};
+
+function seedEmployeeEpis(nome, cpf, items, defaultsByItem) {
+    employeeEpisByPerson[getFuncionarioKeyFromFields(nome, cpf)] = buildFuncionarioEpisFromDefaults(items, defaultsByItem);
+}
+
+seedEmployeeEpis("ANDRESON DA ROCHA SILVA", "132.919.664-30", episAndresonRocha, episAndresonRochaDefaults);
+seedEmployeeEpis("ISAEL FORTUNATO DE LIMA", "182.838.664-27", episIsaelFortunato, episIsaelFortunatoDefaults);
+seedEmployeeEpis("JOSE EDIVANILSON DA SILVA", "115.353.914-48", episJoseEdivanilson, episJoseEdivanilsonDefaults);
+seedEmployeeEpis("JOSE EMERSON DA SILVA NASCIMENTO", "102.407.824-88", episJoseEmerson, episJoseEmersonDefaults);
+seedEmployeeEpis("VINICIUS JOSE DE LIMA", "135.640.954-70", episViniciusJose, episViniciusJoseDefaults);
+
 function buildFuncionarioEpis(viaturaId) {
     return (checklistDataByViatura[String(viaturaId)]?.epis || []).map(item => {
         const nome = getItemName(item);
         const defaults = getChecklistItemDefaults("epis", nome, viaturaId);
-        return {
+        return normalizeEmployeeEpiItem({
             nome,
             quantidade: defaults.quantidade || 1,
+            valor: defaults.valor || 0,
             ca: defaults.ca || "",
             dataEntrega: defaults.dataEntrega || "",
             observacao: defaults.observacao || ""
+        });
+    });
+}
+
+export function cloneEmployeeEpis(items = []) {
+    return items.map((item, index) => {
+        const normalized = normalizeEmployeeEpiItem(item, index);
+        return {
+            ...normalized,
+            substituicoes: normalized.substituicoes.map(substituicao => ({ ...substituicao }))
         };
     });
+}
+
+function getFuncionarioEpis(viaturaId, tipo, nome, cpf) {
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    if (employeeEpisByPerson[key]) return cloneEmployeeEpis(employeeEpisByPerson[key]);
+    return tipo === "Técnico" ? buildFuncionarioEpis(viaturaId) : [];
+}
+
+export function ensureFuncionarioEpis(viaturaId, tipo, nome, cpf) {
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    if (!employeeEpisByPerson[key]) {
+        employeeEpisByPerson[key] = tipo === "Técnico" ? buildFuncionarioEpis(viaturaId) : [];
+    }
+    return employeeEpisByPerson[key];
+}
+
+export function getEpiPessoaOptions(viaturaId) {
+    const responsaveis = viaturaResponsaveis[String(viaturaId)] || {};
+    return [
+        responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
+            ? {
+                tipo: "Técnico",
+                nome: responsaveis.tecnico,
+                cpf: responsaveis.tecnicoCpf || "",
+                key: getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf)
+            }
+            : null,
+        responsaveis.auxiliar
+            ? {
+                tipo: "Auxiliar técnico",
+                nome: responsaveis.auxiliar,
+                cpf: responsaveis.auxiliarCpf || "",
+                key: getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf)
+            }
+            : null
+    ].filter(Boolean);
+}
+
+export function getEpiPessoaByKey(viaturaId, key) {
+    return getEpiPessoaOptions(viaturaId).find(pessoa => pessoa.key === key) || getEpiPessoaOptions(viaturaId)[0] || null;
+}
+
+export function getChecklistItemsForPessoa(category, viaturaId, pessoaKey = "") {
+    if (category !== "epis") return getChecklistItems(category, viaturaId);
+    const pessoa = getEpiPessoaByKey(viaturaId, pessoaKey);
+    if (!pessoa) return [];
+    return ensureFuncionarioEpis(viaturaId, pessoa.tipo, pessoa.nome, pessoa.cpf);
 }
 
 function buildFuncionarioFromViatura(viaturaId, tipo, nome, cpf) {
@@ -1440,21 +1705,25 @@ function buildFuncionarioFromViatura(viaturaId, tipo, nome, cpf) {
         funcao: tipo,
         status: "Ativo",
         viaturaId: String(viaturaId),
-        epis: tipo === "Técnico" ? buildFuncionarioEpis(viaturaId) : []
+        epis: getFuncionarioEpis(viaturaId, tipo, nome, cpf)
     };
 }
 
-export const funcionariosData = [
-    ...Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => [
+export function getFuncionariosData() {
+    return [
+        ...Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => [
         responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
             ? buildFuncionarioFromViatura(viaturaId, "Técnico", responsaveis.tecnico, responsaveis.tecnicoCpf)
             : null,
         responsaveis.auxiliar
             ? buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", responsaveis.auxiliar, responsaveis.auxiliarCpf)
             : null
-    ].filter(Boolean)),
-    ...funcionariosExtras
-];
+        ].filter(Boolean)),
+        ...funcionariosExtras
+    ];
+}
+
+export const funcionariosData = getFuncionariosData();
 
 export const totalViaturas = 9;
 export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) => {

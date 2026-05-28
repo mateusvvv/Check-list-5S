@@ -490,6 +490,49 @@
     flex: 1 1 180px;
 }
 
+.admin-vehicle-row {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-vehicle-main {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.admin-vehicle-main input[type="text"] {
+    flex: 1 1 180px;
+}
+
+.admin-responsaveis-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+}
+
+.admin-responsaveis-grid label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    color: var(--primary-blue);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.admin-responsaveis-grid input {
+    width: 100%;
+    box-sizing: border-box;
+    text-transform: none;
+}
+
+.admin-item-person-select {
+    flex: 1 1 230px;
+}
+
 .admin-config-actions {
     display: flex;
     gap: 6px;

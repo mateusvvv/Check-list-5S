@@ -1,4 +1,4 @@
-import { categoryNames, checklistDataByViatura, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItems, getItemName, normalizeChecklistItem, vehicleViewNames } from "./config.js";
+import { categoryNames, checklistDataByViatura, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItemsForPessoa, getEpiPessoaOptions, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
 import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
@@ -15,6 +15,14 @@ function escapeHtml(value) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
+
+function escapeJsString(value) {
+    return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "");
 }
 
 function formatDateBR(date = new Date()) {
@@ -126,16 +134,39 @@ export function renderAdminViaturas() {
     const container = document.getElementById("admin-viaturas-list");
     if (!container) return;
 
-    container.innerHTML = state.viaturas.map((viatura) => `
-        <div class="admin-config-row ${viatura.ativa === false ? "inactive" : ""}">
-            <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)">
-            <span>ID ${formatTwoDigits(viatura.id)}</span>
-            <div class="admin-config-actions">
-                <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
-                <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
+    container.innerHTML = state.viaturas.map((viatura) => {
+        const responsaveis = viaturaResponsaveis[viatura.id] || {};
+        return `
+            <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
+                <div class="admin-vehicle-main">
+                    <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)">
+                    <span>ID ${formatTwoDigits(viatura.id)}</span>
+                    <div class="admin-config-actions">
+                        <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
+                        <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
+                    </div>
+                </div>
+                <div class="admin-responsaveis-grid">
+                    <label>
+                        <span>Técnico</span>
+                        <input type="text" value="${escapeHtml(responsaveis.tecnico || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'tecnico', this.value)">
+                    </label>
+                    <label>
+                        <span>CPF técnico</span>
+                        <input type="text" value="${escapeHtml(responsaveis.tecnicoCpf || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'tecnicoCpf', this.value)">
+                    </label>
+                    <label>
+                        <span>Auxiliar</span>
+                        <input type="text" value="${escapeHtml(responsaveis.auxiliar || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'auxiliar', this.value)">
+                    </label>
+                    <label>
+                        <span>CPF auxiliar</span>
+                        <input type="text" value="${escapeHtml(responsaveis.auxiliarCpf || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'auxiliarCpf', this.value)">
+                    </label>
+                </div>
             </div>
-        </div>
-    `).join("");
+        `;
+    }).join("");
 }
 
 export function renderAdminHistory() {
@@ -190,6 +221,17 @@ export async function editarNomeViatura(id, nome) {
     refreshAppAfterConfigChange();
 }
 
+export async function editarResponsavelViatura(id, campo, valor) {
+    const viaturaId = String(id);
+    if (!viaturaResponsaveis[viaturaId]) {
+        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+    if (!["tecnico", "tecnicoCpf", "auxiliar", "auxiliarCpf"].includes(campo)) return;
+    viaturaResponsaveis[viaturaId][campo] = valor.trim();
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
 export async function alternarViaturaAtiva(id) {
     const viatura = state.viaturas.find(item => item.id === String(id));
     if (!viatura) return;
@@ -234,12 +276,25 @@ export function renderAdminChecklist() {
     const container = document.getElementById("admin-checklist-list");
     const select = document.getElementById("admin-item-category");
     const viaturaSelect = document.getElementById("admin-item-viatura");
+    const pessoaSelect = document.getElementById("admin-item-pessoa");
     if (!container || !select || !viaturaSelect) return;
 
     const category = select.value || "ferramentas";
     const viaturaId = viaturaSelect.value || state.selectedViatura;
-    const items = getChecklistItems(category, viaturaId);
-    items.splice(0, items.length, ...items.map((item, index) => normalizeChecklistItem(item, index)));
+    if (pessoaSelect) {
+        const pessoas = getEpiPessoaOptions(viaturaId);
+        const valorAtual = pessoaSelect.value;
+        pessoaSelect.style.display = category === "epis" ? "" : "none";
+        pessoaSelect.innerHTML = pessoas.length
+            ? pessoas.map(pessoa => `<option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}</option>`).join("")
+            : `<option value="">Nenhum técnico ou auxiliar</option>`;
+        pessoaSelect.value = pessoas.some(pessoa => pessoa.key === valorAtual) ? valorAtual : (pessoas[0]?.key || "");
+    }
+    const pessoaKey = category === "epis" ? (pessoaSelect?.value || "") : "";
+    const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
+    items.splice(0, items.length, ...items.map((item, index) => (
+        category === "epis" ? normalizeEmployeeEpiItem(item, index) : normalizeChecklistItem(item, index)
+    )));
 
     container.innerHTML = items.map((item, index) => {
         const ultimaSubstituicao = item.substituicoes?.at?.(-1);
@@ -249,11 +304,11 @@ export function renderAdminChecklist() {
 
         return `
             <div class="admin-config-row ${item.ativo === false ? "inactive" : ""}">
-                <input type="text" value="${escapeHtml(getItemName(item))}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, this.value)">
+                <input type="text" value="${escapeHtml(getItemName(item))}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, this.value, '${escapeJsString(pessoaKey)}')">
                 <div class="admin-config-actions">
-                    <button type="button" onclick="substituirItemChecklist('${viaturaId}', '${category}', ${index})">Substituir</button>
-                    <button type="button" class="btn-muted" onclick="alternarItemChecklist('${viaturaId}', '${category}', ${index})">${item.ativo === false ? "Ativar" : "Desativar"}</button>
-                    <button type="button" class="btn-danger" onclick="removerItemChecklist('${viaturaId}', '${category}', ${index})">Remover</button>
+                    <button type="button" onclick="substituirItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">Substituir</button>
+                    <button type="button" class="btn-muted" onclick="alternarItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">${item.ativo === false ? "Ativar" : "Desativar"}</button>
+                    <button type="button" class="btn-danger" onclick="removerItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">Remover</button>
                 </div>
                 ${nota}
             </div>
@@ -275,6 +330,7 @@ export function renderAdminViaturaOptions() {
 export async function adicionarItemChecklist() {
     const category = document.getElementById("admin-item-category")?.value || "ferramentas";
     const viaturaId = document.getElementById("admin-item-viatura")?.value || state.selectedViatura;
+    const pessoaKey = category === "epis" ? (document.getElementById("admin-item-pessoa")?.value || "") : "";
     const input = document.getElementById("admin-item-name");
     const nome = input?.value.trim();
     if (!nome) {
@@ -282,10 +338,13 @@ export async function adicionarItemChecklist() {
         return;
     }
 
-    getChecklistItems(category, viaturaId).push(normalizeChecklistItem({
+    const normalizeItem = category === "epis" ? normalizeEmployeeEpiItem : normalizeChecklistItem;
+    getChecklistItemsForPessoa(category, viaturaId, pessoaKey).push(normalizeItem({
         id: `item-${Date.now()}`,
         nome,
         ativo: true,
+        quantidade: 1,
+        valor: 0,
         substituicoes: []
     }));
     if (input) input.value = "";
@@ -293,32 +352,32 @@ export async function adicionarItemChecklist() {
     refreshAppAfterConfigChange();
 }
 
-export async function editarItemChecklist(viaturaId, category, index, nome) {
-    const items = getChecklistItems(category, viaturaId);
-    items[index] = normalizeChecklistItem(items[index], index);
+export async function editarItemChecklist(viaturaId, category, index, nome, pessoaKey = "") {
+    const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
+    items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
     items[index].nome = nome.trim() || items[index].nome;
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
 
-export async function alternarItemChecklist(viaturaId, category, index) {
-    const items = getChecklistItems(category, viaturaId);
-    items[index] = normalizeChecklistItem(items[index], index);
+export async function alternarItemChecklist(viaturaId, category, index, pessoaKey = "") {
+    const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
+    items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
     items[index].ativo = items[index].ativo === false;
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
 
-export async function removerItemChecklist(viaturaId, category, index) {
+export async function removerItemChecklist(viaturaId, category, index, pessoaKey = "") {
     if (!confirm("Deseja remover este item do checklist?")) return;
-    getChecklistItems(category, viaturaId).splice(index, 1);
+    getChecklistItemsForPessoa(category, viaturaId, pessoaKey).splice(index, 1);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
 
-export async function substituirItemChecklist(viaturaId, category, index) {
-    const items = getChecklistItems(category, viaturaId);
-    items[index] = normalizeChecklistItem(items[index], index);
+export async function substituirItemChecklist(viaturaId, category, index, pessoaKey = "") {
+    const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
+    items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
     const item = items[index];
     const novoNome = prompt("Informe o nome do novo item:", item.nome);
     if (!novoNome || !novoNome.trim()) return;
@@ -711,6 +770,9 @@ export function verDetalhes(docId) {
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
     if (vistoria.auxiliarTecnico) html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
     if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
+    if (vistoria.categoria === "epis" && vistoria.epiResponsavelNome) {
+        html += `<p><strong>EPIs vistoriados:</strong> ${vistoria.epiResponsavelTipo || "Funcionário"} - ${vistoria.epiResponsavelNome}</p>`;
+    }
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
     if (vistoria.categoria === "tablets") {
         html += `<p><strong>Tablet:</strong> ${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)} vinculado à Viatura ${formatTwoDigits(vistoria.viaturaId)}</p>`;

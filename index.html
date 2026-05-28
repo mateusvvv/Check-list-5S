@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <section id="app-login-screen" class="auth-screen" style="display: none;">
@@ -115,6 +115,10 @@
             <section id="epis" class="tab-content">
                 <div class="card">
                     <h2>🦺 Equipamentos de Proteção Individual</h2>
+                    <div class="epi-person-selector">
+                        <label for="epi-pessoa">EPIs de</label>
+                        <select id="epi-pessoa" onchange="selecionarPessoaEpi()"></select>
+                    </div>
                     <div id="lista-epis" class="checklist-items">
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
@@ -231,7 +235,7 @@
             <!-- Página 5: Funcionários -->
             <section id="funcionarios" class="tab-content">
                 <div class="card">
-                    <h2>Funcionários</h2>
+                    <h2 class="employee-title">Funcionários <span id="funcionarios-total" class="employee-total">0</span></h2>
                     <div class="employee-filters">
                         <div class="input-group">
                             <label for="funcionario-search">Pesquisar funcionário</label>
@@ -245,6 +249,7 @@
                                 <option value="Férias">Férias</option>
                                 <option value="Folga">Folga</option>
                                 <option value="Atestado">Atestado</option>
+                                <option value="Falta">Falta</option>
                             </select>
                         </div>
                     </div>
@@ -302,6 +307,7 @@
                                     <option value="viaturas">Viatura</option>
                                     <option value="tablets">Tablet</option>
                                 </select>
+                                <select id="admin-item-pessoa" class="admin-item-person-select" onchange="renderAdminChecklist()"></select>
                                 <input type="text" id="admin-item-name" placeholder="Nome do novo item">
                                 <button type="button" onclick="adicionarItemChecklist()">Adicionar item</button>
                             </div>
@@ -408,6 +414,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=9"></script>
+    <script type="module" src="script.js?v=15"></script>
 </body>
 </html>
