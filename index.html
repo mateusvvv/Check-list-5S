@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <section id="app-login-screen" class="auth-screen">
+    <section id="app-login-screen" class="auth-screen" style="display: none;">
         <div class="auth-card">
             <div class="logo auth-logo">
                 <img src="assets/logo.png" alt="Logo">
@@ -55,6 +55,7 @@
                 <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
+                <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Funcionários</a></li>
                 <li class="nav-admin-link"><a href="#" onclick="showPage('admin')">🔐 Painel Admin</a></li>
             </ul>
         </nav>
@@ -79,11 +80,15 @@
                         <label for="checking-date">Data da vistoria:</label>
                         <input type="date" id="checking-date">
                     </div>
+                    <div class="input-group checking-name-field">
+                        <label for="tecnico-nome">Técnico:</label>
+                        <input type="text" id="tecnico-nome" placeholder="Nome do técnico">
+                    </div>
                     <div class="input-group">
                         <label for="tecnico-cpf">CPF do técnico:</label>
                         <input type="text" id="tecnico-cpf" placeholder="000.000.000-00">
                     </div>
-                    <div class="input-group">
+                    <div class="input-group checking-name-field">
                         <label for="auxiliar-nome">Auxiliar técnico:</label>
                         <input type="text" id="auxiliar-nome" placeholder="Nome do auxiliar técnico">
                     </div>
@@ -223,7 +228,33 @@
                 </div>
             </section>
 
-            <!-- Página 5: Admin (Login) -->
+            <!-- Página 5: Funcionários -->
+            <section id="funcionarios" class="tab-content">
+                <div class="card">
+                    <h2>Funcionários</h2>
+                    <div class="employee-filters">
+                        <div class="input-group">
+                            <label for="funcionario-search">Pesquisar funcionário</label>
+                            <input type="text" id="funcionario-search" placeholder="Nome, CPF ou função" oninput="renderFuncionariosPage()">
+                        </div>
+                        <div class="input-group">
+                            <label for="funcionario-status-filter">Situação</label>
+                            <select id="funcionario-status-filter" onchange="renderFuncionariosPage()">
+                                <option value="">Todos</option>
+                                <option value="Ativo">Ativo</option>
+                                <option value="Férias">Férias</option>
+                                <option value="Folga">Folga</option>
+                                <option value="Atestado">Atestado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="funcionarios-list" class="employees-list">
+                        <p class="placeholder">Pesquise um funcionário.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Página 6: Admin (Login) -->
             <section id="admin" class="tab-content">
                 <div class="card" id="admin-login-section">
                     <h2>Acesso Restrito</h2>
@@ -241,14 +272,13 @@
                         </div>
                     <div class="admin-buttons-container">
                         <button class="btn-admin-pdf" onclick="exportarHistoricoPDF()">📄 Exportar PDF</button>
-                            <button class="btn-admin-logout" onclick="logoutAdmin()">Sair</button>
                         </div>
                     </div>
 
                     <div class="admin-config-tabs">
                         <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
                         <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
-                        <button type="button" id="admin-tab-historico" onclick="showAdminConfigTab('historico')">Histórico</button>
+                        <button type="button" id="admin-tab-historico" onclick="abrirPaginaHistoricoVistorias()">Histórico</button>
                     </div>
 
                     <div class="admin-config-grid">

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Alterações - Checklist 5S</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header style="display: none;">
+        <div class="logo">
+            <img src="assets/logo.png" alt="Logo">
+        </div>
+        <div class="admin-header-actions">
+            <button type="button" class="btn-header-logout" onclick="voltarPainelAdmin()">Voltar</button>
+            <button type="button" class="btn-header-logout" onclick="logoutAdmin()">Sair</button>
+        </div>
+    </header>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <main style="display: none;">
+        <div class="container">
+            <section class="card history-page-card">
+                <div class="admin-header-actions">
+                    <div>
+                        <h2 class="admin-title">Histórico de Alterações</h2>
+                    </div>
+                    <div class="history-page-actions">
+                        <button type="button" class="btn-danger" onclick="limparHistoricoConfig()">Limpar histórico</button>
+                    </div>
+                </div>
+
+                <div id="admin-config-history-list" class="admin-history-list">
+                    <p class="admin-history-empty">Carregando histórico...</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="js/historico.js"></script>
+</body>
+</html>

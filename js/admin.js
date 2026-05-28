@@ -89,6 +89,7 @@ export async function loginAdmin() {
 }
 
 export async function logoutAdmin() {
+    if (!confirm("Tem certeza que deseja sair?")) return;
     await signOut(auth);
 }
 
@@ -148,13 +149,13 @@ export function renderAdminHistory() {
 
     container.innerHTML = state.configHistory.map(item => `
         <div class="admin-history-row">
-            <div>
-                <strong>${escapeHtml(item.tipo)}</strong>
-                <p>${escapeHtml(item.descricao)}</p>
-            </div>
             <div class="admin-history-meta">
                 <span>${escapeHtml(item.vistoriador || "Não identificado")}</span>
                 <small>${escapeHtml(formatDateTimeBR(item.data))}</small>
+            </div>
+            <div class="admin-history-change">
+                <strong>${escapeHtml(item.tipo)}</strong>
+                <p>${escapeHtml(item.descricao)}</p>
             </div>
         </div>
     `).join("");
@@ -706,6 +707,7 @@ export function verDetalhes(docId) {
     const pendentes = vistoria.itens.filter(i => i.status !== "ok");
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
     if (vistoria.dataVistoria) html += `<p><strong>Data da vistoria:</strong> ${String(vistoria.dataVistoria).split("-").reverse().join("/")}</p>`;
+    if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
     if (vistoria.auxiliarTecnico) html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
     if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
@@ -737,7 +739,8 @@ export function verDetalhes(docId) {
             const quantidade = Number(p.quantidade || 0);
             const valor = Number(p.valorUnitario || 0);
             const total = Number(p.total || quantidade * valor);
-            html += `<li><strong>${labelStatus} ${quantidade || "-"}x ${p.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)}:</strong> ${p.observacao || "Sem observação"}</li>`;
+            const epiMeta = `${p.ca ? ` - C.A.: ${escapeHtml(p.ca)}` : ""}${p.dataEntrega ? ` - Entrega: ${escapeHtml(p.dataEntrega)}` : ""}`;
+            html += `<li><strong>${labelStatus} ${quantidade || "-"}x ${p.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)}${epiMeta}:</strong> ${p.observacao || "Sem observação"}</li>`;
         });
         html += "</ul>";
     } else {

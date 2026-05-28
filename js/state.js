@@ -27,11 +27,18 @@ export function ensureViaturaState(id) {
 defaultViaturas.forEach(viatura => ensureViaturaState(viatura.id));
 
 export function setViaturas(viaturas) {
-    state.viaturas = viaturas.length > 0 ? viaturas.map(viatura => ({
-        id: String(viatura.id),
-        nome: viatura.nome || `Viatura ${String(viatura.id).padStart(2, "0")}`,
-        ativa: viatura.ativa !== false
-    })) : [...defaultViaturas];
+    state.viaturas = viaturas.length > 0 ? viaturas.map(viatura => {
+        const id = String(viatura.id);
+        const genericName = `Viatura ${id.padStart(2, "0")}`;
+        const defaultName = defaultViaturas.find(item => item.id === id)?.nome || genericName;
+        const savedName = viatura.nome || genericName;
+
+        return {
+            id,
+            nome: savedName === genericName ? defaultName : savedName,
+            ativa: viatura.ativa !== false
+        };
+    }) : [...defaultViaturas];
 
     state.viaturas.forEach(viatura => {
         if (!state.surveyStatus[viatura.id]) ensureViaturaState(viatura.id);

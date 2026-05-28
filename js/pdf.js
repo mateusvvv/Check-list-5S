@@ -285,6 +285,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
         addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5 });
         addColumnText(`Vistoriador: ${v.vistoriador}`);
+        if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`);
         if (v.tecnicoCpf) addColumnText(`CPF Técnico: ${v.tecnicoCpf}`);
         if (v.auxiliarTecnico) addColumnText(`Auxiliar Técnico: ${v.auxiliarTecnico}`);
         if (v.auxiliarCpf) addColumnText(`CPF Auxiliar: ${v.auxiliarCpf}`);
@@ -321,6 +322,8 @@ export async function gerarPDF(titulo, dados, options = {}) {
             const valor = Number(item.valorUnitario || 0);
             const total = Number(item.total || quantidade * valor);
             let linha = `${quantidade || "-"}x ${item.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)} - ${s === "ok" ? "[OK]" : `[${s.toUpperCase()}]`}`;
+            if (item.ca) linha += ` - C.A.: ${item.ca}`;
+            if (item.dataEntrega) linha += ` - Entrega: ${item.dataEntrega}`;
             if (item.observacao) linha += ` - Motivo: ${item.observacao}`;
             addColumnText(linha);
         });

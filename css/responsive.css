@@ -88,6 +88,84 @@
         width: 100%;
     }
 
+    .admin-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .stat-card {
+        padding: 10px 8px;
+        border-left-width: 4px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-card:hover {
+        transform: none;
+    }
+
+    .stat-card h3 {
+        font-size: 0.62rem;
+        line-height: 1.15;
+        letter-spacing: 0;
+    }
+
+    .stat-card p {
+        margin-top: 5px;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+    .filters-bar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+        margin-bottom: 12px;
+    }
+
+    .filter-field,
+    .filter-field-user {
+        min-width: 0;
+    }
+
+    .filters-bar .input-group label {
+        font-size: 0.68rem;
+        line-height: 1.15;
+        margin-bottom: 3px;
+        white-space: normal;
+    }
+
+    .filters-bar .input-group select,
+    .filters-bar .input-group input {
+        min-height: 34px;
+        padding: 6px;
+        font-size: 0.82rem;
+    }
+
+    .btn-refresh {
+        min-height: 34px;
+        padding: 6px 8px;
+    }
+
+    .bulk-actions-bar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .btn-export-selected,
+    .btn-resolve-selected,
+    .btn-delete-selected {
+        width: 100%;
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 0.82rem;
+        white-space: normal;
+    }
+
 }
 
 @media (max-width: 480px) {
@@ -162,12 +240,25 @@
         margin: 10px 0;
     }
 
+    .employee-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .employee-card {
+        padding: 12px;
+    }
+
+    .employee-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .checking-meta .input-group label,
     .item-quantity-field,
     .item-value-field,
     .item-total-field,
     .checklist-extra-fields label {
-        font-size: 0.58rem;
+        font-size: 0.68rem;
     }
 
     .checking-meta .input-group input {
@@ -176,16 +267,33 @@
         font-size: 0.82rem;
     }
 
+    .checking-meta .checking-name-field {
+        grid-column: 1 / -1;
+    }
+
+    .checking-meta .checking-name-field input {
+        font-size: clamp(0.58rem, 2.55vw, 0.68rem);
+        padding-left: 7px;
+        padding-right: 7px;
+    }
+
+    .checking-meta #tecnico-cpf,
+    .checking-meta #auxiliar-cpf {
+        font-size: clamp(0.62rem, 2.75vw, 0.72rem);
+        padding-left: 7px;
+        padding-right: 7px;
+    }
+
     .checklist-item {
         padding: 9px 8px;
     }
 
     .checklist-item-header {
-        grid-template-columns: 48px minmax(74px, 1fr) minmax(82px, 1fr);
+        grid-template-columns: 44px minmax(60px, 0.82fr) minmax(68px, 0.88fr);
         grid-template-areas:
             "name name name"
             "qtd valor total";
-        gap: 5px;
+        gap: 6px 12px;
     }
 
     .item-label {
@@ -212,13 +320,15 @@
     .item-total-field input,
     .checklist-extra-fields input,
     .checklist-extra-fields textarea {
-        min-height: 30px;
-        padding: 5px 6px;
-        font-size: 0.78rem;
+        min-height: 28px;
+        padding: 4px 5px;
+        font-size: 0.74rem;
     }
 
     .checklist-extra-fields {
-        margin-top: 7px;
+        grid-template-columns: 1fr;
+        gap: 9px;
+        margin-top: 10px;
     }
 
     .status-options {
@@ -245,8 +355,34 @@
 }
 
 @media (max-width: 380px) {
+    .admin-stats {
+        gap: 6px;
+    }
+
+    .stat-card {
+        padding: 8px 6px;
+    }
+
+    .stat-card h3 {
+        font-size: 0.58rem;
+    }
+
+    .stat-card p {
+        font-size: 1.1rem;
+    }
+
+    .filters-bar .input-group label {
+        font-size: 0.62rem;
+    }
+
+    .filters-bar .input-group select,
+    .filters-bar .input-group input {
+        font-size: 0.76rem;
+    }
+
     .checklist-item-header {
-        grid-template-columns: 46px minmax(68px, 1fr) minmax(76px, 1fr);
+        grid-template-columns: 42px minmax(56px, 0.82fr) minmax(64px, 0.88fr);
+        gap: 6px 9px;
     }
 
     .item-quantity-field input,

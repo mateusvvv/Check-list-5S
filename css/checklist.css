@@ -34,11 +34,11 @@
 
 .checklist-item-header {
     display: grid;
-    grid-template-columns: 58px 92px 108px minmax(0, 1fr);
+    grid-template-columns: 52px 76px 88px minmax(0, 1fr);
     grid-template-areas:
         "name name name name"
         "qtd valor total .";
-    gap: 6px 8px;
+    gap: 7px 18px;
     width: 100%;
     align-items: end;
 }
@@ -78,11 +78,11 @@
 .checklist-extra-fields input,
 .checklist-extra-fields textarea {
     width: 100%;
-    min-height: 30px;
-    padding: 5px 7px;
+    min-height: 28px;
+    padding: 4px 6px;
     border: 1px solid #ddd;
     border-radius: 5px;
-    font: 0.82rem/1.2 inherit;
+    font: 0.78rem/1.2 inherit;
     background: #fff;
 }
 
@@ -92,8 +92,16 @@
 }
 
 .checklist-extra-fields {
+    display: grid;
+    grid-template-columns: minmax(110px, 0.7fr) minmax(140px, 0.8fr) minmax(0, 1.5fr);
+    gap: 12px;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 12px;
+    align-items: end;
+}
+
+.checklist-extra-fields label {
+    min-width: 0;
 }
 
 .error-msg {

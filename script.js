@@ -1,4 +1,4 @@
-import { categoryNames, getChecklistItems, getItemName, getChecklistItemDefaults, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, formatTwoDigits, funcionariosData, getChecklistItems, getItemName, getChecklistItemDefaults, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -261,7 +261,7 @@ function showPage(pageId) {
     }
 
     const headerInfo = document.querySelector(".header-info");
-    if (headerInfo) headerInfo.style.display = pageId === "admin" ? "none" : "block";
+    if (headerInfo) headerInfo.style.display = ["admin", "funcionarios"].includes(pageId) ? "none" : "block";
 
     document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
 
@@ -271,10 +271,156 @@ function showPage(pageId) {
         renderItems(pageId);
     }
 
+    if (pageId === "funcionarios") renderFuncionariosPage();
     if (pageId === "admin" && auth.currentUser) carregarHistorico();
 
     document.getElementById("menu-list").classList.remove("show");
     window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function normalizeSearch(value) {
+    return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+}
+
+function getFuncionarioStatusClass(status) {
+    const normalized = normalizeSearch(status);
+    if (normalized.includes("ferias")) return "vacation";
+    if (normalized.includes("folga")) return "dayoff";
+    if (normalized.includes("atestado")) return "medical";
+    return "active";
+}
+
+function getFuncionarioKey(funcionario) {
+    return funcionario.cpf || funcionario.nome;
+}
+
+function getFuncionarioStatusOverrides() {
+    try {
+        return JSON.parse(localStorage.getItem("funcionarioStatusOverrides") || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function getFuncionarioStatus(funcionario) {
+    return getFuncionarioStatusOverrides()[getFuncionarioKey(funcionario)] || funcionario.status;
+}
+
+function alterarStatusFuncionario(key, status) {
+    if (getVistoriadorAtivo() !== "Alisson") {
+        alert("Somente Alisson pode alterar o status do funcionário.");
+        renderFuncionariosPage();
+        return;
+    }
+
+    const overrides = getFuncionarioStatusOverrides();
+    overrides[key] = status;
+    localStorage.setItem("funcionarioStatusOverrides", JSON.stringify(overrides));
+    renderFuncionariosPage();
+}
+
+function renderFuncionarioCard(funcionario) {
+    const status = getFuncionarioStatus(funcionario);
+    const key = getFuncionarioKey(funcionario);
+    const statusControl = getVistoriadorAtivo() === "Alisson"
+        ? `
+            <label class="employee-status-control">
+                <span>Situação</span>
+                <select onchange="alterarStatusFuncionario('${escapeJsString(key)}', this.value)">
+                    ${["Ativo", "Férias", "Folga", "Atestado"].map(option => `
+                        <option value="${option}" ${status === option ? "selected" : ""}>${option}</option>
+                    `).join("")}
+                </select>
+            </label>
+        `
+        : `<span class="employee-status ${getFuncionarioStatusClass(status)}">${escapeHtml(status)}</span>`;
+    const episHtml = funcionario.epis?.length
+        ? `
+            <div class="employee-epi-table-wrap">
+                <table class="employee-epi-table">
+                    <thead>
+                        <tr>
+                            <th>Qtd</th>
+                            <th>Descrição do EPI</th>
+                            <th>C.A.</th>
+                            <th>Data de entrega</th>
+                            <th>OBS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${funcionario.epis.map(epi => `
+                            <tr>
+                                <td>${Number(epi.quantidade || 1)}</td>
+                                <td>${escapeHtml(epi.nome)}</td>
+                                <td>${escapeHtml(epi.ca || "-")}</td>
+                                <td>${escapeHtml(epi.dataEntrega || "-")}</td>
+                                <td>${escapeHtml(epi.observacao || "")}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `
+        : `<p class="employee-empty-epis">Nenhum EPI cadastrado para esta pessoa.</p>`;
+
+    return `
+        <article class="employee-card">
+            <div class="employee-card-header">
+                <div>
+                    <h3>${escapeHtml(funcionario.nome)}</h3>
+                    <p>${escapeHtml(funcionario.funcao)}${funcionario.viaturaId ? ` - Viatura ${formatTwoDigits(funcionario.viaturaId)}` : ""}</p>
+                </div>
+                ${statusControl}
+            </div>
+            <div class="employee-meta">
+                <span>CPF: ${escapeHtml(funcionario.cpf || "-")}</span>
+                <span>EPIs: ${funcionario.epis?.length || 0}</span>
+            </div>
+            ${episHtml}
+        </article>
+    `;
+}
+
+function renderFuncionariosPage() {
+    const list = document.getElementById("funcionarios-list");
+    const search = document.getElementById("funcionario-search")?.value || "";
+    const status = document.getElementById("funcionario-status-filter")?.value || "";
+    if (!list) return;
+
+    const termo = normalizeSearch(search);
+    const filtrados = funcionariosData.filter(funcionario => {
+        const matchesSearch = !termo
+            || normalizeSearch(funcionario.nome).includes(termo)
+            || normalizeSearch(funcionario.cpf).includes(termo)
+            || normalizeSearch(funcionario.funcao).includes(termo);
+        const matchesStatus = !status || getFuncionarioStatus(funcionario) === status;
+        return matchesSearch && matchesStatus;
+    });
+
+    list.innerHTML = filtrados.length
+        ? filtrados.map(renderFuncionarioCard).join("")
+        : `<p class="placeholder">Nenhum funcionário encontrado.</p>`;
+}
+
+function abrirPaginaHistoricoVistorias() {
+    const confirmado = confirm("Você será direcionado para uma página exclusiva do histórico de alterações. Deseja continuar?");
+    if (confirmado) window.location.href = "historico.html";
+}
+
+function preencherResponsaveisViatura() {
+    const responsaveis = viaturaResponsaveis[state.selectedViatura];
+    const tecnicoNomeInput = document.getElementById("tecnico-nome");
+    const tecnicoCpfInput = document.getElementById("tecnico-cpf");
+    const auxiliarNomeInput = document.getElementById("auxiliar-nome");
+    const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
+
+    if (tecnicoNomeInput) tecnicoNomeInput.value = responsaveis?.tecnico || "";
+    if (tecnicoCpfInput) tecnicoCpfInput.value = responsaveis?.tecnicoCpf || "";
+    if (auxiliarNomeInput) auxiliarNomeInput.value = responsaveis?.auxiliar || "";
+    if (auxiliarCpfInput) auxiliarCpfInput.value = responsaveis?.auxiliarCpf || "";
 }
 
 function renderItems(pageId) {
@@ -290,10 +436,20 @@ function renderItems(pageId) {
 
     container.innerHTML = items.map((item, index) => {
         const itemName = getItemName(item);
-        const defaults = getChecklistItemDefaults(pageId, itemName);
+        const defaults = getChecklistItemDefaults(pageId, itemName, state.selectedViatura);
         const quantidade = Number(defaults.quantidade || 1);
         const valor = Number(defaults.valor || 0);
         const total = quantidade * valor;
+        const epiExtraFields = pageId === "epis" ? `
+                <label>
+                    <span>C.A.</span>
+                    <input type="text" id="ca-${pageId}-${index}" value="${escapeHtml(defaults.ca || "")}" placeholder="Certificado de aprovação">
+                </label>
+                <label>
+                    <span>Data de entrega</span>
+                    <input type="text" id="entrega-${pageId}-${index}" value="${escapeHtml(defaults.dataEntrega || "")}" placeholder="dd/mm/aaaa">
+                </label>
+        ` : "";
         const ultimaSubstituicao = item.substituicoes?.at?.(-1);
         const descricaoSubstituicao = ultimaSubstituicao
             ? `${ultimaSubstituicao.itemAnterior} foi substituído por ${ultimaSubstituicao.itemNovo || itemName}.`
@@ -340,6 +496,7 @@ function renderItems(pageId) {
                 ` : ""}
             </div>
             <div class="checklist-extra-fields">
+                ${epiExtraFields}
                 <label>
                     <span>OBS</span>
                     <textarea id="obs-${pageId}-${index}" rows="1" placeholder="Observação do item">${escapeHtml(defaults.observacao || "")}</textarea>
@@ -422,6 +579,7 @@ function selectViatura(id) {
     renderViaturaDashboard();
     updateMenuStatus();
     updateVistoriaModeUI();
+    preencherResponsaveisViatura();
     updateVehicleMapImage(id);
     updateTabletInfo(id);
 
@@ -489,6 +647,7 @@ function updateMenuStatus() {
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById("km");
     const dataVistoriaInput = document.getElementById("checking-date");
+    const tecnicoNomeInput = document.getElementById("tecnico-nome");
     const tecnicoCpfInput = document.getElementById("tecnico-cpf");
     const auxiliarNomeInput = document.getElementById("auxiliar-nome");
     const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
@@ -531,6 +690,8 @@ async function finalizarVistoria(category) {
         const quantidade = Number(document.getElementById(`qtd-${category}-${i}`)?.value || 0);
         const valorUnitario = Number(document.getElementById(`valor-${category}-${i}`)?.value || 0);
         const observacao = document.getElementById(`obs-${category}-${i}`)?.value.trim() || "";
+        const ca = category === "epis" ? document.getElementById(`ca-${category}-${i}`)?.value.trim() || "" : "";
+        const dataEntrega = category === "epis" ? document.getElementById(`entrega-${category}-${i}`)?.value.trim() || "" : "";
 
         checklistResults.push({
             item: getItemName(items[i]),
@@ -538,7 +699,9 @@ async function finalizarVistoria(category) {
             valorUnitario,
             total: quantidade * valorUnitario,
             status: radio.value,
-            observacao
+            observacao,
+            ca,
+            dataEntrega
         });
     }
 
@@ -552,6 +715,7 @@ async function finalizarVistoria(category) {
         tabletId: category === "tablets" ? state.selectedViatura : null,
         vistoriador,
         dataVistoria: dataVistoriaInput?.value || new Date().toLocaleDateString("sv-SE"),
+        tecnicoNome: tecnicoNomeInput?.value.trim() || "",
         tecnicoCpf: tecnicoCpfInput?.value.trim() || "",
         auxiliarTecnico: auxiliarNomeInput?.value.trim() || "",
         auxiliarCpf: auxiliarCpfInput?.value.trim() || "",
@@ -676,6 +840,7 @@ function bindWindowFunctions() {
         removerViatura,
         renderAdminChecklist,
         showAdminConfigTab,
+        abrirPaginaHistoricoVistorias,
         adicionarItemChecklist,
         editarItemChecklist,
         alternarItemChecklist,
@@ -683,6 +848,8 @@ function bindWindowFunctions() {
         substituirItemChecklist,
         confirmarEnvioFinal,
         abrirModalRevisao,
+        renderFuncionariosPage,
+        alterarStatusFuncionario,
         atualizarTotalItem,
         limparErroItem,
         mostrarSubstituicaoItem,
@@ -712,10 +879,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
     const checkingDate = document.getElementById("checking-date");
     if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
+    preencherResponsaveisViatura();
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
     setAuthReadyCallback(async () => {
         selecionarVistoriadorPorLogin();
+        preencherResponsaveisViatura();
         renderItems("ferramentas");
         renderViaturaDashboard();
         updateVehicleMapImage();
@@ -723,6 +892,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateMenuStatus();
         updateVistoriaModeUI();
         selecionarVistoriadorAtivo(true);
+        if (sessionStorage.getItem("abrirPainelAdmin") === "1") {
+            sessionStorage.removeItem("abrirPainelAdmin");
+            showPage("admin");
+        }
     });
     initAdminAuthListener();
 });

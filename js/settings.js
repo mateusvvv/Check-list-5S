@@ -1,4 +1,4 @@
-import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, defaultViaturas, ensureChecklistForViatura, normalizeChecklistItem } from "./config.js";
+import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, defaultViaturas, ensureChecklistForViatura, getDefaultChecklistDataByViatura, normalizeChecklistItem } from "./config.js";
 import { db, firestoreDoc, getDoc, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
@@ -33,6 +33,15 @@ function ensureChecklistForAllViaturas() {
     state.viaturas.forEach(viatura => ensureChecklistForViatura(viatura.id));
 }
 
+function applyDefaultVehicleInventories() {
+    Object.entries(getDefaultChecklistDataByViatura()).forEach(([viaturaId, porCategoria]) => {
+        if (!checklistDataByViatura[viaturaId]) checklistDataByViatura[viaturaId] = {};
+        Object.entries(porCategoria).forEach(([category, items]) => {
+            checklistDataByViatura[viaturaId][category] = items.map((item, index) => normalizeChecklistItem(item, index));
+        });
+    });
+}
+
 function applyConfigHistory(history = []) {
     state.configHistory = Array.isArray(history)
         ? history
@@ -57,6 +66,7 @@ export async function carregarConfiguracoes() {
             applyChecklistData(data.checklistData || checklistData);
             setViaturas(data.viaturas || defaultViaturas);
             applyChecklistDataByViatura(data.checklistDataByViatura || {});
+            applyDefaultVehicleInventories();
             applyConfigHistory(data.configHistory || []);
             ensureChecklistForAllViaturas();
             return;
@@ -65,6 +75,7 @@ export async function carregarConfiguracoes() {
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
+        applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
         await salvarConfiguracoes();
     } catch (error) {
@@ -72,6 +83,7 @@ export async function carregarConfiguracoes() {
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
+        applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
     }
 }
