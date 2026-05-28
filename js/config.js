@@ -1557,7 +1557,7 @@ export const viaturaResponsaveis = {
     }
 };
 
-const funcionariosExtras = [
+export const funcionariosExtras = [
     {
         nome: "JOSE RANDSON SILVA",
         cpf: "125.442.764-36",

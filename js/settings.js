@@ -1,4 +1,4 @@
-import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, getDefaultChecklistDataByViatura, normalizeChecklistItem, normalizeEmployeeEpiItem, viaturaResponsaveis } from "./config.js";
+import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, viaturaResponsaveis } from "./config.js";
 import { db, firestoreDoc, getDoc, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
@@ -52,6 +52,30 @@ function applyViaturaResponsaveis(data = {}) {
     });
 }
 
+function normalizeFuncionarioExtra(funcionario = {}, index = 0) {
+    return {
+        id: String(funcionario.id || `funcionario-extra-${Date.now()}-${index}`),
+        nome: String(funcionario.nome || "").trim(),
+        cpf: String(funcionario.cpf || "").trim(),
+        funcao: String(funcionario.funcao || "Técnico").trim() || "Técnico",
+        status: String(funcionario.status || "Ativo").trim() || "Ativo",
+        viaturaId: String(funcionario.viaturaId || ""),
+        epis: Array.isArray(funcionario.epis)
+            ? funcionario.epis.map((item, itemIndex) => normalizeEmployeeEpiItem(item, itemIndex)).filter(item => item.nome)
+            : []
+    };
+}
+
+function applyFuncionariosExtras(data = funcionariosExtras) {
+    const normalized = Array.isArray(data)
+        ? data.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)).filter(funcionario => funcionario.nome)
+        : [];
+    funcionariosExtras.splice(0, funcionariosExtras.length, ...normalized);
+    funcionariosExtras.forEach(funcionario => {
+        employeeEpisByPerson[getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)] = cloneEmployeeEpis(funcionario.epis || []);
+    });
+}
+
 function ensureChecklistForAllViaturas() {
     state.viaturas.forEach(viatura => ensureChecklistForViatura(viatura.id));
 }
@@ -91,6 +115,7 @@ export async function carregarConfiguracoes() {
             applyViaturaResponsaveis(data.viaturaResponsaveis || viaturaResponsaveis);
             applyChecklistDataByViatura(data.checklistDataByViatura || {});
             if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
+            applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
             applyDefaultVehicleInventories();
             applyConfigHistory(data.configHistory || []);
             ensureChecklistForAllViaturas();
@@ -100,6 +125,7 @@ export async function carregarConfiguracoes() {
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
+        applyFuncionariosExtras(funcionariosExtras);
         applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
         await salvarConfiguracoes();
@@ -108,6 +134,7 @@ export async function carregarConfiguracoes() {
         applyChecklistData(checklistData);
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
+        applyFuncionariosExtras(funcionariosExtras);
         applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
     }
@@ -131,6 +158,7 @@ export async function salvarConfiguracoes() {
         employeeEpisByPerson: Object.fromEntries(
             Object.entries(employeeEpisByPerson).map(([key, items]) => [key, cloneEmployeeEpis(items)])
         ),
+        funcionariosExtras: funcionariosExtras.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)),
         viaturaResponsaveis: Object.fromEntries(
             Object.entries(viaturaResponsaveis).map(([viaturaId, responsaveis]) => [
                 viaturaId,

@@ -35,15 +35,23 @@ import {
     logoutAdmin,
     limparHistoricoConfig,
     adicionarItemChecklist,
+    adicionarEpiFuncionarioExtra,
+    adicionarFuncionarioExtra,
     adicionarViatura,
     alternarItemChecklist,
     alternarViaturaAtiva,
     editarItemChecklist,
+    editarEpiFuncionarioExtra,
+    editarFuncionarioExtra,
     editarNomeViatura,
     editarResponsavelViatura,
     removerViatura,
+    removerEpiFuncionarioExtra,
+    removerFuncionarioExtra,
     removerItemChecklist,
     renderAdminChecklist,
+    selecionarAuxiliarViatura,
+    selecionarTecnicoViatura,
     setAuthReadyCallback,
     showAdminConfigTab,
     substituirItemChecklist,
@@ -310,6 +318,121 @@ function getFuncionarioStatus(funcionario) {
     return getFuncionarioStatusOverrides()[getFuncionarioKey(funcionario)] || funcionario.status;
 }
 
+function getTecnicoOptions() {
+    const porChave = new Map();
+    getFuncionariosData()
+        .filter(funcionario => funcionario?.nome && funcionario?.cpf)
+        .forEach(funcionario => {
+            const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
+            if (!porChave.has(key)) {
+                porChave.set(key, {
+                    nome: funcionario.nome,
+                    cpf: funcionario.cpf
+                });
+            }
+        });
+
+    return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function findTecnicoByName(nome) {
+    const termo = normalizeSearch(nome).trim();
+    if (!termo) return null;
+    return getTecnicoOptions().find(tecnico => normalizeSearch(tecnico.nome).trim() === termo) || null;
+}
+
+function onlyDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+}
+
+function findResponsavelEmOutraViatura(viaturaIdAtual, nome, cpf) {
+    const nomeNormalizado = normalizeSearch(nome).trim();
+    const cpfNormalizado = onlyDigits(cpf);
+    if (!nomeNormalizado && !cpfNormalizado) return null;
+
+    for (const [viaturaId, responsaveis] of Object.entries(viaturaResponsaveis)) {
+        if (String(viaturaId) === String(viaturaIdAtual)) continue;
+
+        const pessoas = [
+            { tipo: "técnico", nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf },
+            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf }
+        ];
+
+        const encontrada = pessoas.find(pessoa => {
+            if (!pessoa.nome || pessoa.nome === "Veículo sem Técnico") return false;
+            const mesmoCpf = cpfNormalizado && onlyDigits(pessoa.cpf) === cpfNormalizado;
+            const mesmoNome = nomeNormalizado && normalizeSearch(pessoa.nome).trim() === nomeNormalizado;
+            return mesmoCpf || mesmoNome;
+        });
+
+        if (encontrada) {
+            const viatura = getViaturaById(viaturaId);
+            return {
+                ...encontrada,
+                viaturaNome: viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`
+            };
+        }
+    }
+
+    return null;
+}
+
+function confirmarResponsavelDuplicadoVistoria(nome, cpf) {
+    const duplicado = findResponsavelEmOutraViatura(state.selectedViatura, nome, cpf);
+    if (!duplicado) return true;
+
+    return confirm(
+        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
+        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
+        "Tem certeza que deseja cadastrar mesmo assim?"
+    );
+}
+
+function renderTecnicoDatalist() {
+    const tecnicoDatalist = document.getElementById("tecnicos-list");
+    const auxiliarDatalist = document.getElementById("auxiliares-list");
+    if (!tecnicoDatalist && !auxiliarDatalist) return;
+
+    const options = getTecnicoOptions()
+        .map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`)
+        .join("");
+
+    if (tecnicoDatalist) tecnicoDatalist.innerHTML = options;
+    if (auxiliarDatalist) auxiliarDatalist.innerHTML = options;
+}
+
+function selecionarTecnicoVistoriaAtual(nome) {
+    const tecnico = findTecnicoByName(nome);
+    const tecnicoNomeInput = document.getElementById("tecnico-nome");
+    const tecnicoCpfInput = document.getElementById("tecnico-cpf");
+    const tecnicoNome = tecnico?.nome || nome.trim();
+    const tecnicoCpf = tecnico?.cpf || tecnicoCpfInput?.value || "";
+
+    if (!confirmarResponsavelDuplicadoVistoria(tecnicoNome, tecnicoCpf)) {
+        preencherResponsaveisViatura();
+        return;
+    }
+
+    if (tecnicoNomeInput) tecnicoNomeInput.value = tecnicoNome;
+    if (tecnico && tecnicoCpfInput) tecnicoCpfInput.value = tecnicoCpf;
+}
+
+function selecionarAuxiliarVistoriaAtual(nome) {
+    const auxiliar = findTecnicoByName(nome);
+    const auxiliarNomeInput = document.getElementById("auxiliar-nome");
+    const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
+    const auxiliarNome = auxiliar?.nome || nome.trim();
+    const auxiliarCpf = auxiliar?.cpf || auxiliarCpfInput?.value || "";
+
+    if (!confirmarResponsavelDuplicadoVistoria(auxiliarNome, auxiliarCpf)) {
+        preencherResponsaveisViatura();
+        return;
+    }
+
+    if (auxiliarNomeInput) auxiliarNomeInput.value = auxiliarNome;
+    if (auxiliar && auxiliarCpfInput) auxiliarCpfInput.value = auxiliarCpf;
+}
+
 function alterarStatusFuncionario(key, status) {
     if (getVistoriadorAtivo() !== "Alisson") {
         alert("Somente Alisson pode alterar o status do funcionário.");
@@ -494,7 +617,7 @@ function renderItems(pageId) {
             <div class="checklist-item-header">
                 <div class="item-quantity-field">
                     <label for="qtd-${pageId}-${index}">QTD</label>
-                    <input type="number" id="qtd-${pageId}-${index}" min="0" step="1" value="${quantidade}" oninput="atualizarTotalItem('${pageId}', ${index})">
+                    <input type="number" id="qtd-${pageId}-${index}" min="0" step="1" value="${quantidade}" oninput="atualizarTotalItem('${pageId}', ${index})" onkeydown="salvarItemComEnter(event, '${pageId}')">
                 </div>
                 <label class="item-label">${escapeHtml(itemName)}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
                 <div class="item-value-field">
@@ -570,6 +693,12 @@ function atualizarTotalItem(pageId, index) {
     const valor = Number(document.getElementById(`valor-${pageId}-${index}`)?.value || 0);
     const totalInput = document.getElementById(`total-${pageId}-${index}`);
     if (totalInput) totalInput.value = formatCurrency(quantidade * valor);
+}
+
+function salvarItemComEnter(event, pageId) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    finalizarVistoria(pageId);
 }
 
 function mostrarSubstituicaoItem(data, descricao) {
@@ -712,6 +841,7 @@ async function finalizarVistoria(category) {
     const epiPessoa = category === "epis" ? getEpiPessoaByKey(state.selectedViatura, getSelectedEpiPessoaKey()) : null;
     const items = getChecklistItemsForPessoa(category, state.selectedViatura, getSelectedEpiPessoaKey()).filter(item => item.ativo !== false);
     const checklistResults = [];
+    const quantidadesAumentadas = [];
     let temErro = false;
 
     for (let i = 0; i < items.length; i++) {
@@ -727,9 +857,20 @@ async function finalizarVistoria(category) {
         const observacao = document.getElementById(`obs-${category}-${i}`)?.value.trim() || "";
         const ca = category === "epis" ? document.getElementById(`ca-${category}-${i}`)?.value.trim() || "" : "";
         const dataEntrega = category === "epis" ? document.getElementById(`entrega-${category}-${i}`)?.value.trim() || "" : "";
+        const itemName = getItemName(items[i]);
+        const defaults = category === "epis" ? items[i] : getChecklistItemDefaults(category, itemName, state.selectedViatura);
+        const quantidadeOriginal = Number(defaults.quantidade || 1);
+
+        if (quantidade > quantidadeOriginal) {
+            quantidadesAumentadas.push({
+                item: itemName,
+                original: quantidadeOriginal,
+                nova: quantidade
+            });
+        }
 
         checklistResults.push({
-            item: getItemName(items[i]),
+            item: itemName,
             quantidade,
             valorUnitario,
             total: quantidade * valorUnitario,
@@ -743,6 +884,20 @@ async function finalizarVistoria(category) {
     if (temErro) {
         alert("Existem itens sem marcação. Por favor, verifique os campos destacados em vermelho.");
         return;
+    }
+
+    if (quantidadesAumentadas.length > 0) {
+        const detalhes = quantidadesAumentadas
+            .slice(0, 6)
+            .map(item => `- ${item.item}: ${item.original} para ${item.nova}`)
+            .join("\n");
+        const restante = quantidadesAumentadas.length > 6
+            ? `\n...e mais ${quantidadesAumentadas.length - 6} item(ns).`
+            : "";
+
+        if (!confirm(`Você aumentou a QTD de alguns itens:\n\n${detalhes}${restante}\n\nDeseja realmente salvar assim?`)) {
+            return;
+        }
     }
 
     state.dadosTemporariosVistoria = {
@@ -853,6 +1008,8 @@ function bindWindowFunctions() {
         loginApp,
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
+        selecionarTecnicoVistoriaAtual,
+        selecionarAuxiliarVistoriaAtual,
         configurarModoVistoria,
         showHome,
         showPage,
@@ -874,8 +1031,16 @@ function bindWindowFunctions() {
         toggleSelecionarTodasVistorias,
         excluirVistoriasSelecionadas,
         adicionarViatura,
+        adicionarFuncionarioExtra,
+        adicionarEpiFuncionarioExtra,
+        editarFuncionarioExtra,
+        editarEpiFuncionarioExtra,
+        removerFuncionarioExtra,
+        removerEpiFuncionarioExtra,
         editarNomeViatura,
         editarResponsavelViatura,
+        selecionarTecnicoViatura,
+        selecionarAuxiliarViatura,
         alternarViaturaAtiva,
         removerViatura,
         renderAdminChecklist,
@@ -891,6 +1056,7 @@ function bindWindowFunctions() {
         renderFuncionariosPage,
         alterarStatusFuncionario,
         atualizarTotalItem,
+        salvarItemComEnter,
         limparErroItem,
         mostrarSubstituicaoItem,
         fecharModalRevisao,
@@ -919,11 +1085,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
     const checkingDate = document.getElementById("checking-date");
     if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
+    renderTecnicoDatalist();
     preencherResponsaveisViatura();
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
     setAuthReadyCallback(async () => {
         selecionarVistoriadorPorLogin();
+        renderTecnicoDatalist();
         preencherResponsaveisViatura();
         renderItems("ferramentas");
         renderViaturaDashboard();
@@ -943,13 +1111,15 @@ document.addEventListener("DOMContentLoaded", () => {
 bindWindowFunctions();
 
 window.refreshAppAfterConfigChange = function() {
+    renderTecnicoDatalist();
     preencherResponsaveisViatura();
     renderViaturaDashboard();
     updateMenuStatus();
     const activeTab = document.querySelector(".tab-content.active");
-    if (activeTab?.id === "funcionarios") {
+    if (document.getElementById("funcionarios-list")) {
         renderFuncionariosPage();
-    } else if (activeTab) {
+    }
+    if (activeTab && activeTab.id !== "funcionarios") {
         renderItems(activeTab.id);
     }
 };

@@ -1,4 +1,4 @@
-import { categoryNames, checklistDataByViatura, damageTypeNames, ensureChecklistForViatura, formatTwoDigits, getChecklistItemsForPessoa, getEpiPessoaOptions, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
 import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
@@ -6,8 +6,6 @@ import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
 import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
 
 let authReadyCallback = async () => {};
-const splashDelayMs = 3000;
-let splashTimer = null;
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -68,6 +66,96 @@ function isValidDateBR(value) {
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
+function isAlissonAdmin() {
+    const email = String(auth.currentUser?.email || "").trim().toLowerCase();
+    return getVistoriadorResponsavel() === "Alisson" || vistoriadorPorEmail[email] === "Alisson";
+}
+
+function normalizeSearch(value) {
+    return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+function getTecnicoOptions() {
+    const porChave = new Map();
+    getFuncionariosData()
+        .filter(funcionario => funcionario?.nome && funcionario?.cpf)
+        .forEach(funcionario => {
+            const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
+            if (!porChave.has(key)) {
+                porChave.set(key, {
+                    nome: funcionario.nome,
+                    cpf: funcionario.cpf
+                });
+            }
+        });
+
+    return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function findTecnicoByName(nome) {
+    const termo = normalizeSearch(nome);
+    if (!termo) return null;
+    return getTecnicoOptions().find(tecnico => normalizeSearch(tecnico.nome) === termo) || null;
+}
+
+function onlyDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+}
+
+function findResponsavelEmOutraViatura(viaturaIdAtual, nome, cpf) {
+    const nomeNormalizado = normalizeSearch(nome);
+    const cpfNormalizado = onlyDigits(cpf);
+    if (!nomeNormalizado && !cpfNormalizado) return null;
+
+    for (const [viaturaId, responsaveis] of Object.entries(viaturaResponsaveis)) {
+        if (String(viaturaId) === String(viaturaIdAtual)) continue;
+
+        const pessoas = [
+            { tipo: "técnico", nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf },
+            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf }
+        ];
+
+        const encontrada = pessoas.find(pessoa => {
+            if (!pessoa.nome || pessoa.nome === "Veículo sem Técnico") return false;
+            const mesmoCpf = cpfNormalizado && onlyDigits(pessoa.cpf) === cpfNormalizado;
+            const mesmoNome = nomeNormalizado && normalizeSearch(pessoa.nome) === nomeNormalizado;
+            return mesmoCpf || mesmoNome;
+        });
+
+        if (encontrada) {
+            const viatura = state.viaturas.find(item => item.id === String(viaturaId));
+            return {
+                ...encontrada,
+                viaturaId,
+                viaturaNome: viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`
+            };
+        }
+    }
+
+    return null;
+}
+
+function confirmarResponsavelDuplicado(viaturaId, campo, valor) {
+    const responsaveisAtuais = viaturaResponsaveis[String(viaturaId)] || {};
+    const proximos = { ...responsaveisAtuais, [campo]: valor.trim() };
+    const isTecnico = campo.startsWith("tecnico");
+    const nome = isTecnico ? proximos.tecnico : proximos.auxiliar;
+    const cpf = isTecnico ? proximos.tecnicoCpf : proximos.auxiliarCpf;
+    const duplicado = findResponsavelEmOutraViatura(viaturaId, nome, cpf);
+
+    if (!duplicado) return true;
+
+    return confirm(
+        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
+        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
+        "Tem certeza que deseja cadastrar mesmo assim?"
+    );
+}
+
 export function setAuthReadyCallback(callback) {
     authReadyCallback = callback;
 }
@@ -105,6 +193,7 @@ function renderAdminConfig() {
     renderAdminViaturas();
     renderAdminViaturaOptions();
     renderAdminChecklist();
+    renderAdminFuncionariosExtras();
     renderAdminHistory();
 }
 
@@ -112,14 +201,14 @@ export function showAdminConfigTab(tab) {
     const targetButton = document.getElementById(`admin-tab-${tab}`);
     const isAlreadyOpen = targetButton?.classList.contains("active");
     if (isAlreadyOpen) {
-        ["viaturas", "itens", "historico"].forEach(item => {
+        ["viaturas", "itens", "funcionarios", "historico"].forEach(item => {
             document.getElementById(`admin-tab-${item}`)?.classList.remove("active");
             document.getElementById(`admin-config-${item}`)?.classList.remove("active");
         });
         return;
     }
 
-    ["viaturas", "itens", "historico"].forEach(item => {
+    ["viaturas", "itens", "funcionarios", "historico"].forEach(item => {
         document.getElementById(`admin-tab-${item}`)?.classList.toggle("active", tab === item);
         document.getElementById(`admin-config-${item}`)?.classList.toggle("active", tab === item);
     });
@@ -134,8 +223,12 @@ export function renderAdminViaturas() {
     const container = document.getElementById("admin-viaturas-list");
     if (!container) return;
 
+    const tecnicoOptions = getTecnicoOptions();
+
     container.innerHTML = state.viaturas.map((viatura) => {
         const responsaveis = viaturaResponsaveis[viatura.id] || {};
+        const tecnicoDatalistId = `tecnicos-viatura-${viatura.id}`;
+        const auxiliarDatalistId = `auxiliares-viatura-${viatura.id}`;
         return `
             <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
                 <div class="admin-vehicle-main">
@@ -148,16 +241,22 @@ export function renderAdminViaturas() {
                 </div>
                 <div class="admin-responsaveis-grid">
                     <label>
-                        <span>Técnico</span>
-                        <input type="text" value="${escapeHtml(responsaveis.tecnico || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'tecnico', this.value)">
+                        <span>Pesquisar técnico</span>
+                        <input type="text" list="${tecnicoDatalistId}" value="${escapeHtml(responsaveis.tecnico || "")}" placeholder="Digite o nome do técnico" onchange="selecionarTecnicoViatura('${viatura.id}', this.value)">
+                        <datalist id="${tecnicoDatalistId}">
+                            ${tecnicoOptions.map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`).join("")}
+                        </datalist>
                     </label>
                     <label>
                         <span>CPF técnico</span>
                         <input type="text" value="${escapeHtml(responsaveis.tecnicoCpf || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'tecnicoCpf', this.value)">
                     </label>
                     <label>
-                        <span>Auxiliar</span>
-                        <input type="text" value="${escapeHtml(responsaveis.auxiliar || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'auxiliar', this.value)">
+                        <span>Pesquisar auxiliar</span>
+                        <input type="text" list="${auxiliarDatalistId}" value="${escapeHtml(responsaveis.auxiliar || "")}" placeholder="Digite o nome do auxiliar" onchange="selecionarAuxiliarViatura('${viatura.id}', this.value)">
+                        <datalist id="${auxiliarDatalistId}">
+                            ${tecnicoOptions.map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`).join("")}
+                        </datalist>
                     </label>
                     <label>
                         <span>CPF auxiliar</span>
@@ -167,6 +266,60 @@ export function renderAdminViaturas() {
             </div>
         `;
     }).join("");
+}
+
+export async function selecionarTecnicoViatura(id, nome) {
+    const viaturaId = String(id);
+    if (!viaturaResponsaveis[viaturaId]) {
+        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+
+    const tecnico = findTecnicoByName(nome);
+    const tecnicoNome = tecnico?.nome || nome.trim();
+    const tecnicoCpf = tecnico?.cpf || viaturaResponsaveis[viaturaId].tecnicoCpf || "";
+
+    const duplicado = findResponsavelEmOutraViatura(viaturaId, tecnicoNome, tecnicoCpf);
+    if (duplicado && !confirm(
+        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
+        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
+        "Tem certeza que deseja cadastrar mesmo assim?"
+    )) {
+        refreshAppAfterConfigChange();
+        return;
+    }
+
+    viaturaResponsaveis[viaturaId].tecnico = tecnicoNome;
+    if (tecnico) viaturaResponsaveis[viaturaId].tecnicoCpf = tecnicoCpf;
+
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function selecionarAuxiliarViatura(id, nome) {
+    const viaturaId = String(id);
+    if (!viaturaResponsaveis[viaturaId]) {
+        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+
+    const auxiliar = findTecnicoByName(nome);
+    const auxiliarNome = auxiliar?.nome || nome.trim();
+    const auxiliarCpf = auxiliar?.cpf || viaturaResponsaveis[viaturaId].auxiliarCpf || "";
+
+    const duplicado = findResponsavelEmOutraViatura(viaturaId, auxiliarNome, auxiliarCpf);
+    if (duplicado && !confirm(
+        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
+        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
+        "Tem certeza que deseja cadastrar mesmo assim?"
+    )) {
+        refreshAppAfterConfigChange();
+        return;
+    }
+
+    viaturaResponsaveis[viaturaId].auxiliar = auxiliarNome;
+    if (auxiliar) viaturaResponsaveis[viaturaId].auxiliarCpf = auxiliarCpf;
+
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
 }
 
 export function renderAdminHistory() {
@@ -227,6 +380,10 @@ export async function editarResponsavelViatura(id, campo, valor) {
         viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
     }
     if (!["tecnico", "tecnicoCpf", "auxiliar", "auxiliarCpf"].includes(campo)) return;
+    if (!confirmarResponsavelDuplicado(viaturaId, campo, valor)) {
+        refreshAppAfterConfigChange();
+        return;
+    }
     viaturaResponsaveis[viaturaId][campo] = valor.trim();
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
@@ -325,6 +482,223 @@ export function renderAdminViaturaOptions() {
         <option value="${viatura.id}">${escapeHtml(viatura.nome)}${viatura.ativa === false ? " (desativada)" : ""}</option>
     `).join("");
     select.value = state.viaturas.some(viatura => viatura.id === valorAtual) ? valorAtual : state.selectedViatura;
+}
+
+function syncFuncionarioExtraEpis(funcionario, oldKey = "") {
+    if (oldKey && oldKey !== getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)) {
+        delete employeeEpisByPerson[oldKey];
+    }
+    employeeEpisByPerson[getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)] = cloneEmployeeEpis(funcionario.epis || []);
+}
+
+function requireAlissonAdmin() {
+    if (isAlissonAdmin()) return true;
+    alert("Somente Alisson pode gerenciar técnicos e auxiliares.");
+    renderAdminFuncionariosExtras();
+    return false;
+}
+
+function getFuncionarioExtra(index) {
+    return funcionariosExtras[Number(index)] || null;
+}
+
+export function renderAdminFuncionariosExtras() {
+    const manager = document.getElementById("admin-funcionarios-manager");
+    const blocked = document.getElementById("admin-funcionarios-alisson-only");
+    const list = document.getElementById("admin-funcionarios-list");
+    if (!manager || !blocked || !list) return;
+
+    const canManage = isAlissonAdmin();
+    blocked.style.display = canManage ? "none" : "block";
+    manager.style.display = canManage ? "block" : "none";
+    if (!canManage) return;
+
+    if (!funcionariosExtras.length) {
+        list.innerHTML = '<p class="admin-history-empty">Nenhum funcionário extra cadastrado.</p>';
+        return;
+    }
+
+    list.innerHTML = funcionariosExtras.map((funcionario, index) => {
+        const epis = Array.isArray(funcionario.epis) ? funcionario.epis : [];
+        return `
+            <div class="admin-config-row admin-extra-employee-row">
+                <div class="admin-responsaveis-grid">
+                    <label>
+                        <span>Nome</span>
+                        <input type="text" value="${escapeHtml(funcionario.nome || "")}" onchange="editarFuncionarioExtra(${index}, 'nome', this.value)">
+                    </label>
+                    <label>
+                        <span>CPF</span>
+                        <input type="text" value="${escapeHtml(funcionario.cpf || "")}" onchange="editarFuncionarioExtra(${index}, 'cpf', this.value)">
+                    </label>
+                    <label>
+                        <span>Função</span>
+                        <select onchange="editarFuncionarioExtra(${index}, 'funcao', this.value)">
+                            <option value="Técnico" ${funcionario.funcao === "Técnico" ? "selected" : ""}>Técnico</option>
+                            <option value="Auxiliar técnico" ${funcionario.funcao === "Auxiliar técnico" ? "selected" : ""}>Auxiliar técnico</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Status</span>
+                        <select onchange="editarFuncionarioExtra(${index}, 'status', this.value)">
+                            ${["Ativo", "Férias", "Folga", "Atestado", "Falta"].map(status => `
+                                <option value="${status}" ${funcionario.status === status ? "selected" : ""}>${status}</option>
+                            `).join("")}
+                        </select>
+                    </label>
+                </div>
+                <div class="admin-config-actions">
+                    <button type="button" class="btn-danger" onclick="removerFuncionarioExtra(${index})">Remover funcionário</button>
+                </div>
+                <div class="admin-extra-epi-wrap">
+                    <strong>EPIs</strong>
+                    <div class="admin-extra-epi-form">
+                        <input type="number" id="extra-epi-qtd-${index}" min="1" step="1" value="1" aria-label="Quantidade">
+                        <input type="text" id="extra-epi-nome-${index}" value="" placeholder="Nome do EPI" autocomplete="new-password">
+                        <input type="text" id="extra-epi-ca-${index}" value="" placeholder="C.A." autocomplete="new-password">
+                        <input type="text" id="extra-epi-obs-${index}" value="" placeholder="OBS" autocomplete="new-password">
+                        <button type="button" onclick="adicionarEpiFuncionarioExtra(${index})">Adicionar EPI</button>
+                    </div>
+                    <div class="admin-extra-epi-list">
+                        ${epis.length ? epis.map((epi, epiIndex) => `
+                            <div class="admin-extra-epi-row">
+                                <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'quantidade', this.value)" aria-label="Quantidade do EPI">
+                                <input type="text" value="${escapeHtml(epi.nome || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'nome', this.value)" aria-label="Nome do EPI">
+                                <input type="text" value="${escapeHtml(epi.ca || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'ca', this.value)" aria-label="CA do EPI">
+                                <input type="text" value="${escapeHtml(epi.observacao || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'observacao', this.value)" aria-label="Observação do EPI">
+                                <button type="button" class="btn-danger" onclick="removerEpiFuncionarioExtra(${index}, ${epiIndex})">Remover</button>
+                            </div>
+                        `).join("") : '<p class="admin-history-empty">Nenhum EPI cadastrado para este funcionário.</p>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+export async function adicionarFuncionarioExtra() {
+    if (!requireAlissonAdmin()) return;
+
+    const nomeInput = document.getElementById("admin-funcionario-nome");
+    const cpfInput = document.getElementById("admin-funcionario-cpf");
+    const funcaoInput = document.getElementById("admin-funcionario-funcao");
+    const nome = nomeInput?.value.trim() || "";
+    const cpf = cpfInput?.value.trim() || "";
+    const funcao = funcaoInput?.value || "Técnico";
+
+    if (!nome || !cpf) {
+        alert("Informe o nome e o CPF do funcionário.");
+        return;
+    }
+
+    if (getFuncionariosData().some(funcionario => onlyDigits(funcionario.cpf) === onlyDigits(cpf))) {
+        if (!confirm("Já existe um funcionário com este CPF. Deseja cadastrar mesmo assim?")) return;
+    }
+
+    const funcionario = {
+        id: `funcionario-extra-${Date.now()}`,
+        nome,
+        cpf,
+        funcao,
+        status: "Ativo",
+        viaturaId: "",
+        epis: []
+    };
+
+    funcionariosExtras.push(funcionario);
+    syncFuncionarioExtraEpis(funcionario);
+    if (nomeInput) nomeInput.value = "";
+    if (cpfInput) cpfInput.value = "";
+    registrarHistoricoConfig("Funcionário adicionado", `${nome} foi adicionado como ${funcao}.`);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function editarFuncionarioExtra(index, campo, valor) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    if (!funcionario || !["nome", "cpf", "funcao", "status"].includes(campo)) return;
+
+    const oldKey = getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
+    funcionario[campo] = String(valor || "").trim();
+    if (!funcionario.nome) {
+        renderAdminFuncionariosExtras();
+        return;
+    }
+
+    syncFuncionarioExtraEpis(funcionario, oldKey);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function removerFuncionarioExtra(index) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    if (!funcionario) return;
+    if (!confirm(`Tem certeza que deseja remover ${funcionario.nome}? Esta ação também remove os EPIs cadastrados para essa pessoa.`)) return;
+
+    delete employeeEpisByPerson[getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)];
+    funcionariosExtras.splice(Number(index), 1);
+    registrarHistoricoConfig("Funcionário removido", `${funcionario.nome} foi removido.`);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function adicionarEpiFuncionarioExtra(index) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    if (!funcionario) return;
+
+    const quantidade = Number(document.getElementById(`extra-epi-qtd-${index}`)?.value || 1);
+    const nome = document.getElementById(`extra-epi-nome-${index}`)?.value.trim() || "";
+    const ca = document.getElementById(`extra-epi-ca-${index}`)?.value.trim() || "";
+    const observacao = document.getElementById(`extra-epi-obs-${index}`)?.value.trim() || "";
+
+    if (!nome) {
+        alert("Informe o nome do EPI.");
+        return;
+    }
+
+    funcionario.epis = Array.isArray(funcionario.epis) ? funcionario.epis : [];
+    funcionario.epis.push(normalizeEmployeeEpiItem({
+        id: `epi-extra-${Date.now()}`,
+        nome,
+        quantidade,
+        ca,
+        dataEntrega: "",
+        observacao,
+        ativo: true,
+        valor: 0,
+        substituicoes: []
+    }));
+    syncFuncionarioExtraEpis(funcionario);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function editarEpiFuncionarioExtra(index, epiIndex, campo, valor) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    const epi = funcionario?.epis?.[Number(epiIndex)];
+    if (!epi || !["quantidade", "nome", "ca", "observacao"].includes(campo)) return;
+
+    epi[campo] = campo === "quantidade" ? Number(valor || 1) : String(valor || "").trim();
+    funcionario.epis[Number(epiIndex)] = normalizeEmployeeEpiItem(epi, Number(epiIndex));
+    syncFuncionarioExtraEpis(funcionario);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+}
+
+export async function removerEpiFuncionarioExtra(index, epiIndex) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    if (!funcionario?.epis?.[Number(epiIndex)]) return;
+    if (!confirm("Tem certeza que deseja remover este EPI?")) return;
+
+    funcionario.epis.splice(Number(epiIndex), 1);
+    syncFuncionarioExtraEpis(funcionario);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
 }
 
 export async function adicionarItemChecklist() {
@@ -845,19 +1219,12 @@ export async function exportarHistoricoPDF() {
 export function initAdminAuthListener() {
     onAuthStateChanged(auth, async (user) => {
         const loginScreen = document.getElementById("app-login-screen");
-        const splashScreen = document.getElementById("app-splash-screen");
         const header = document.querySelector("header");
         const main = document.querySelector("main");
         const loginSec = document.getElementById("admin-login-section");
         const panelSec = document.getElementById("admin-panel-section");
 
-        if (splashTimer) {
-            clearTimeout(splashTimer);
-            splashTimer = null;
-        }
-
         if (loginScreen) loginScreen.style.display = user ? "none" : "grid";
-        if (splashScreen) splashScreen.style.display = user ? "grid" : "none";
         if (header) header.style.display = "none";
         if (main) main.style.display = "none";
         if (loginSec) loginSec.style.display = user ? "none" : "block";
@@ -867,23 +1234,13 @@ export function initAdminAuthListener() {
             if (vistoriadorSelect) vistoriadorSelect.disabled = false;
         }
         if (user) {
-            const splashWait = new Promise(resolve => {
-                splashTimer = setTimeout(resolve, splashDelayMs);
-            });
-            await Promise.all([
-                (async () => {
-                    await carregarConfiguracoes();
-                    await authReadyCallback();
-                    renderAdminConfig();
-                    carregarHistorico();
-                })(),
-                splashWait
-            ]);
+            await carregarConfiguracoes();
+            await authReadyCallback();
+            renderAdminConfig();
+            carregarHistorico();
             if (auth.currentUser !== user) return;
-            if (splashScreen) splashScreen.style.display = "none";
             if (header) header.style.display = "flex";
             if (main) main.style.display = "block";
-            splashTimer = null;
         }
     });
 }

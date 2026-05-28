@@ -171,6 +171,20 @@
         grid-template-columns: 1fr;
     }
 
+    .admin-item-form select,
+    .admin-item-form input,
+    .admin-item-person-select {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .admin-extra-epi-form,
+    .admin-extra-epi-row {
+        grid-template-columns: 1fr;
+        gap: 7px;
+    }
+
     .btn-export-selected,
     .btn-resolve-selected,
     .btn-delete-selected {
@@ -291,8 +305,11 @@
 
     .epi-person-selector select {
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
         min-height: 38px;
         font-size: 0.88rem;
+        text-overflow: ellipsis;
     }
 
     .employee-title {

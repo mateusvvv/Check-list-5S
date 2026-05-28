@@ -419,6 +419,7 @@ body > main {
 }
 
 .epi-person-selector label {
+    min-width: 0;
     color: var(--primary-blue);
     font-size: 0.78rem;
     font-weight: 800;
@@ -426,11 +427,14 @@ body > main {
 }
 
 .epi-person-selector select {
+    min-width: 0;
+    max-width: 100%;
     min-height: 38px;
     border: 1px solid var(--border-color);
     border-radius: 5px;
     padding: 7px 9px;
     font: inherit;
+    text-overflow: ellipsis;
 }
 
 .employees-list {

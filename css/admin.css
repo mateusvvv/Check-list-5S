@@ -478,8 +478,11 @@
 }
 
 .admin-config-row input,
+.admin-config-row select,
 .admin-item-form input,
 .admin-item-form select {
+    min-width: 0;
+    max-width: 100%;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 8px;
@@ -523,14 +526,71 @@
     text-transform: uppercase;
 }
 
-.admin-responsaveis-grid input {
+.admin-responsaveis-grid input,
+.admin-responsaveis-grid select {
     width: 100%;
     box-sizing: border-box;
     text-transform: none;
 }
 
+.admin-extra-employee-row {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-extra-epi-wrap {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    padding-top: 4px;
+}
+
+.admin-extra-epi-wrap strong {
+    color: var(--primary-blue);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+
+.admin-extra-epi-form,
+.admin-extra-epi-row {
+    display: grid;
+    grid-template-columns: 54px minmax(170px, 1.6fr) minmax(72px, 0.55fr) minmax(130px, 1fr) auto;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.admin-extra-epi-list {
+    display: grid;
+    gap: 8px;
+}
+
+.admin-extra-epi-row {
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fbfcfe;
+}
+
+.admin-extra-epi-form input,
+.admin-extra-epi-row input,
+.admin-extra-epi-form button,
+.admin-extra-epi-row button {
+    min-width: 0;
+    min-height: 32px;
+    font-size: 0.76rem;
+    line-height: 1.2;
+}
+
+.admin-extra-epi-form button,
+.admin-extra-epi-row button {
+    padding: 6px 8px;
+    white-space: nowrap;
+}
+
 .admin-item-person-select {
     flex: 1 1 230px;
+    width: 100%;
+    text-overflow: ellipsis;
 }
 
 .admin-config-actions {
