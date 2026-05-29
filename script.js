@@ -1,4 +1,4 @@
-import { categoryNames, formatTwoDigits, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionariosData, getItemName, getChecklistItemDefaults, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js?v=epis-pessoa-20260527";
+import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -37,6 +37,7 @@ import {
     adicionarItemChecklist,
     adicionarEpiFuncionarioExtra,
     adicionarFuncionarioExtra,
+    finalizarCadastroFuncionarioExtra,
     adicionarViatura,
     alternarItemChecklist,
     alternarViaturaAtiva,
@@ -75,6 +76,9 @@ import {
     state,
     todasEtapasConcluidas
 } from "./js/state.js";
+import { salvarConfiguracoes } from "./js/settings.js";
+
+let funcionarioItensEditandoKey = "";
 
 function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
@@ -271,6 +275,7 @@ function showPage(pageId) {
 
     const headerInfo = document.querySelector(".header-info");
     if (headerInfo) headerInfo.style.display = ["admin", "funcionarios"].includes(pageId) ? "none" : "block";
+    document.body.classList.toggle("page-funcionarios", pageId === "funcionarios");
 
     document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
 
@@ -306,6 +311,16 @@ function getFuncionarioKey(funcionario) {
     return funcionario.cpf || funcionario.nome;
 }
 
+function getFuncionarioEditKey(funcionario) {
+    return getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
+}
+
+function getFuncionarioDisplayViaturaId(funcionario) {
+    if (getFuncionarioStatus(funcionario) !== "Ativo") return "";
+    const viaturaId = String(funcionario?.viaturaId || "");
+    return getActiveViaturas().some(viatura => String(viatura.id) === viaturaId) ? viaturaId : "";
+}
+
 function getFuncionarioStatusOverrides() {
     try {
         return JSON.parse(localStorage.getItem("funcionarioStatusOverrides") || "{}");
@@ -320,17 +335,27 @@ function getFuncionarioStatus(funcionario) {
 
 function getTecnicoOptions() {
     const porChave = new Map();
+    const addOption = (funcionario) => {
+        if (!funcionario?.nome || !funcionario?.cpf) return;
+        const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
+        if (!porChave.has(key)) {
+            porChave.set(key, {
+                nome: funcionario.nome,
+                cpf: funcionario.cpf,
+                funcao: funcionario.funcao || ""
+            });
+        }
+    };
+
     getFuncionariosData()
         .filter(funcionario => funcionario?.nome && funcionario?.cpf)
-        .forEach(funcionario => {
-            const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
-            if (!porChave.has(key)) {
-                porChave.set(key, {
-                    nome: funcionario.nome,
-                    cpf: funcionario.cpf
-                });
-            }
-        });
+        .forEach(addOption);
+
+    addOption({
+        nome: "SIDNEY MANOEL DO NASCIMENTO",
+        cpf: "099.077.164-48",
+        funcao: "Técnico"
+    });
 
     return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -338,7 +363,10 @@ function getTecnicoOptions() {
 function findTecnicoByName(nome) {
     const termo = normalizeSearch(nome).trim();
     if (!termo) return null;
-    return getTecnicoOptions().find(tecnico => normalizeSearch(tecnico.nome).trim() === termo) || null;
+    const options = getTecnicoOptions();
+    return options.find(tecnico => normalizeSearch(tecnico.nome).trim() === termo)
+        || options.find(tecnico => normalizeSearch(tecnico.nome).includes(termo))
+        || null;
 }
 
 function onlyDigits(value) {
@@ -391,7 +419,8 @@ function confirmarResponsavelDuplicadoVistoria(nome, cpf) {
 function renderTecnicoDatalist() {
     const tecnicoDatalist = document.getElementById("tecnicos-list");
     const auxiliarDatalist = document.getElementById("auxiliares-list");
-    if (!tecnicoDatalist && !auxiliarDatalist) return;
+    const tecnicoAuxiliarDatalist = document.getElementById("tecnicos-auxiliares-list");
+    if (!tecnicoDatalist && !auxiliarDatalist && !tecnicoAuxiliarDatalist) return;
 
     const options = getTecnicoOptions()
         .map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`)
@@ -399,6 +428,7 @@ function renderTecnicoDatalist() {
 
     if (tecnicoDatalist) tecnicoDatalist.innerHTML = options;
     if (auxiliarDatalist) auxiliarDatalist.innerHTML = options;
+    if (tecnicoAuxiliarDatalist) tecnicoAuxiliarDatalist.innerHTML = options;
 }
 
 function selecionarTecnicoVistoriaAtual(nome) {
@@ -433,6 +463,33 @@ function selecionarAuxiliarVistoriaAtual(nome) {
     if (auxiliar && auxiliarCpfInput) auxiliarCpfInput.value = auxiliarCpf;
 }
 
+async function selecionarResponsavelPorPesquisa(nome) {
+    const pessoa = findTecnicoByName(nome);
+    const pesquisaInput = document.getElementById("responsavel-pesquisa");
+    const pessoaNome = pessoa?.nome || nome.trim();
+    const pessoaCpf = pessoa?.cpf || "";
+    const isAuxiliar = normalizeSearch(pessoa?.funcao || "").includes("auxiliar");
+    const campoNome = isAuxiliar ? "auxiliar" : "tecnico";
+    const campoCpf = isAuxiliar ? "auxiliarCpf" : "tecnicoCpf";
+    const nomeInput = document.getElementById(isAuxiliar ? "auxiliar-nome" : "tecnico-nome");
+    const cpfInput = document.getElementById(isAuxiliar ? "auxiliar-cpf" : "tecnico-cpf");
+
+    if (!confirmarResponsavelDuplicadoVistoria(pessoaNome, pessoaCpf)) {
+        if (pesquisaInput) pesquisaInput.value = "";
+        return;
+    }
+
+    if (nomeInput) nomeInput.value = pessoaNome;
+    if (pessoa && cpfInput) cpfInput.value = pessoaCpf;
+    if (viaturaResponsaveis[state.selectedViatura]) {
+        viaturaResponsaveis[state.selectedViatura][campoNome] = pessoaNome;
+        viaturaResponsaveis[state.selectedViatura][campoCpf] = pessoaCpf;
+        await salvarConfiguracoes();
+    }
+    if (pesquisaInput) pesquisaInput.value = "";
+    renderEpiPessoaOptions();
+}
+
 function alterarStatusFuncionario(key, status) {
     if (getVistoriadorAtivo() !== "Alisson") {
         alert("Somente Alisson pode alterar o status do funcionário.");
@@ -449,7 +506,16 @@ function alterarStatusFuncionario(key, status) {
 function renderFuncionarioCard(funcionario) {
     const status = getFuncionarioStatus(funcionario);
     const key = getFuncionarioKey(funcionario);
+    const editKey = getFuncionarioEditKey(funcionario);
+    const isEditingItems = funcionarioItensEditandoKey === editKey;
+    const displayViaturaId = getFuncionarioDisplayViaturaId(funcionario);
     const statusClass = getFuncionarioStatusClass(status);
+    const deleteControl = getVistoriadorAtivo() === "Alisson"
+        ? `<button type="button" class="employee-delete-btn" onclick="excluirFuncionario('${escapeJsString(editKey)}')">Excluir</button>`
+        : "";
+    const editControl = getVistoriadorAtivo() === "Alisson"
+        ? `<button type="button" class="employee-edit-items-btn ${isEditingItems ? "editing" : ""}" onclick="abrirEditorItensFuncionario('${escapeJsString(editKey)}')">${isEditingItems ? "Concluir edição" : "Editar itens"}</button>`
+        : "";
     const statusControl = getVistoriadorAtivo() === "Alisson"
         ? `
             <label class="employee-status-control">
@@ -462,7 +528,12 @@ function renderFuncionarioCard(funcionario) {
             </label>
         `
         : `<span class="employee-status ${statusClass}">${escapeHtml(status)}</span>`;
-    const episHtml = funcionario.epis?.length
+    const actionsHtml = deleteControl || editControl || statusControl
+        ? `<div class="employee-card-actions">${deleteControl}${editControl}${statusControl}</div>`
+        : "";
+    const episHtml = isEditingItems
+        ? renderEditorItensFuncionarioInline(editKey)
+        : funcionario.epis?.length
         ? `
             <div class="employee-epi-table-wrap">
                 <table class="employee-epi-table">
@@ -496,9 +567,9 @@ function renderFuncionarioCard(funcionario) {
             <div class="employee-card-header">
                 <div>
                     <h3>${escapeHtml(funcionario.nome)}</h3>
-                    <p>${escapeHtml(funcionario.funcao)}${funcionario.viaturaId ? ` - Viatura ${formatTwoDigits(funcionario.viaturaId)}` : ""}</p>
+                    <p>${escapeHtml(funcionario.funcao)}${displayViaturaId ? ` - Viatura ${formatTwoDigits(displayViaturaId)}` : ""}</p>
                 </div>
-                ${statusControl}
+                ${actionsHtml}
             </div>
             <div class="employee-meta">
                 <span>CPF: ${escapeHtml(funcionario.cpf || "-")}</span>
@@ -507,6 +578,348 @@ function renderFuncionarioCard(funcionario) {
             ${episHtml}
         </article>
     `;
+}
+
+function getFuncionarioRoleOrder(funcao = "") {
+    const normalized = normalizeSearch(funcao);
+    if (normalized.includes("tecnico") && !normalized.includes("auxiliar")) return 0;
+    if (normalized.includes("auxiliar")) return 1;
+    return 2;
+}
+
+function findFuncionarioByEditKey(key) {
+    return getFuncionariosData().find(funcionario => getFuncionarioEditKey(funcionario) === key) || null;
+}
+
+function getFuncionarioExtraByEditKey(key) {
+    return funcionariosExtras.find(funcionario => getFuncionarioEditKey(funcionario) === key) || null;
+}
+
+function getFuncionarioVinculoViatura(key) {
+    for (const [viaturaId, responsaveis] of Object.entries(viaturaResponsaveis)) {
+        if (responsaveis.tecnico && getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf) === key) {
+            return { viaturaId, campoNome: "tecnico", campoCpf: "tecnicoCpf", funcao: "Técnico" };
+        }
+
+        if (responsaveis.auxiliar && getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf) === key) {
+            return { viaturaId, campoNome: "auxiliar", campoCpf: "auxiliarCpf", funcao: "Auxiliar técnico" };
+        }
+    }
+
+    return null;
+}
+
+function moveFuncionarioStoredData(oldKey, newKey) {
+    if (!oldKey || oldKey === newKey) return;
+
+    if (employeeEpisByPerson[oldKey]) {
+        employeeEpisByPerson[newKey] = employeeEpisByPerson[oldKey];
+        delete employeeEpisByPerson[oldKey];
+    }
+
+    const overrides = getFuncionarioStatusOverrides();
+    if (overrides[oldKey]) {
+        overrides[newKey] = overrides[oldKey];
+        delete overrides[oldKey];
+        localStorage.setItem("funcionarioStatusOverrides", JSON.stringify(overrides));
+    }
+}
+
+async function editarDadosFuncionario(key, campo, valor) {
+    if (getVistoriadorAtivo() !== "Alisson") return;
+
+    const funcionario = findFuncionarioByEditKey(key);
+    if (!funcionario || !["nome", "cpf", "viaturaId"].includes(campo)) return;
+
+    const extra = getFuncionarioExtraByEditKey(key);
+    const vinculo = getFuncionarioVinculoViatura(key);
+    const newValue = String(valor || "").trim();
+    const oldKey = key;
+    let nextNome = funcionario.nome;
+    let nextCpf = funcionario.cpf;
+
+    if (campo === "nome" && !newValue) {
+        alert("Informe o nome do funcionário.");
+        renderFuncionariosPage();
+        return;
+    }
+
+    if (extra) {
+        extra[campo] = newValue;
+        nextNome = extra.nome;
+        nextCpf = extra.cpf;
+    } else if (vinculo) {
+        const responsaveisAtuais = viaturaResponsaveis[vinculo.viaturaId];
+
+        if (campo === "nome") {
+            responsaveisAtuais[vinculo.campoNome] = newValue;
+            nextNome = newValue;
+        } else if (campo === "cpf") {
+            responsaveisAtuais[vinculo.campoCpf] = newValue;
+            nextCpf = newValue;
+        } else if (campo === "viaturaId" && !newValue) {
+            responsaveisAtuais[vinculo.campoNome] = "";
+            responsaveisAtuais[vinculo.campoCpf] = "";
+        } else if (campo === "viaturaId" && newValue && newValue !== vinculo.viaturaId) {
+            const destino = viaturaResponsaveis[newValue];
+            if (!destino) {
+                alert("Viatura não encontrada.");
+                renderFuncionariosPage();
+                return;
+            }
+
+            const destinoOcupado = destino[vinculo.campoNome];
+            if (destinoOcupado && destinoOcupado !== "Veículo sem Técnico") {
+                const confirmar = confirm(`A ${formatTwoDigits(newValue)} já possui ${vinculo.funcao.toLowerCase()}: ${destinoOcupado}. Deseja substituir?`);
+                if (!confirmar) {
+                    renderFuncionariosPage();
+                    return;
+                }
+            }
+
+            destino[vinculo.campoNome] = responsaveisAtuais[vinculo.campoNome];
+            destino[vinculo.campoCpf] = responsaveisAtuais[vinculo.campoCpf];
+            nextNome = destino[vinculo.campoNome];
+            nextCpf = destino[vinculo.campoCpf];
+            responsaveisAtuais[vinculo.campoNome] = "";
+            responsaveisAtuais[vinculo.campoCpf] = "";
+        }
+    }
+
+    const newKey = getFuncionarioKeyFromFields(nextNome, nextCpf);
+    moveFuncionarioStoredData(oldKey, newKey);
+    funcionarioItensEditandoKey = newKey;
+    await salvarConfiguracoes();
+    renderTecnicoDatalist();
+    preencherResponsaveisViatura();
+    renderFuncionariosPage();
+}
+
+async function excluirFuncionario(key) {
+    if (getVistoriadorAtivo() !== "Alisson") {
+        alert("Somente Alisson pode excluir funcionários.");
+        return;
+    }
+
+    const funcionario = findFuncionarioByEditKey(key);
+    if (!funcionario) {
+        alert("Funcionário não encontrado.");
+        return;
+    }
+
+    if (!confirm(`Deseja realmente excluir ${funcionario.nome}?`)) return;
+
+    const extraIndex = funcionariosExtras.findIndex(item => getFuncionarioEditKey(item) === key);
+    if (extraIndex >= 0) {
+        funcionariosExtras.splice(extraIndex, 1);
+    } else {
+        Object.values(viaturaResponsaveis).forEach(responsaveis => {
+            if (responsaveis.tecnico && getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf) === key) {
+                responsaveis.tecnico = "";
+                responsaveis.tecnicoCpf = "";
+            }
+
+            if (responsaveis.auxiliar && getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf) === key) {
+                responsaveis.auxiliar = "";
+                responsaveis.auxiliarCpf = "";
+            }
+        });
+    }
+
+    delete employeeEpisByPerson[key];
+    if (funcionarioItensEditandoKey === key) funcionarioItensEditandoKey = "";
+    await salvarConfiguracoes();
+    renderTecnicoDatalist();
+    preencherResponsaveisViatura();
+    renderFuncionariosPage();
+}
+
+function getEditableFuncionarioEpis(key) {
+    const funcionario = findFuncionarioByEditKey(key);
+    if (!funcionario) return [];
+
+    if (!employeeEpisByPerson[key]) {
+        employeeEpisByPerson[key] = (funcionario.epis || []).map((epi, index) => normalizeEmployeeEpiItem(epi, index));
+    }
+
+    return employeeEpisByPerson[key];
+}
+
+function syncFuncionarioExtraFromEditableEpis(key) {
+    const funcionarioExtra = getFuncionarioExtraByEditKey(key);
+    if (!funcionarioExtra) return;
+    funcionarioExtra.epis = (employeeEpisByPerson[key] || []).map((epi, index) => normalizeEmployeeEpiItem(epi, index));
+}
+
+function renderEditorItensFuncionario(key) {
+    const funcionario = findFuncionarioByEditKey(key);
+    const modal = document.getElementById("employee-items-modal");
+    const title = document.getElementById("employee-items-title");
+    const body = document.getElementById("employee-items-body");
+    if (!modal || !title || !body || !funcionario) return;
+
+    const items = getEditableFuncionarioEpis(key);
+    title.textContent = `Editar itens - ${funcionario.nome}`;
+    body.innerHTML = `
+        <div class="employee-items-add-form">
+            <input type="number" min="1" step="1" id="employee-item-new-qtd" value="1" aria-label="Quantidade">
+            <input type="text" id="employee-item-new-nome" placeholder="Descrição do item" autocomplete="new-password">
+            <input type="text" id="employee-item-new-ca" placeholder="C.A." autocomplete="new-password">
+            <input type="text" id="employee-item-new-entrega" placeholder="Data de entrega" autocomplete="new-password">
+            <input type="text" id="employee-item-new-obs" placeholder="OBS" autocomplete="new-password">
+            <button type="button" onclick="adicionarItemFuncionarioEditado('${escapeJsString(key)}')">Adicionar</button>
+        </div>
+        <div class="employee-items-editor-list">
+            ${items.length ? items.map((epi, index) => `
+                <div class="employee-items-editor-row">
+                    <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
+                    <input type="text" value="${escapeHtml(epi.nome || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
+                    <input type="text" value="${escapeHtml(epi.ca || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
+                    <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
+                    <input type="text" value="${escapeHtml(epi.observacao || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
+                    <button type="button" class="employee-item-remove-btn" onclick="removerItemFuncionarioEditado('${escapeJsString(key)}', ${index})">Remover</button>
+                </div>
+            `).join("") : `<p class="employee-empty-epis">Nenhum item cadastrado para esta pessoa.</p>`}
+        </div>
+    `;
+}
+
+function abrirEditorItensFuncionario(key) {
+    if (getVistoriadorAtivo() !== "Alisson") {
+        alert("Somente Alisson pode editar os itens dos funcionários.");
+        return;
+    }
+
+    const funcionario = findFuncionarioByEditKey(key);
+    if (!funcionario) {
+        alert("Funcionário não encontrado.");
+        return;
+    }
+
+    funcionarioItensEditandoKey = funcionarioItensEditandoKey === key ? "" : key;
+    renderFuncionariosPage();
+}
+
+function fecharEditorItensFuncionario() {
+    funcionarioItensEditandoKey = "";
+    const modal = document.getElementById("employee-items-modal");
+    if (modal) {
+        modal.style.display = "none";
+        modal.dataset.funcionarioKey = "";
+    }
+    renderFuncionariosPage();
+}
+
+function renderEditorItensFuncionarioInline(key) {
+    const funcionario = findFuncionarioByEditKey(key);
+    const items = getEditableFuncionarioEpis(key);
+    const displayViaturaId = getFuncionarioDisplayViaturaId(funcionario);
+    const viaturasOptions = getActiveViaturas().map(viatura => `
+        <option value="${escapeHtml(viatura.id)}" ${displayViaturaId === String(viatura.id) ? "selected" : ""}>${escapeHtml(viatura.nome || `Viatura ${formatTwoDigits(viatura.id)}`)}</option>
+    `).join("");
+
+    return `
+        <div class="employee-inline-editor">
+            <div class="employee-inline-person-form">
+                <label>
+                    <span>Nome</span>
+                    <input type="text" value="${escapeHtml(funcionario?.nome || "")}" onchange="editarDadosFuncionario('${escapeJsString(key)}', 'nome', this.value)" autocomplete="new-password">
+                </label>
+                <label>
+                    <span>CPF</span>
+                    <input type="text" value="${escapeHtml(funcionario?.cpf || "")}" onchange="editarDadosFuncionario('${escapeJsString(key)}', 'cpf', this.value)" autocomplete="new-password">
+                </label>
+                <label>
+                    <span>Viatura</span>
+                    <select onchange="editarDadosFuncionario('${escapeJsString(key)}', 'viaturaId', this.value)">
+                        <option value="">Sem viatura</option>
+                        ${viaturasOptions}
+                    </select>
+                </label>
+            </div>
+            <div class="employee-items-add-form employee-inline-add-form">
+                <input type="number" min="1" step="1" id="employee-item-new-qtd" value="1" aria-label="Quantidade">
+                <input type="text" id="employee-item-new-nome" placeholder="Descrição do item" autocomplete="new-password">
+                <input type="text" id="employee-item-new-ca" placeholder="C.A." autocomplete="new-password">
+                <input type="text" id="employee-item-new-entrega" placeholder="Data de entrega" autocomplete="new-password">
+                <input type="text" id="employee-item-new-obs" placeholder="OBS" autocomplete="new-password">
+                <button type="button" onclick="adicionarItemFuncionarioEditado('${escapeJsString(key)}')">Adicionar</button>
+            </div>
+            <div class="employee-items-editor-list">
+                ${items.length ? items.map((epi, index) => `
+                    <div class="employee-items-editor-row employee-inline-editor-row">
+                        <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
+                        <input type="text" value="${escapeHtml(epi.nome || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
+                        <input type="text" value="${escapeHtml(epi.ca || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
+                        <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
+                        <input type="text" value="${escapeHtml(epi.observacao || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
+                        <button type="button" class="employee-item-remove-btn" onclick="removerItemFuncionarioEditado('${escapeJsString(key)}', ${index})">Remover</button>
+                    </div>
+                `).join("") : `<p class="employee-empty-epis">Nenhum item cadastrado para esta pessoa.</p>`}
+            </div>
+        </div>
+    `;
+}
+
+async function persistirItensFuncionarioEditado(key, shouldRenderEditor = false) {
+    const items = employeeEpisByPerson[key] || [];
+    employeeEpisByPerson[key] = items.map((epi, index) => normalizeEmployeeEpiItem(epi, index)).filter(epi => epi.nome);
+    syncFuncionarioExtraFromEditableEpis(key);
+    await salvarConfiguracoes();
+    if (shouldRenderEditor) {
+        if (funcionarioItensEditandoKey === key) renderFuncionariosPage();
+        else renderEditorItensFuncionario(key);
+    }
+}
+
+async function adicionarItemFuncionarioEditado(key) {
+    if (getVistoriadorAtivo() !== "Alisson") return;
+    const items = getEditableFuncionarioEpis(key);
+    const quantidade = Number(document.getElementById("employee-item-new-qtd")?.value || 1);
+    const nome = document.getElementById("employee-item-new-nome")?.value.trim() || "";
+    const ca = document.getElementById("employee-item-new-ca")?.value.trim() || "";
+    const dataEntrega = document.getElementById("employee-item-new-entrega")?.value.trim() || "";
+    const observacao = document.getElementById("employee-item-new-obs")?.value.trim() || "";
+
+    if (!nome) {
+        alert("Informe a descrição do item.");
+        return;
+    }
+
+    items.push(normalizeEmployeeEpiItem({
+        id: `epi-funcionario-${Date.now()}`,
+        nome,
+        quantidade,
+        ca,
+        dataEntrega,
+        observacao,
+        ativo: true,
+        valor: 0,
+        substituicoes: []
+    }, items.length));
+
+    await persistirItensFuncionarioEditado(key, true);
+}
+
+async function editarItemFuncionarioEditado(key, index, campo, valor) {
+    if (getVistoriadorAtivo() !== "Alisson") return;
+    const items = getEditableFuncionarioEpis(key);
+    const item = items[Number(index)];
+    if (!item || !["quantidade", "nome", "ca", "dataEntrega", "observacao"].includes(campo)) return;
+
+    item[campo] = campo === "quantidade" ? Number(valor || 1) : String(valor || "").trim();
+    items[Number(index)] = normalizeEmployeeEpiItem(item, Number(index));
+    await persistirItensFuncionarioEditado(key);
+}
+
+async function removerItemFuncionarioEditado(key, index) {
+    if (getVistoriadorAtivo() !== "Alisson") return;
+    const items = getEditableFuncionarioEpis(key);
+    if (!items[Number(index)]) return;
+    if (!confirm("Deseja remover este item do funcionário?")) return;
+
+    items.splice(Number(index), 1);
+    await persistirItensFuncionarioEditado(key, true);
 }
 
 function renderFuncionariosPage() {
@@ -525,6 +938,15 @@ function renderFuncionariosPage() {
             || normalizeSearch(funcionario.funcao).includes(termo);
         const matchesStatus = !status || getFuncionarioStatus(funcionario) === status;
         return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+        const viaturaA = Number(a.viaturaId || Number.MAX_SAFE_INTEGER);
+        const viaturaB = Number(b.viaturaId || Number.MAX_SAFE_INTEGER);
+        if (viaturaA !== viaturaB) return viaturaA - viaturaB;
+
+        const roleOrder = getFuncionarioRoleOrder(a.funcao) - getFuncionarioRoleOrder(b.funcao);
+        if (roleOrder !== 0) return roleOrder;
+
+        return String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR");
     });
 
     if (totalLabel) {
@@ -1010,6 +1432,7 @@ function bindWindowFunctions() {
         selecionarResponsavelTablet,
         selecionarTecnicoVistoriaAtual,
         selecionarAuxiliarVistoriaAtual,
+        selecionarResponsavelPorPesquisa,
         configurarModoVistoria,
         showHome,
         showPage,
@@ -1034,6 +1457,7 @@ function bindWindowFunctions() {
         adicionarFuncionarioExtra,
         adicionarEpiFuncionarioExtra,
         editarFuncionarioExtra,
+        finalizarCadastroFuncionarioExtra,
         editarEpiFuncionarioExtra,
         removerFuncionarioExtra,
         removerEpiFuncionarioExtra,
@@ -1055,6 +1479,13 @@ function bindWindowFunctions() {
         abrirModalRevisao,
         renderFuncionariosPage,
         alterarStatusFuncionario,
+        excluirFuncionario,
+        editarDadosFuncionario,
+        abrirEditorItensFuncionario,
+        fecharEditorItensFuncionario,
+        adicionarItemFuncionarioEditado,
+        editarItemFuncionarioEditado,
+        removerItemFuncionarioEditado,
         atualizarTotalItem,
         salvarItemComEnter,
         limparErroItem,

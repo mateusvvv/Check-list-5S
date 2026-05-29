@@ -1564,6 +1564,7 @@ export const funcionariosExtras = [
         funcao: "Técnico",
         status: "Férias",
         viaturaId: "",
+        finalizado: true,
         epis: episJoseRandson.map(nome => ({
             nome,
             ...(nome === "CAPACETE DE SEGURANÇA BRANCO" ? { quantidade: 1, ca: "14.816", dataEntrega: "21/09/2023" } : {}),
@@ -1719,7 +1720,7 @@ export function getFuncionariosData() {
             ? buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", responsaveis.auxiliar, responsaveis.auxiliarCpf)
             : null
         ].filter(Boolean)),
-        ...funcionariosExtras
+        ...funcionariosExtras.filter(f => f.finalizado)
     ];
 }
 

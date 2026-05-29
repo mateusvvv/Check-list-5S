@@ -171,6 +171,20 @@
         grid-template-columns: 1fr;
     }
 
+    .admin-vehicle-main {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .admin-config-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .admin-config-actions button {
+        flex: 1 1 0;
+    }
+
     .admin-item-form select,
     .admin-item-form input,
     .admin-item-person-select {
@@ -340,6 +354,25 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+    }
+
+    .employee-card-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .employee-edit-items-btn {
+        width: 100%;
+        min-height: 36px;
+        font-size: 0.86rem;
+    }
+
+    .employee-delete-btn {
+        width: 100%;
+        min-height: 36px;
+        font-size: 0.86rem;
     }
 
     .employee-card-header > div {

@@ -81,17 +81,25 @@ function normalizeSearch(value) {
 
 function getTecnicoOptions() {
     const porChave = new Map();
+    const addOption = (funcionario) => {
+        if (!funcionario?.nome || !funcionario?.cpf) return;
+        const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
+        if (!porChave.has(key)) {
+            porChave.set(key, {
+                nome: funcionario.nome,
+                cpf: funcionario.cpf
+            });
+        }
+    };
+
     getFuncionariosData()
         .filter(funcionario => funcionario?.nome && funcionario?.cpf)
-        .forEach(funcionario => {
-            const key = `${normalizeSearch(funcionario.nome)}|${funcionario.cpf}`;
-            if (!porChave.has(key)) {
-                porChave.set(key, {
-                    nome: funcionario.nome,
-                    cpf: funcionario.cpf
-                });
-            }
-        });
+        .forEach(addOption);
+
+    addOption({
+        nome: "SIDNEY MANOEL DO NASCIMENTO",
+        cpf: "099.077.164-48"
+    });
 
     return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -99,7 +107,10 @@ function getTecnicoOptions() {
 function findTecnicoByName(nome) {
     const termo = normalizeSearch(nome);
     if (!termo) return null;
-    return getTecnicoOptions().find(tecnico => normalizeSearch(tecnico.nome) === termo) || null;
+    const options = getTecnicoOptions();
+    return options.find(tecnico => normalizeSearch(tecnico.nome) === termo)
+        || options.find(tecnico => normalizeSearch(tecnico.nome).includes(termo))
+        || null;
 }
 
 function onlyDigits(value) {
@@ -233,7 +244,6 @@ export function renderAdminViaturas() {
             <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
                 <div class="admin-vehicle-main">
                     <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)">
-                    <span>ID ${formatTwoDigits(viatura.id)}</span>
                     <div class="admin-config-actions">
                         <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
                         <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
@@ -513,12 +523,17 @@ export function renderAdminFuncionariosExtras() {
     manager.style.display = canManage ? "block" : "none";
     if (!canManage) return;
 
-    if (!funcionariosExtras.length) {
-        list.innerHTML = '<p class="admin-history-empty">Nenhum funcionário extra cadastrado.</p>';
+    const visibleFuncionarios = funcionariosExtras
+        .map((f, i) => ({ ...f, originalIndex: i }))
+        .filter(f => !f.finalizado);
+
+    if (!visibleFuncionarios.length) {
+        list.innerHTML = '<p class="admin-history-empty">Nenhum funcionário pendente de cadastro.</p>';
         return;
     }
 
-    list.innerHTML = funcionariosExtras.map((funcionario, index) => {
+    list.innerHTML = visibleFuncionarios.map((funcionario) => {
+        const index = funcionario.originalIndex;
         const epis = Array.isArray(funcionario.epis) ? funcionario.epis : [];
         return `
             <div class="admin-config-row admin-extra-employee-row">
@@ -548,7 +563,8 @@ export function renderAdminFuncionariosExtras() {
                     </label>
                 </div>
                 <div class="admin-config-actions">
-                    <button type="button" class="btn-danger" onclick="removerFuncionarioExtra(${index})">Remover funcionário</button>
+                    <button type="button" class="btn-submit" onclick="finalizarCadastroFuncionarioExtra(${index})">Finalizar e Salvar no Sistema</button>
+                    <button type="button" class="btn-danger" onclick="removerFuncionarioExtra(${index})">Remover</button>
                 </div>
                 <div class="admin-extra-epi-wrap">
                     <strong>EPIs</strong>
@@ -556,8 +572,9 @@ export function renderAdminFuncionariosExtras() {
                         <input type="number" id="extra-epi-qtd-${index}" min="1" step="1" value="1" aria-label="Quantidade">
                         <input type="text" id="extra-epi-nome-${index}" value="" placeholder="Nome do EPI" autocomplete="new-password">
                         <input type="text" id="extra-epi-ca-${index}" value="" placeholder="C.A." autocomplete="new-password">
+                        <input type="text" id="extra-epi-entrega-${index}" value="" placeholder="Data" autocomplete="new-password">
                         <input type="text" id="extra-epi-obs-${index}" value="" placeholder="OBS" autocomplete="new-password">
-                        <button type="button" onclick="adicionarEpiFuncionarioExtra(${index})">Adicionar EPI</button>
+                        <button type="button" onclick="adicionarEpiFuncionarioExtra(${index})">Salvar EPI</button>
                     </div>
                     <div class="admin-extra-epi-list">
                         ${epis.length ? epis.map((epi, epiIndex) => `
@@ -565,8 +582,9 @@ export function renderAdminFuncionariosExtras() {
                                 <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'quantidade', this.value)" aria-label="Quantidade do EPI">
                                 <input type="text" value="${escapeHtml(epi.nome || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'nome', this.value)" aria-label="Nome do EPI">
                                 <input type="text" value="${escapeHtml(epi.ca || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'ca', this.value)" aria-label="CA do EPI">
+                                <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'dataEntrega', this.value)" aria-label="Data de entrega do EPI">
                                 <input type="text" value="${escapeHtml(epi.observacao || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'observacao', this.value)" aria-label="Observação do EPI">
-                                <button type="button" class="btn-danger" onclick="removerEpiFuncionarioExtra(${index}, ${epiIndex})">Remover</button>
+                                <button type="button" class="btn-danger" onclick="removerEpiFuncionarioExtra(${index}, ${epiIndex})">Remover EPI</button>
                             </div>
                         `).join("") : '<p class="admin-history-empty">Nenhum EPI cadastrado para este funcionário.</p>'}
                     </div>
@@ -652,6 +670,7 @@ export async function adicionarEpiFuncionarioExtra(index) {
     const quantidade = Number(document.getElementById(`extra-epi-qtd-${index}`)?.value || 1);
     const nome = document.getElementById(`extra-epi-nome-${index}`)?.value.trim() || "";
     const ca = document.getElementById(`extra-epi-ca-${index}`)?.value.trim() || "";
+    const dataEntrega = document.getElementById(`extra-epi-entrega-${index}`)?.value.trim() || "";
     const observacao = document.getElementById(`extra-epi-obs-${index}`)?.value.trim() || "";
 
     if (!nome) {
@@ -665,13 +684,22 @@ export async function adicionarEpiFuncionarioExtra(index) {
         nome,
         quantidade,
         ca,
-        dataEntrega: "",
+        dataEntrega,
         observacao,
         ativo: true,
         valor: 0,
         substituicoes: []
     }));
     syncFuncionarioExtraEpis(funcionario);
+
+    // Limpar campos de entrada do EPI após adicionar para que "sumam"
+    ['qtd', 'nome', 'ca', 'entrega', 'obs'].forEach(field => {
+        const input = document.getElementById(`extra-epi-${field}-${index}`);
+        if (input) {
+            input.value = field === 'qtd' ? "1" : "";
+        }
+    });
+
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -680,13 +708,30 @@ export async function editarEpiFuncionarioExtra(index, epiIndex, campo, valor) {
     if (!requireAlissonAdmin()) return;
     const funcionario = getFuncionarioExtra(index);
     const epi = funcionario?.epis?.[Number(epiIndex)];
-    if (!epi || !["quantidade", "nome", "ca", "observacao"].includes(campo)) return;
+    if (!epi || !["quantidade", "nome", "ca", "dataEntrega", "observacao"].includes(campo)) return;
 
     epi[campo] = campo === "quantidade" ? Number(valor || 1) : String(valor || "").trim();
     funcionario.epis[Number(epiIndex)] = normalizeEmployeeEpiItem(epi, Number(epiIndex));
     syncFuncionarioExtraEpis(funcionario);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
+}
+
+export async function finalizarCadastroFuncionarioExtra(index) {
+    if (!requireAlissonAdmin()) return;
+    const funcionario = getFuncionarioExtra(index);
+    if (!funcionario) return;
+
+    if (funcionario.epis.length === 0) {
+        if (!confirm(`O funcionário ${funcionario.nome} não possui EPIs cadastrados. Deseja finalizar assim mesmo?`)) return;
+    }
+
+    funcionario.finalizado = true;
+    registrarHistoricoConfig("Funcionário Cadastrado", `${funcionario.nome} foi oficialmente adicionado ao sistema.`);
+    
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+    alert(`Funcionário ${funcionario.nome} salvo com sucesso! Agora ele faz parte do sistema como os outros funcionários.`);
 }
 
 export async function removerEpiFuncionarioExtra(index, epiIndex) {

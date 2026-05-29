@@ -495,24 +495,34 @@
 
 .admin-vehicle-row {
     display: grid;
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: stretch;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .admin-vehicle-main {
-    display: flex;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto;
+    gap: 18px;
     align-items: center;
-    flex-wrap: wrap;
+    width: 100%;
 }
 
 .admin-vehicle-main input[type="text"] {
-    flex: 1 1 180px;
+    width: 100%;
+    min-width: 0;
+}
+
+.admin-vehicle-main .admin-config-actions {
+    margin-left: 4px;
 }
 
 .admin-responsaveis-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: minmax(220px, 1.35fr) minmax(150px, 0.8fr);
+    gap: 10px 12px;
     width: 100%;
 }
 
@@ -529,7 +539,9 @@
 .admin-responsaveis-grid input,
 .admin-responsaveis-grid select {
     width: 100%;
+    min-width: 0;
     box-sizing: border-box;
+    font-weight: 400;
     text-transform: none;
 }
 

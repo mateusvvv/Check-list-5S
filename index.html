@@ -5,6 +5,158 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
     <link rel="stylesheet" href="style.css?v=7">
+    <style>
+        /* Estilos Gerais para Gestão de Funcionários (Admin) */
+        .admin-extra-employee-row {
+            width: 98% !important;
+            max-width: 1150px;
+            margin: 20px auto !important;
+            padding: 25px !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+            box-sizing: border-box !important;
+        }
+
+        .admin-extra-employee-row .admin-responsaveis-grid {
+            display: grid !important;
+            grid-template-columns: 1fr;
+            gap: 15px !important;
+            margin-bottom: 20px !important;
+            width: 100% !important;
+        }
+
+        .admin-extra-employee-row .admin-responsaveis-grid label span {
+            font-size: 1.05rem !important; /* Letras das etiquetas levemente maiores */
+            font-weight: 600 !important;
+            color: #4a5568 !important;
+        }
+
+        .admin-extra-employee-row .admin-responsaveis-grid input,
+        .admin-extra-employee-row .admin-responsaveis-grid select {
+            font-size: 1.05rem !important; /* Texto dentro dos campos levemente maior */
+            height: 40px !important; /* Ajuste na altura para equilibrar com a fonte */
+        }
+
+        .admin-extra-epi-wrap {
+            border-top: 2px solid #f8fafc !important;
+            margin-top: 20px !important;
+            padding-top: 15px !important;
+        }
+
+        .admin-extra-epi-form, .admin-extra-epi-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 12px !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 15px !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            background: #fafafa !important;
+            margin-bottom: 10px !important;
+            border-radius: 8px !important;
+        }
+
+        .admin-extra-epi-form input, .admin-extra-epi-row input {
+            height: 40px !important;
+            border: 1px solid #cbd5e0 !important;
+            border-radius: 5px !important;
+            padding: 0 12px !important;
+            font-size: 0.95rem !important;
+            flex: 1 1 auto !important;
+            box-sizing: border-box !important;
+            min-width: 0 !important;
+        }
+
+        /* Larguras específicas para campos menores */
+        .admin-extra-epi-form input[type="number"], 
+        .admin-extra-epi-row input[type="number"] {
+            flex: 0 0 60px !important;
+            text-align: center !important;
+        }
+
+        .admin-extra-epi-form input[placeholder="C.A."], 
+        .admin-extra-epi-row input:nth-child(3) {
+            flex: 0 0 100px !important;
+        }
+
+        .admin-extra-epi-form input[placeholder="Data"], 
+        .admin-extra-epi-row input:nth-child(4) {
+            flex: 0 0 120px !important;
+        }
+
+        .admin-extra-epi-form button, .admin-extra-epi-row button {
+            height: 40px !important;
+            padding: 0 20px !important;
+            font-size: 0.9rem !important;
+            font-weight: 600 !important;
+            border-radius: 5px !important;
+            white-space: nowrap !important;
+            cursor: pointer !important;
+            flex: 0 0 auto !important;
+            margin-left: 5px !important;
+        }
+
+        /* Ajustes específicos para Desktop */
+        @media (min-width: 1024px) {
+            .admin-extra-employee-row .admin-responsaveis-grid {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 25px !important;
+            }
+
+            .admin-extra-epi-form, .admin-extra-epi-row {
+                flex-wrap: nowrap !important; /* Tudo em uma linha no PC */
+                justify-content: space-between !important;
+            }
+
+            .employees-list {
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+                gap: 25px !important;
+                align-items: start !important;
+                width: 100% !important;
+            }
+
+            .employee-card {
+                box-sizing: border-box !important;
+                min-width: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        }
+
+        /* Ajustes específicos para Mobile */
+        @media (max-width: 768px) {
+            .admin-extra-employee-row {
+                width: 100% !important;
+                padding: 15px !important;
+            }
+
+            .admin-extra-epi-form input, .admin-extra-epi-row input {
+                width: 100% !important; /* Cada campo em uma linha no mobile para não amontoar */
+                flex: 0 0 100% !important;
+                margin-bottom: 5px !important;
+            }
+
+            .admin-extra-epi-form button, .admin-extra-epi-row button {
+                width: 100% !important;
+                margin-left: 0 !important;
+                margin-top: 10px !important;
+            }
+        }
+
+        /* Centraliza o cabeçalho da seção para alinhar com os cards */
+        .admin-config-header {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+            text-align: center !important;
+        }
+    </style>
 </head>
 <body>
     <section id="app-login-screen" class="auth-screen" style="display: none;">
@@ -69,8 +221,13 @@
                         <label for="checking-date">Data da vistoria:</label>
                         <input type="date" id="checking-date">
                     </div>
+                    <div class="input-group checking-search-field">
+                        <label for="responsavel-pesquisa">Pesquisar técnico/auxiliar:</label>
+                        <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list" placeholder="Digite o nome para substituir na viatura" onchange="selecionarResponsavelPorPesquisa(this.value)">
+                        <datalist id="tecnicos-auxiliares-list"></datalist>
+                    </div>
                     <div class="input-group checking-name-field">
-                        <label for="tecnico-nome">Pesquisar técnico:</label>
+                        <label for="tecnico-nome">Técnico:</label>
                         <input type="text" id="tecnico-nome" list="tecnicos-list" placeholder="Nome do técnico" onchange="selecionarTecnicoVistoriaAtual(this.value)">
                         <datalist id="tecnicos-list"></datalist>
                     </div>
@@ -412,6 +569,15 @@
         </div>
     </div>
 
+    <!-- Modal de Edição dos Itens do Funcionário -->
+    <div id="employee-items-modal" class="modal">
+        <div class="modal-content employee-items-modal-content">
+            <span class="close-modal" onclick="fecharEditorItensFuncionario()">&times;</span>
+            <h3 id="employee-items-title">Editar itens</h3>
+            <div id="employee-items-body"></div>
+        </div>
+    </div>
+
     <!-- Modal de Revisão de Pendências -->
     <div id="revisao-modal" class="modal">
         <div class="modal-content revisao-modal-content">
@@ -425,6 +591,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=23"></script>
+    <script type="module" src="script.js?v=29"></script>
 </body>
 </html>

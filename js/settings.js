@@ -59,6 +59,7 @@ function normalizeFuncionarioExtra(funcionario = {}, index = 0) {
         cpf: String(funcionario.cpf || "").trim(),
         funcao: String(funcionario.funcao || "Técnico").trim() || "Técnico",
         status: String(funcionario.status || "Ativo").trim() || "Ativo",
+        finalizado: Boolean(funcionario.finalizado),
         viaturaId: String(funcionario.viaturaId || ""),
         epis: Array.isArray(funcionario.epis)
             ? funcionario.epis.map((item, itemIndex) => normalizeEmployeeEpiItem(item, itemIndex)).filter(item => item.nome)
