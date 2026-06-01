@@ -211,15 +211,15 @@ body > main {
 }
 
 .checking-meta .input-group label {
-    font-size: 0.9rem;
+    font-size: 1rem;
 }
 
 .checking-meta input {
-    font-size: 0.9rem;
+    font-size: 0.96rem;
 }
 
 .checking-name-field input {
-    font-size: 0.76rem;
+    font-size: 0.84rem;
 }
 
 .checking-search-field {
@@ -228,7 +228,7 @@ body > main {
 
 .checking-meta #tecnico-cpf,
 .checking-meta #auxiliar-cpf {
-    font-size: 0.76rem;
+    font-size: 0.84rem;
 }
 
 @media (min-width: 901px) {
@@ -268,14 +268,14 @@ body > main {
     }
 
     .checking-meta .checking-name-field input {
-        font-size: clamp(0.64rem, 0.76vw, 0.74rem);
+        font-size: clamp(0.76rem, 0.88vw, 0.86rem);
         padding-left: 8px;
         padding-right: 8px;
     }
 
     .checking-meta #tecnico-cpf,
     .checking-meta #auxiliar-cpf {
-        font-size: clamp(0.66rem, 0.78vw, 0.76rem);
+        font-size: clamp(0.76rem, 0.88vw, 0.86rem);
         padding-left: 8px;
         padding-right: 8px;
     }
@@ -310,10 +310,43 @@ body > main {
     transform: scale(1.05);
 }
 
+.viatura-card.disabled {
+    opacity: 0.48;
+    background: #f1f5f9;
+    filter: grayscale(55%);
+}
+
+.viatura-card.disabled.active {
+    transform: none;
+}
+
 .viatura-name {
     font-weight: bold;
     display: block;
+    margin-bottom: 6px;
+}
+
+.viatura-disabled-label {
+    display: inline-block;
+    margin-bottom: 6px;
+    border: 1px solid #94a3b8;
+    border-radius: 999px;
+    padding: 2px 8px;
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.viatura-responsaveis {
+    display: block;
+    min-height: 2.4em;
     margin-bottom: 8px;
+    color: #4b5563;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
 }
 
 .status-dots {
@@ -798,7 +831,9 @@ body > main {
 .employee-inline-add-form button,
 .employee-inline-editor-row .employee-item-remove-btn {
     grid-area: action;
-    width: 100%;
+    justify-self: end;
+    width: auto;
+    min-width: 96px;
 }
 
 @media (max-width: 900px) {
@@ -852,7 +887,9 @@ body > main {
     .employee-items-add-form button,
     .employee-item-remove-btn {
         grid-area: action;
-        width: 100%;
+        justify-self: end;
+        width: auto;
+        min-width: 96px;
     }
 
     .employee-inline-person-form {

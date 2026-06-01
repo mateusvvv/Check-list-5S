@@ -660,6 +660,34 @@ const episRicksonSantos = [
     "BOLSA EPI CG 445"
 ];
 
+const episMikeRyan = [
+    "CAPACETE DE SEGURANÇA BRANCO",
+    "TALABART DE POSICIONAMENTO",
+    "CINTURÃO DE SEG.TAM02",
+    "MOSQUETÃO TRAVA QUEDAS",
+    "LUVAS FLEX CUT",
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V",
+    "OCULOS DE SEG.",
+    "POCHETE CARBOGRAFITE",
+    "BOTINA DE SEG. Nº 40",
+    "BOLSA EPI CG 445",
+    "OCULOS DE SOBREPOR"
+];
+
+const episMikeRyanDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "-" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "" },
+    "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V": { quantidade: 1, ca: "-" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-" },
+    "BOTINA DE SEG. Nº 40": { quantidade: 1, ca: "" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-" },
+    "OCULOS DE SOBREPOR": { quantidade: 1, ca: "" }
+};
+
 const episJoseEmerson = [
     "CAPACETE DE SEGURANÇA BRANCO",
     "TALABART DE POSICIONAMENTO",
@@ -840,7 +868,8 @@ export const checklistDataByViatura = {
         epis: mapChecklistItems("8", "epis", episRicksonSantos)
     },
     "9": {
-        ferramentas: mapVehicleTools("9", ferramentasViatura09)
+        ferramentas: mapVehicleTools("9", ferramentasViatura09),
+        epis: mapChecklistItems("9", "epis", episMikeRyan)
     }
 };
 
@@ -878,7 +907,8 @@ export function getDefaultChecklistDataByViatura() {
             epis: mapChecklistItems("8", "epis", episRicksonSantos)
         },
         "9": {
-            ferramentas: mapVehicleTools("9", ferramentasViatura09)
+            ferramentas: mapVehicleTools("9", ferramentasViatura09),
+            epis: mapChecklistItems("9", "epis", episMikeRyan)
         }
     };
 }
@@ -1578,6 +1608,30 @@ export const funcionariosExtras = [
             ...(nome === "CANETA DETECÇÃO DE TENSÃO DTV-1210 1000V" ? { quantidade: 1, ca: "-", dataEntrega: "21/09/2023" } : {}),
             ...(nome === "BOLSA EPI CG 445" ? { quantidade: 1, ca: "-", dataEntrega: "21/09/2023" } : {})
         }))
+    },
+    {
+        nome: "JOSENILDO VINICIUS ALVES LOPES SILVA",
+        cpf: "131.000.574-57",
+        funcao: "Auxiliar técnico",
+        status: "Ativo",
+        viaturaId: "",
+        finalizado: true,
+        epis: episMikeRyan.map(nome => ({
+            nome,
+            ...(episMikeRyanDefaults[nome] || {})
+        }))
+    },
+    {
+        nome: "MIKE RYAN LIMA CRUZ",
+        cpf: "159.056.184-88",
+        funcao: "Auxiliar técnico",
+        status: "Ativo",
+        viaturaId: "",
+        finalizado: true,
+        epis: episMikeRyan.map(nome => ({
+            nome,
+            ...(episMikeRyanDefaults[nome] || {})
+        }))
     }
 ];
 
@@ -1626,6 +1680,8 @@ seedEmployeeEpis("ISAEL FORTUNATO DE LIMA", "182.838.664-27", episIsaelFortunato
 seedEmployeeEpis("JOSE EDIVANILSON DA SILVA", "115.353.914-48", episJoseEdivanilson, episJoseEdivanilsonDefaults);
 seedEmployeeEpis("JOSE EMERSON DA SILVA NASCIMENTO", "102.407.824-88", episJoseEmerson, episJoseEmersonDefaults);
 seedEmployeeEpis("VINICIUS JOSE DE LIMA", "135.640.954-70", episViniciusJose, episViniciusJoseDefaults);
+seedEmployeeEpis("JOSENILDO VINICIUS ALVES LOPES SILVA", "131.000.574-57", episMikeRyan, episMikeRyanDefaults);
+seedEmployeeEpis("MIKE RYAN LIMA CRUZ", "159.056.184-88", episMikeRyan, episMikeRyanDefaults);
 
 function buildFuncionarioEpis(viaturaId) {
     return (checklistDataByViatura[String(viaturaId)]?.epis || []).map(item => {
@@ -1655,13 +1711,19 @@ export function cloneEmployeeEpis(items = []) {
 function getFuncionarioEpis(viaturaId, tipo, nome, cpf) {
     const key = getFuncionarioKeyFromFields(nome, cpf);
     if (employeeEpisByPerson[key]) return cloneEmployeeEpis(employeeEpisByPerson[key]);
-    return tipo === "Técnico" ? buildFuncionarioEpis(viaturaId) : [];
+    return buildFuncionarioEpis(viaturaId);
+}
+
+function getFuncionarioExtraFinalizadoByKey(key) {
+    return funcionariosExtras.find(funcionario =>
+        funcionario.finalizado && getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf) === key
+    ) || null;
 }
 
 export function ensureFuncionarioEpis(viaturaId, tipo, nome, cpf) {
     const key = getFuncionarioKeyFromFields(nome, cpf);
     if (!employeeEpisByPerson[key]) {
-        employeeEpisByPerson[key] = tipo === "Técnico" ? buildFuncionarioEpis(viaturaId) : [];
+        employeeEpisByPerson[key] = buildFuncionarioEpis(viaturaId);
     }
     return employeeEpisByPerson[key];
 }
@@ -1700,27 +1762,32 @@ export function getChecklistItemsForPessoa(category, viaturaId, pessoaKey = "") 
 }
 
 function buildFuncionarioFromViatura(viaturaId, tipo, nome, cpf) {
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    const funcionarioExtra = getFuncionarioExtraFinalizadoByKey(key);
     return {
         nome,
         cpf,
         funcao: tipo,
-        status: "Ativo",
+        status: funcionarioExtra?.status || "Ativo",
         viaturaId: String(viaturaId),
         epis: getFuncionarioEpis(viaturaId, tipo, nome, cpf)
     };
 }
 
 export function getFuncionariosData() {
-    return [
-        ...Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => [
+    const vinculos = Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => [
         responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
             ? buildFuncionarioFromViatura(viaturaId, "Técnico", responsaveis.tecnico, responsaveis.tecnicoCpf)
             : null,
         responsaveis.auxiliar
             ? buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", responsaveis.auxiliar, responsaveis.auxiliarCpf)
             : null
-        ].filter(Boolean)),
-        ...funcionariosExtras.filter(f => f.finalizado)
+    ].filter(Boolean));
+    const vinculoKeys = new Set(vinculos.map(funcionario => getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)));
+
+    return [
+        ...vinculos,
+        ...funcionariosExtras.filter(f => f.finalizado && !vinculoKeys.has(getFuncionarioKeyFromFields(f.nome, f.cpf)))
     ];
 }
 

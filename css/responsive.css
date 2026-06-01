@@ -199,6 +199,12 @@
         gap: 7px;
     }
 
+    .admin-extra-epi-form button,
+    .admin-extra-epi-row button {
+        justify-self: stretch;
+        width: 100%;
+    }
+
     .btn-export-selected,
     .btn-resolve-selected,
     .btn-delete-selected {
@@ -480,13 +486,13 @@
     .item-value-field,
     .item-total-field,
     .checklist-extra-fields label {
-        font-size: 0.68rem;
+        font-size: 0.76rem;
     }
 
     .checking-meta .input-group input {
         min-height: 34px;
         padding: 6px;
-        font-size: 0.82rem;
+        font-size: 0.88rem;
     }
 
     .checking-meta .checking-name-field {
@@ -494,14 +500,14 @@
     }
 
     .checking-meta .checking-name-field input {
-        font-size: clamp(0.58rem, 2.55vw, 0.68rem);
+        font-size: clamp(0.68rem, 2.8vw, 0.78rem);
         padding-left: 7px;
         padding-right: 7px;
     }
 
     .checking-meta #tecnico-cpf,
     .checking-meta #auxiliar-cpf {
-        font-size: clamp(0.62rem, 2.75vw, 0.72rem);
+        font-size: clamp(0.68rem, 2.8vw, 0.78rem);
         padding-left: 7px;
         padding-right: 7px;
     }

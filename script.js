@@ -316,7 +316,6 @@ function getFuncionarioEditKey(funcionario) {
 }
 
 function getFuncionarioDisplayViaturaId(funcionario) {
-    if (getFuncionarioStatus(funcionario) !== "Ativo") return "";
     const viaturaId = String(funcionario?.viaturaId || "");
     return getActiveViaturas().some(viatura => String(viatura.id) === viaturaId) ? viaturaId : "";
 }
@@ -356,6 +355,11 @@ function getTecnicoOptions() {
         cpf: "099.077.164-48",
         funcao: "Técnico"
     });
+    [
+        { nome: "JOSE RANDSON SILVA", cpf: "125.442.764-36", funcao: "Técnico" },
+        { nome: "JOSENILDO VINICIUS ALVES LOPES SILVA", cpf: "131.000.574-57", funcao: "Auxiliar técnico" },
+        { nome: "MIKE RYAN LIMA CRUZ", cpf: "159.056.184-88", funcao: "Auxiliar técnico" }
+    ].forEach(addOption);
 
     return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -609,6 +613,64 @@ function getFuncionarioVinculoViatura(key) {
     return null;
 }
 
+function getFuncionarioResponsavelFields(funcionario) {
+    const isAuxiliar = normalizeSearch(funcionario?.funcao || "").includes("auxiliar");
+    return {
+        campoNome: isAuxiliar ? "auxiliar" : "tecnico",
+        campoCpf: isAuxiliar ? "auxiliarCpf" : "tecnicoCpf",
+        funcao: isAuxiliar ? "Auxiliar técnico" : "Técnico"
+    };
+}
+
+function removerVinculosFuncionario(keys) {
+    const keySet = new Set(keys.filter(Boolean));
+    if (!keySet.size) return;
+
+    Object.values(viaturaResponsaveis).forEach(responsaveis => {
+        if (responsaveis.tecnico && keySet.has(getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf))) {
+            responsaveis.tecnico = "";
+            responsaveis.tecnicoCpf = "";
+        }
+
+        if (responsaveis.auxiliar && keySet.has(getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf))) {
+            responsaveis.auxiliar = "";
+            responsaveis.auxiliarCpf = "";
+        }
+    });
+}
+
+function sincronizarFuncionarioExtraComViatura(funcionario, oldKey = "") {
+    const currentKey = getFuncionarioEditKey(funcionario);
+    const viaturaId = String(funcionario.viaturaId || "").trim();
+    const fields = getFuncionarioResponsavelFields(funcionario);
+
+    if (!viaturaId || !getActiveViaturas().some(viatura => String(viatura.id) === viaturaId)) {
+        funcionario.viaturaId = "";
+        removerVinculosFuncionario([oldKey, currentKey]);
+        return true;
+    }
+
+    if (!viaturaResponsaveis[viaturaId]) {
+        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+
+    const destino = viaturaResponsaveis[viaturaId];
+    const destinoNome = destino[fields.campoNome];
+    const destinoKey = getFuncionarioKeyFromFields(destinoNome, destino[fields.campoCpf]);
+    const mesmoFuncionario = destinoKey === oldKey || destinoKey === currentKey;
+
+    if (destinoNome && destinoNome !== "Veículo sem Técnico" && !mesmoFuncionario) {
+        const confirmar = confirm(`A ${formatTwoDigits(viaturaId)} já possui ${fields.funcao.toLowerCase()}: ${destinoNome}. Deseja substituir?`);
+        if (!confirmar) return false;
+    }
+
+    removerVinculosFuncionario([oldKey, currentKey]);
+    destino[fields.campoNome] = funcionario.nome;
+    destino[fields.campoCpf] = funcionario.cpf;
+    funcionario.viaturaId = viaturaId;
+    return true;
+}
+
 function moveFuncionarioStoredData(oldKey, newKey) {
     if (!oldKey || oldKey === newKey) return;
 
@@ -635,6 +697,9 @@ async function editarDadosFuncionario(key, campo, valor) {
     const vinculo = getFuncionarioVinculoViatura(key);
     const newValue = String(valor || "").trim();
     const oldKey = key;
+    const previousExtra = extra
+        ? { nome: extra.nome, cpf: extra.cpf, viaturaId: extra.viaturaId }
+        : null;
     let nextNome = funcionario.nome;
     let nextCpf = funcionario.cpf;
 
@@ -648,6 +713,14 @@ async function editarDadosFuncionario(key, campo, valor) {
         extra[campo] = newValue;
         nextNome = extra.nome;
         nextCpf = extra.cpf;
+        if (!sincronizarFuncionarioExtraComViatura(extra, oldKey)) {
+            Object.assign(extra, previousExtra);
+            renderFuncionariosPage();
+            return;
+        }
+        if (campo === "viaturaId" && extra.viaturaId) {
+            setSelectedViatura(extra.viaturaId);
+        }
     } else if (vinculo) {
         const responsaveisAtuais = viaturaResponsaveis[vinculo.viaturaId];
 
@@ -689,10 +762,18 @@ async function editarDadosFuncionario(key, campo, valor) {
     const newKey = getFuncionarioKeyFromFields(nextNome, nextCpf);
     moveFuncionarioStoredData(oldKey, newKey);
     funcionarioItensEditandoKey = newKey;
-    await salvarConfiguracoes();
     renderTecnicoDatalist();
     preencherResponsaveisViatura();
+    renderViaturaDashboard();
+    updateMenuStatus();
     renderFuncionariosPage();
+
+    try {
+        await salvarConfiguracoes();
+    } catch (error) {
+        console.warn("Não foi possível salvar o vínculo do funcionário no Firebase.", error);
+        alert("O vínculo foi atualizado nesta tela, mas não consegui salvar no Firebase. Verifique sua conexão e tente novamente.");
+    }
 }
 
 async function excluirFuncionario(key) {
@@ -1133,16 +1214,24 @@ function renderViaturaDashboard() {
 
     grid.innerHTML = "";
 
-    getActiveViaturas().forEach((viatura) => {
+    state.viaturas.forEach((viatura) => {
         const id = viatura.id;
-        const status = state.surveyStatus[id];
+        const status = state.surveyStatus[id] || {};
         const isActive = state.selectedViatura === id;
+        const isDisabled = viatura.ativa === false;
+        const responsaveis = viaturaResponsaveis[id] || {};
+        const tecnico = responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
+            ? responsaveis.tecnico
+            : "Sem técnico";
+        const auxiliar = responsaveis.auxiliar || "Sem auxiliar";
 
         const card = document.createElement("div");
-        card.className = `viatura-card ${isActive ? "active" : ""}`;
+        card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""}`;
         card.onclick = () => selectViatura(id);
         card.innerHTML = `
             <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
+            ${isDisabled ? `<span class="viatura-disabled-label">Desativada</span>` : ""}
+            <span class="viatura-responsaveis">${escapeHtml(tecnico)} / ${escapeHtml(auxiliar)}</span>
             <div class="status-dots">
                 <span class="dot ${status.ferramentas ? "done" : ""}" title="Ferramentas">🔧</span>
                 <span class="dot ${status.epis ? "done" : ""}" title="EPIs">🦺</span>

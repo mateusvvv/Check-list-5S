@@ -157,6 +157,21 @@ function carregarImagem(src) {
     });
 }
 
+async function carregarImagemDataUrl(src) {
+    const image = await carregarImagem(src);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+
+    return {
+        dataUrl: canvas.toDataURL("image/png"),
+        width: image.naturalWidth,
+        height: image.naturalHeight
+    };
+}
+
 async function criarMapaAvariasDataUrl(src, avarias, options = {}) {
     const image = await carregarImagem(src);
     const maxWidth = 900;
@@ -202,21 +217,42 @@ export async function gerarPDF(titulo, dados, options = {}) {
     const doc = new jsPDF();
     const reportName = options.reportName || titulo.replace(/_/g, " ");
     const columnWidth = 90;
-    const columns = [{ x: 10, y: 36 }, { x: 108, y: 36 }];
-    const cursor = { col: 0, y: 36 };
+    const contentStartY = 42;
+    const columns = [{ x: 10, y: contentStartY }, { x: 108, y: contentStartY }];
+    const cursor = { col: 0, y: contentStartY };
     const ordemPaginas = [["ferramentas", "epis"], ["viaturas", "tablets"]];
+    let logoData = null;
+
+    try {
+        logoData = await carregarImagemDataUrl("assets/logo.png");
+    } catch (error) {
+        console.warn("Não foi possível carregar a logo no PDF.", error);
+    }
 
     function addPdfHeader() {
-        doc.setFillColor(0, 86, 179);
-        doc.rect(0, 0, 210, 24, "F");
-        doc.setTextColor(255, 255, 255);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, 210, 32, "F");
+        doc.setDrawColor(220, 226, 235);
+        doc.line(10, 32, 200, 32);
+        doc.setTextColor(51, 51, 51);
+
+        if (logoData) {
+            const logoWidth = 48;
+            const logoHeight = Math.min(18, logoWidth * (logoData.height / logoData.width));
+            doc.addImage(logoData.dataUrl, "PNG", 10, 7, logoWidth, logoHeight);
+        } else {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(15);
+            doc.text("DIGITAL", 10, 15);
+        }
+
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text("DIGITAL Vistoria", 10, 10);
         doc.setFontSize(10);
-        doc.text(reportName, 10, 17);
+        const titleLines = doc.splitTextToSize(reportName, 112).slice(0, 2);
+        doc.text(titleLines, 68, 12);
         doc.setFont("helvetica", "normal");
-        doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 140, 10);
+        doc.setFontSize(8);
+        doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 68, 25);
         doc.setTextColor(51, 51, 51);
     }
 
@@ -355,7 +391,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
 
     doc.addPage();
     addPdfHeader();
-    adicionarTermoResponsabilidade(doc, 36);
+    adicionarTermoResponsabilidade(doc, contentStartY);
     doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
 }
 

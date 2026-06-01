@@ -1,4 +1,4 @@
-import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
 import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
@@ -100,6 +100,11 @@ function getTecnicoOptions() {
         nome: "SIDNEY MANOEL DO NASCIMENTO",
         cpf: "099.077.164-48"
     });
+    [
+        { nome: "JOSE RANDSON SILVA", cpf: "125.442.764-36" },
+        { nome: "JOSENILDO VINICIUS ALVES LOPES SILVA", cpf: "131.000.574-57" },
+        { nome: "MIKE RYAN LIMA CRUZ", cpf: "159.056.184-88" }
+    ].forEach(addOption);
 
     return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -365,6 +370,11 @@ export async function limparHistoricoConfig() {
 }
 
 export async function adicionarViatura() {
+    if (state.viaturas.length >= defaultViaturas.length) {
+        alert("O sistema está configurado para 9 viaturas.");
+        return;
+    }
+
     const proximoId = String(Math.max(0, ...state.viaturas.map(viatura => Number(viatura.id) || 0)) + 1);
     const nome = `Viatura ${formatTwoDigits(proximoId)}`;
     state.viaturas.push({ id: proximoId, nome, ativa: true });

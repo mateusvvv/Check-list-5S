@@ -23,14 +23,15 @@ function applyChecklistData(data) {
 }
 
 function applyChecklistDataByViatura(data = {}) {
+    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
     Object.keys(checklistDataByViatura).forEach(viaturaId => delete checklistDataByViatura[viaturaId]);
     Object.entries(data).forEach(([viaturaId, porCategoria]) => {
+        if (!defaultIds.has(String(viaturaId))) return;
         checklistDataByViatura[String(viaturaId)] = normalizeAllChecklistData(porCategoria);
     });
 }
 
 function applyEmployeeEpisByPerson(data = {}) {
-    Object.keys(employeeEpisByPerson).forEach(key => delete employeeEpisByPerson[key]);
     Object.entries(data).forEach(([key, items]) => {
         employeeEpisByPerson[key] = Array.isArray(items)
             ? items.map((item, index) => normalizeEmployeeEpiItem(item, index)).filter(item => item.nome)
@@ -39,7 +40,12 @@ function applyEmployeeEpisByPerson(data = {}) {
 }
 
 function applyViaturaResponsaveis(data = {}) {
+    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+    Object.keys(viaturaResponsaveis).forEach(viaturaId => {
+        if (!defaultIds.has(String(viaturaId))) delete viaturaResponsaveis[viaturaId];
+    });
     Object.entries(data).forEach(([viaturaId, responsaveis]) => {
+        if (!defaultIds.has(String(viaturaId))) return;
         if (!viaturaResponsaveis[String(viaturaId)]) {
             viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
         }
@@ -50,6 +56,22 @@ function applyViaturaResponsaveis(data = {}) {
             auxiliarCpf: String(responsaveis?.auxiliarCpf || "")
         };
     });
+
+    const viatura09 = viaturaResponsaveis["9"];
+    if (viatura09) {
+        const nomesAntigos = [
+            "JOSENILDO VINICIUS ALVES LOPES SILVA",
+            "MIKE RYAN LIMA CRUZ"
+        ];
+        if (nomesAntigos.includes(viatura09.tecnico)) {
+            viatura09.tecnico = "Veículo sem Técnico";
+            viatura09.tecnicoCpf = "";
+        }
+        if (nomesAntigos.includes(viatura09.auxiliar)) {
+            viatura09.auxiliar = "";
+            viatura09.auxiliarCpf = "";
+        }
+    }
 }
 
 function normalizeFuncionarioExtra(funcionario = {}, index = 0) {
@@ -68,13 +90,107 @@ function normalizeFuncionarioExtra(funcionario = {}, index = 0) {
 }
 
 function applyFuncionariosExtras(data = funcionariosExtras) {
+    const defaultExtras = new Map(funcionariosExtras
+        .filter(funcionario => funcionario.finalizado)
+        .map(funcionario => [getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf), cloneFuncionarioExtra(funcionario)]));
     const normalized = Array.isArray(data)
         ? data.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)).filter(funcionario => funcionario.nome)
         : [];
     funcionariosExtras.splice(0, funcionariosExtras.length, ...normalized);
+    ensureDefaultExtra(defaultExtras, "JOSE RANDSON SILVA", "125.442.764-36", { funcao: "Técnico", status: "Férias" });
+    ensureDefaultExtra(defaultExtras, "JOSENILDO VINICIUS ALVES LOPES SILVA", "131.000.574-57", { funcao: "Auxiliar técnico", status: "Ativo" });
+    ensureDefaultExtra(defaultExtras, "MIKE RYAN LIMA CRUZ", "159.056.184-88", { funcao: "Auxiliar técnico", status: "Ativo" });
     funcionariosExtras.forEach(funcionario => {
         employeeEpisByPerson[getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)] = cloneEmployeeEpis(funcionario.epis || []);
     });
+    syncFuncionariosExtrasViaturas();
+}
+
+function cloneFuncionarioExtra(funcionario) {
+    return normalizeFuncionarioExtra({
+        ...funcionario,
+        epis: cloneEmployeeEpis(funcionario.epis || [])
+    });
+}
+
+function ensureDefaultExtra(defaultExtras, nome, cpf, defaults = {}) {
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    const existingIndex = funcionariosExtras.findIndex(funcionario => getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf) === key);
+    const template = defaultExtras.get(key) || {};
+    const existing = existingIndex >= 0 ? funcionariosExtras[existingIndex] : {};
+    const funcionario = normalizeFuncionarioExtra({
+        ...template,
+        ...existing,
+        nome,
+        cpf,
+        funcao: defaults.funcao || existing.funcao || template.funcao || "Técnico",
+        status: defaults.status || existing.status || template.status || "Ativo",
+        finalizado: true,
+        viaturaId: existing.viaturaId || template.viaturaId || "",
+        epis: cloneEmployeeEpis((existing.epis?.length ? existing.epis : template.epis) || employeeEpisByPerson[key] || [])
+    });
+
+    if (existingIndex >= 0) {
+        funcionariosExtras.splice(existingIndex, 1, funcionario);
+    } else {
+        funcionariosExtras.push({
+            id: `funcionario-extra-${key.replace(/[^a-z0-9]+/gi, "-")}`,
+            ...funcionario
+        });
+    }
+}
+
+function getFuncionarioExtraResponsavelFields(funcionario) {
+    const funcao = String(funcionario?.funcao || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    const isAuxiliar = funcao.includes("auxiliar");
+
+    return {
+        campoNome: isAuxiliar ? "auxiliar" : "tecnico",
+        campoCpf: isAuxiliar ? "auxiliarCpf" : "tecnicoCpf"
+    };
+}
+
+function clearFuncionarioResponsavel(key) {
+    Object.values(viaturaResponsaveis).forEach(responsaveis => {
+        if (responsaveis.tecnico && getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf) === key) {
+            responsaveis.tecnico = "";
+            responsaveis.tecnicoCpf = "";
+        }
+
+        if (responsaveis.auxiliar && getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf) === key) {
+            responsaveis.auxiliar = "";
+            responsaveis.auxiliarCpf = "";
+        }
+    });
+}
+
+function syncFuncionariosExtrasViaturas() {
+    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+
+    funcionariosExtras
+        .filter(funcionario => funcionario.finalizado && funcionario.viaturaId && defaultIds.has(String(funcionario.viaturaId)))
+        .forEach(funcionario => {
+            const viaturaId = String(funcionario.viaturaId);
+            const key = getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
+            const fields = getFuncionarioExtraResponsavelFields(funcionario);
+
+            if (!viaturaResponsaveis[viaturaId]) {
+                viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+            }
+
+            const destino = viaturaResponsaveis[viaturaId];
+            const destinoNome = destino[fields.campoNome];
+            const destinoKey = getFuncionarioKeyFromFields(destinoNome, destino[fields.campoCpf]);
+            const destinoLivre = !destinoNome || destinoNome === "Veículo sem Técnico" || destinoKey === key;
+            if (!destinoLivre) return;
+
+            clearFuncionarioResponsavel(key);
+            destino[fields.campoNome] = funcionario.nome;
+            destino[fields.campoCpf] = funcionario.cpf;
+        });
 }
 
 function ensureChecklistForAllViaturas() {
@@ -143,10 +259,13 @@ export async function carregarConfiguracoes() {
 
 export async function salvarConfiguracoes() {
     const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
+    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
     await setDoc(ref, {
         checklistData: normalizeAllChecklistData(checklistData),
         checklistDataByViatura: Object.fromEntries(
-            Object.entries(checklistDataByViatura).map(([viaturaId, porCategoria]) => [
+            Object.entries(checklistDataByViatura)
+                .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
+                .map(([viaturaId, porCategoria]) => [
                 viaturaId,
                 Object.fromEntries(
                     Object.keys(categoryNames).map(category => [
@@ -161,10 +280,12 @@ export async function salvarConfiguracoes() {
         ),
         funcionariosExtras: funcionariosExtras.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)),
         viaturaResponsaveis: Object.fromEntries(
-            Object.entries(viaturaResponsaveis).map(([viaturaId, responsaveis]) => [
-                viaturaId,
-                { ...responsaveis }
-            ])
+            Object.entries(viaturaResponsaveis)
+                .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
+                .map(([viaturaId, responsaveis]) => [
+                    viaturaId,
+                    { ...responsaveis }
+                ])
         ),
         viaturas: state.viaturas,
         configHistory: state.configHistory.slice(0, 200),
