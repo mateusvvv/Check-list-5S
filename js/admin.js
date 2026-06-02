@@ -1,11 +1,12 @@
 import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores } from "./config.js";
-import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
+import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
-import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=7";
+import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=8";
 import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
 import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
 
 let authReadyCallback = async () => {};
+let historyUnsubscribe = null;
 const HISTORICO_PAGE_SIZE = 20;
 let historicoFiltradoAtual = [];
 let historicoVisibleCount = HISTORICO_PAGE_SIZE;
@@ -227,9 +228,42 @@ function renderAdminConfig() {
     renderAdminFuncionariosExtras();
     renderAdminVistoriadores();
     renderAdminHistory();
+    updateAdminTabsPermissions();
+}
+
+/**
+ * Controla a visibilidade e permissão das abas do painel admin.
+ * Se não for o Alisson, os botões ficam transparentes e bloqueados.
+ */
+function updateAdminTabsPermissions() {
+    const isAlisson = isAlissonAdmin();
+    const tabs = ["viaturas", "itens", "funcionarios", "historico"];
+    
+    tabs.forEach(tabId => {
+        const btn = document.getElementById(`admin-tab-${tabId}`);
+        if (btn) {
+            if (!isAlisson) {
+                btn.style.opacity = "0.4";
+                btn.style.filter = "grayscale(1)";
+                btn.style.pointerEvents = "none"; // Bloqueia o clique completamente
+                btn.style.cursor = "not-allowed";
+                btn.title = "Acesso restrito ao administrador Alisson";
+            } else {
+                btn.style.opacity = "1";
+                btn.style.filter = "none";
+                btn.style.pointerEvents = "auto";
+                btn.style.cursor = "pointer";
+                btn.title = "";
+            }
+        }
+    });
 }
 
 export function showAdminConfigTab(tab) {
+    if (!isAlissonAdmin()) {
+        alert("Somente Alisson tem permissão para acessar estas configurações.");
+        return;
+    }
     const targetButton = document.getElementById(`admin-tab-${tab}`);
     const isAlreadyOpen = targetButton?.classList.contains("active");
     if (isAlreadyOpen) {
@@ -662,6 +696,11 @@ export function renderAdminVistoriadores() {
                 <strong>${escapeHtml(vistoriador.nome)}</strong>
                 <p class="substitution-note">${escapeHtml(vistoriador.email)} - ${vistoriador.tipo === "tablets" ? "Somente tablets" : "Vistorias gerais"}${vistoriador.padrao ? " - padrão" : ""}</p>
             </div>
+            <div class="admin-config-actions">
+                ${vistoriador.padrao
+                    ? '<button type="button" class="btn-muted" disabled>Padrão</button>'
+                    : `<button type="button" class="btn-danger" onclick="removerVistoriador('${escapeJsString(vistoriador.id)}')">Remover</button>`}
+            </div>
         </div>
     `).join("");
 }
@@ -691,6 +730,7 @@ async function salvarNovoVistoriador({ nome, email, tipo }) {
     registrarHistoricoConfig("Vistoriador adicionado", `${nome} foi adicionado como ${tipo === "tablets" ? "vistoriador de tablets" : "vistoriador geral"}.`);
     await salvarConfiguracoes();
     clearVistoriadorForm();
+    showAdminPeopleTab("vistoriadores");
     refreshAppAfterConfigChange();
     renderAdminVistoriadores();
 }
@@ -718,8 +758,9 @@ export async function adicionarVistoriador() {
         return;
     }
 
-    if (vistoriadores.some(vistoriador => vistoriador.email === email)) {
-        alert("Já existe um vistoriador cadastrado com este e-mail.");
+    const vistoriadorComEmail = vistoriadores.find(vistoriador => vistoriador.email === email);
+    if (vistoriadorComEmail) {
+        alert(`Já existe um vistoriador cadastrado com este e-mail: ${vistoriadorComEmail.nome} (${vistoriadorComEmail.email}).\n\nRemova esse cadastro da lista antes de cadastrar novamente.`);
         return;
     }
 
@@ -743,6 +784,27 @@ export async function adicionarVistoriador() {
         console.error("Erro ao criar vistoriador:", error);
         alert(`Erro ao criar vistoriador: ${error?.message || error}`);
     }
+}
+
+export async function removerVistoriador(id) {
+    if (!requireAlissonAdmin()) return;
+
+    const index = vistoriadores.findIndex(vistoriador => vistoriador.id === id);
+    const vistoriador = vistoriadores[index];
+    if (!vistoriador) return;
+
+    if (vistoriador.padrao) {
+        alert("Vistoriadores padrão não podem ser removidos.");
+        return;
+    }
+
+    if (!confirm(`Tem certeza que deseja remover o vistoriador ${vistoriador.nome}?`)) return;
+
+    vistoriadores.splice(index, 1);
+    registrarHistoricoConfig("Vistoriador removido", `${vistoriador.nome} foi removido da Gestão de Vistorias.`);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+    renderAdminVistoriadores();
 }
 
 export async function adicionarFuncionarioExtra() {
@@ -1097,14 +1159,24 @@ export function aplicarFiltros() {
     renderHistoricoTable(filtrados);
 }
 
+/**
+ * Helper para converter Timestamps do Firebase ou strings em objetos Date.
+ */
+function converterParaData(valor) {
+    if (!valor) return null;
+    if (typeof valor.toDate === "function") return valor.toDate();
+    const d = new Date(valor);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 function getDataReferenciaFiltro(vistoria) {
     if (vistoria.pendenciaResolvida?.resolvida) {
-        return vistoria.pendenciaResolvida.dataResolucao?.toDate?.()
-            || vistoria.dataEnvio?.toDate?.()
+        return converterParaData(vistoria.pendenciaResolvida.dataResolucao)
+            || converterParaData(vistoria.dataEnvio)
             || new Date();
     }
 
-    return vistoria.dataEnvio?.toDate?.() || new Date();
+    return converterParaData(vistoria.dataEnvio) || new Date();
 }
 
 function getStatusVistoria(vistoria) {
@@ -1385,7 +1457,9 @@ export async function exportarVistoriasSelecionadasPDF() {
             const data = (vistoria.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
 
             await gerarPDF(`Relatorio_${equipamento}_${categoria}_${data}`, [vistoria], {
-                reportName: `${equipamento.replace(/_/g, " ")} - ${categoria}`
+                reportName: `${equipamento.replace(/_/g, " ")} - ${categoria}`,
+                tipoVistoria: vistoria.tipoVistoria || "parcial",
+                categorias: [vistoria.categoria]
             });
         }
 
@@ -1459,7 +1533,7 @@ export function verDetalhes(docId) {
     }
 
     if (vistoria.pendenciaResolvida?.resolvida) {
-        const dataResolucao = vistoria.pendenciaResolvida.dataResolucao?.toDate?.();
+        const dataResolucao = converterParaData(vistoria.pendenciaResolvida.dataResolucao);
         html += '<div class="resolution-box">';
         html += '<h4>Pendência Resolvida</h4>';
         html += `<p><strong>Observação:</strong> ${vistoria.pendenciaResolvida.observacao || "Sem observação"}</p>`;

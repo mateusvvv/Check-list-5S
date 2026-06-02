@@ -1,5 +1,5 @@
 import { categoryNames, damageTypeNames, formatTwoDigits, getVehicleMapConfig, vehicleViewNames } from "./config.js";
-import { collection, db, getDocs, limit, orderBy, query } from "./firebase.js";
+import { collection, db, getDocs, orderBy, query } from "./firebase.js";
 import { getDamageColor, getDamageMarkerLabel, renderDamageList, renderDamageMarkers, renderTabletDamageList, renderTabletDamageMarkers } from "./damages.js";
 import {
     buscarVistoriasLocaisHoje,
@@ -37,6 +37,65 @@ export function sortVistoriasPorCategoria(dados) {
         const viaturaDiff = Number(a.viaturaId || 0) - Number(b.viaturaId || 0);
         if (viaturaDiff !== 0) return viaturaDiff;
         return Object.keys(categoryNames).indexOf(a.categoria) - Object.keys(categoryNames).indexOf(b.categoria);
+    });
+}
+
+function getTipoVistoriaLabel(tipo) {
+    return tipo === "parcial" ? "Vistoria parcial" : "Vistoria completa";
+}
+
+function inferirTipoVistoria(dados, categorias = []) {
+    const tipos = [...new Set(dados.map(vistoria => vistoria.tipoVistoria).filter(Boolean))];
+    if (tipos.length === 1) return tipos[0] === "parcial" ? "parcial" : "completa";
+    const categoriasSelecionadas = categorias.length
+        ? categorias
+        : [...new Set(dados.map(vistoria => vistoria.categoria).filter(Boolean))];
+    return categoriasSelecionadas.length === Object.keys(categoryNames).length ? "completa" : "parcial";
+}
+
+function getEpiPessoaKey(vistoria) {
+    return vistoria.epiResponsavelCpf || vistoria.epiResponsavelNome || "sem-responsavel";
+}
+
+function getVistoriaReportKey(vistoria) {
+    if (vistoria.categoria === "epis") return `epis:${getEpiPessoaKey(vistoria)}`;
+    return vistoria.categoria;
+}
+
+function selecionarVistoriasMaisRecentes(dados, viaturaId, categorias) {
+    const categoriasSet = new Set(categorias);
+    const porChave = new Map();
+
+    dados.forEach((vistoria) => {
+        if (vistoria.tipoRegistro === "resolucaoPendencia") return;
+        if (String(vistoria.viaturaId) !== String(viaturaId)) return;
+        if (!categoriasSet.has(vistoria.categoria)) return;
+
+        const key = getVistoriaReportKey(vistoria);
+        const atual = porChave.get(key);
+        const dataAtual = atual ? getDataEnvioDate(atual).getTime() : 0;
+        const dataNova = getDataEnvioDate(vistoria).getTime();
+        if (!atual || dataNova >= dataAtual) porChave.set(key, vistoria);
+    });
+
+    return sortVistoriasPorCategoria([...porChave.values()]);
+}
+
+function getItensSemDuplicidade(itens = []) {
+    const vistos = new Set();
+    return itens.filter((item) => {
+        const key = [
+            limparTextoRelatorio(item.item).toLowerCase(),
+            Number(item.quantidade || 0),
+            Number(item.valorUnitario || 0),
+            String(item.status || ""),
+            limparTextoRelatorio(item.ca || ""),
+            limparTextoRelatorio(item.dataEntrega || ""),
+            limparTextoRelatorio(item.observacao || "")
+        ].join("|");
+        if (vistos.has(key)) return false;
+        vistos.add(key);
+        return true;
     });
 }
 
@@ -261,6 +320,8 @@ export async function gerarPDF(titulo, dados, options = {}) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const reportName = options.reportName || titulo.replace(/_/g, " ");
+    const tipoVistoria = options.tipoVistoria || inferirTipoVistoria(dados, options.categorias || []);
+    const tipoVistoriaLabel = getTipoVistoriaLabel(tipoVistoria);
     const columnWidth = 90;
     const contentStartY = 44;
     const columns = [{ x: 10, y: contentStartY }, { x: 108, y: contentStartY }];
@@ -298,7 +359,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
         doc.text(titleLines, 64, 12);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.text(`Data e hora do arquivo: ${generatedAt}`, 64, 25);
+        doc.text(`${tipoVistoriaLabel} | Data e hora do arquivo: ${generatedAt}`, 64, 25);
         doc.setTextColor(51, 51, 51);
     }
 
@@ -501,7 +562,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
         }
 
         addColumnText("Itens:", { bold: true, color: [15, 82, 160] });
-        v.itens.forEach(item => addChecklistItem(item));
+        getItensSemDuplicidade(v.itens).forEach(item => addChecklistItem(item));
 
         addSectionDivider();
     }
@@ -556,32 +617,14 @@ export async function buscarVistoriasDeHoje() {
 
 export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, options = {}) {
     const { confirmar = true, resetarStatus = true, categorias = Object.keys(categoryNames) } = options;
+    const todasCategoriasSelecionadas = categorias.length === Object.keys(categoryNames).length;
+    const tipoVistoria = options.tipoVistoria
+        || (todasCategoriasSelecionadas && !isVistoriaParcial(viaturaId) ? "completa" : "parcial");
     try {
         let dadosViatura = [];
 
         try {
-            const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"), limit(200));
-            const querySnapshot = await getDocs(q);
-            const porCategoria = {};
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                if (String(data.viaturaId) !== String(viaturaId)) return;
-                if (data.categoria === "epis") {
-                    if (!porCategoria.epis) porCategoria.epis = [];
-                    const pessoaKey = data.epiResponsavelCpf || data.epiResponsavelNome || "sem-responsavel";
-                    const jaIncluida = porCategoria.epis.some(vistoria =>
-                        (vistoria.epiResponsavelCpf || vistoria.epiResponsavelNome || "sem-responsavel") === pessoaKey
-                    );
-                    if (!jaIncluida) porCategoria.epis.push(data);
-                    return;
-                }
-                if (!porCategoria[data.categoria]) porCategoria[data.categoria] = data;
-            });
-            dadosViatura = categorias.flatMap(category => {
-                const vistoria = porCategoria[category];
-                return Array.isArray(vistoria) ? vistoria : (vistoria ? [vistoria] : []);
-            });
-            sortVistoriasPorCategoria(dadosViatura);
+            dadosViatura = selecionarVistoriasMaisRecentes(await buscarVistoriasDeHoje(), viaturaId, categorias);
         } catch (error) {
             console.warn("Não foi possível ler o histórico no Firebase. Usando vistorias locais da sessão.", error);
             dadosViatura = buscarVistoriasLocaisViatura(viaturaId, categorias, sortVistoriasPorCategoria);
@@ -596,7 +639,9 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
         if (!confirmar || confirm(`Deseja gerar o relatório PDF da Viatura ${formatTwoDigits(viaturaId)}?`)) {
             const sufixoCategoria = categorias.length === 1 ? `_${categoryNames[categorias[0]]}` : "";
             await gerarPDF(`Relatorio_Vistoria_Viatura_${formatTwoDigits(viaturaId)}${sufixoCategoria}`, dadosViatura, {
-                reportName: buildReportTitle(viaturaId, categorias)
+                reportName: buildReportTitle(viaturaId, categorias),
+                tipoVistoria,
+                categorias
             });
 
             if (resetarStatus) {
@@ -643,7 +688,9 @@ async function gerarRelatorioTodasViaturasHoje(categorias = Object.keys(category
     await gerarPDF(`Relatorio_5S_Todas_Viaturas_Hoje${sufixoCategoria}`, filtrados, {
         reportName: categorias.length === 1
             ? `Vistoria 5S - ${categoryNames[categorias[0]]} do dia`
-            : "Vistoria 5S - Todas as viaturas do dia"
+            : "Vistoria 5S - Todas as viaturas do dia",
+        tipoVistoria: categorias.length === Object.keys(categoryNames).length ? "completa" : "parcial",
+        categorias
     });
 }
 

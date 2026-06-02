@@ -4,7 +4,14 @@ import {
     auth,
     collection,
     db,
-    serverTimestamp
+    deleteDoc,
+    firestoreDoc,
+    getDocs,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    where
 } from "./js/firebase.js";
 import {
     limparAvariasTablet,
@@ -49,7 +56,9 @@ import {
     removerViatura,
     removerEpiFuncionarioExtra,
     removerFuncionarioExtra,
+    removerVistoriador,
     removerItemChecklist,
+    renderAdminVistoriadores,
     renderAdminChecklist,
     selecionarAuxiliarViatura,
     selecionarTecnicoViatura,
@@ -62,12 +71,12 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=5";
+} from "./js/admin.js?v=8";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
     setPdfUiCallbacks
-} from "./js/pdf.js?v=7";
+} from "./js/pdf.js?v=8";
 import {
     getCategoriasConcluidas,
     getActiveViaturas,
@@ -139,15 +148,20 @@ function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
     return vistoriadoresTablet.includes(vistoriador);
 }
 
+function isAlissonVistoriador(vistoriador = getVistoriadorAtivo()) {
+    return vistoriador === "Alisson";
+}
+
 function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
     if (!categoryNames[category]) return true;
+    if (isAlissonVistoriador(vistoriador)) return true;
     if (category === "tablets") return isTabletOnlyUser(vistoriador);
     return !isTabletOnlyUser(vistoriador);
 }
 
 function getAccessDeniedMessage(category, vistoriador) {
     if (category === "tablets") {
-        return `A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`;
+        return `A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`;
     }
 
     if (isTabletOnlyUser(vistoriador)) {
@@ -188,9 +202,15 @@ function updateAccessByVistoriador() {
     Object.keys(categoryNames).forEach(category => {
         const link = document.getElementById(`menu-${category}`);
         if (!link) return;
-        const shouldRestrict = category !== "tablets" && !podeAcessarCategoria(category, vistoriador);
+        const shouldRestrict = !podeAcessarCategoria(category, vistoriador);
         link.classList.toggle("restricted", shouldRestrict);
     });
+
+    // Restrição visual do Painel Admin: Somente Alisson tem acesso
+    const adminLink = document.getElementById("menu-admin");
+    if (adminLink) {
+        adminLink.classList.toggle("restricted", vistoriador !== "Alisson");
+    }
 }
 
 function selecionarVistoriadorAtivo(silent = false) {
@@ -236,12 +256,12 @@ function selecionarResponsavelTablet() {
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     const responsavel = tabletSelect?.value || "";
 
-    if (!vistoriadoresTablet.includes(responsavel)) {
+    if (!vistoriadoresTablet.includes(responsavel) && !isAlissonVistoriador(responsavel)) {
         updateTabletInfo();
         return;
     }
 
-    if (vistoriadorSelect && !isTabletOnlyUser() && !getVistoriadorAutenticado()) {
+    if (vistoriadorSelect && !isTabletOnlyUser() && !isAlissonVistoriador() && !getVistoriadorAutenticado()) {
         vistoriadorSelect.value = responsavel;
         selecionarVistoriadorAtivo(true);
     }
@@ -250,24 +270,27 @@ function selecionarResponsavelTablet() {
 
 function solicitarVistoriadorTablet() {
     const vistoriadorAutenticado = getVistoriadorAutenticado();
+    if (isAlissonVistoriador(vistoriadorAutenticado)) return true;
     if (vistoriadorAutenticado && !isTabletOnlyUser(vistoriadorAutenticado)) {
-        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
+        alert(`A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
-    const atual = isTabletOnlyUser() ? getVistoriadorAtivo() : "";
+    const atual = (isTabletOnlyUser() || isAlissonVistoriador()) ? getVistoriadorAtivo() : "";
     const resposta = prompt(
-        `Para acessar a vistoria de tablets, informe o vistoriador logado: ${vistoriadoresTablet.join(" ou ").toUpperCase()}.`,
+        `Para acessar a vistoria de tablets, informe o vistoriador logado: ALISSON, ${vistoriadoresTablet.join(" ou ").toUpperCase()}.`,
         atual
     );
 
     if (!resposta) return false;
 
     const normalizado = resposta.trim().toLowerCase();
-    const vistoriador = vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
+    const vistoriador = normalizado === "alisson"
+        ? "Alisson"
+        : vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
 
     if (!vistoriador) {
-        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
+        alert(`A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
@@ -287,7 +310,15 @@ function showHome() {
 
 function showPage(pageId) {
     let vistoriador = getVistoriadorAtivo();
-    if (pageId === "tablets" && !isTabletOnlyUser(vistoriador)) {
+
+    // Bloqueio de acesso ao Painel Admin
+    if (pageId === "admin" && vistoriador !== "Alisson") {
+        alert("Acesso negado. O Painel Admin é restrito ao administrador Alisson.");
+        document.getElementById("menu-list").classList.remove("show");
+        return;
+    }
+
+    if (pageId === "tablets" && !podeAcessarCategoria("tablets", vistoriador)) {
         if (!solicitarVistoriadorTablet()) {
             document.getElementById("menu-list").classList.remove("show");
             return;
@@ -792,6 +823,7 @@ async function editarDadosFuncionario(key, campo, valor) {
     funcionarioItensEditandoKey = newKey;
     renderTecnicoDatalist();
     preencherResponsaveisViatura();
+    renderAdminVistoriadores();
     renderViaturaDashboard();
     updateMenuStatus();
     renderFuncionariosPage();
@@ -1070,6 +1102,12 @@ function renderFuncionariosPage() {
 }
 
 function abrirPaginaHistoricoVistorias() {
+    const vistoriador = getVistoriadorAtivo();
+    if (vistoriador !== "Alisson") {
+        alert("Somente Alisson tem permissão para acessar o histórico de alterações.");
+        return;
+    }
+
     const confirmado = confirm("Você será direcionado para uma página exclusiva do histórico de alterações. Deseja continuar?");
     if (confirmado) window.location.href = "historico.html";
 }
@@ -1553,6 +1591,7 @@ async function finalizarVistoria(category) {
         epiResponsavelNome: epiPessoa?.nome || null,
         epiResponsavelCpf: epiPessoa?.cpf || null,
         categoria: category,
+        tipoVistoria: state.vistoriaMode[state.selectedViatura] || "completa",
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
         avarias: category === "viaturas" ? [...state.vehicleDamages[state.selectedViatura]] : [],
@@ -1665,6 +1704,133 @@ async function enviarVistoriaAoFirebase() {
     }
 }
 
+/**
+ * Escuta as vistorias de hoje no Firebase e atualiza as bolinhas (dots)
+ * de status no Dashboard em tempo real para todos os aparelhos.
+ */
+function sincronizarStatusViaturasRealtime() {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    // Filtramos no Firebase para trazer APENAS vistorias de hoje
+    // Isso evita processar lixo de dias anteriores
+    const q = query(
+        collection(db, "vistorias"), 
+        where("dataEnvio", ">=", hoje),
+        orderBy("dataEnvio", "desc")
+    );
+
+    onSnapshot(q, (snapshot) => {
+        // Reset local dos estados para recalcular com base no banco
+        state.viaturas.forEach(v => {
+            state.surveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+            state.epiSurveyStatus[v.id] = {};
+        });
+        const modoAtualizadoPorViatura = new Set();
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // Ignora registros de resolução de pendência (não contam como nova vistoria)
+            if (data.tipoRegistro === "resolucaoPendencia") return;
+            
+            const viaturaId = String(data.viaturaId);
+            const categoria = data.categoria;
+            if (!modoAtualizadoPorViatura.has(viaturaId) && ["completa", "parcial"].includes(data.tipoVistoria)) {
+                state.vistoriaMode[viaturaId] = data.tipoVistoria;
+                modoAtualizadoPorViatura.add(viaturaId);
+            }
+            
+            if (state.surveyStatus[viaturaId]) {
+                if (categoria === 'epis') {
+                    const pessoaKey = data.epiResponsavelCpf || data.epiResponsavelNome || "sem-responsavel";
+                    if (!state.epiSurveyStatus[viaturaId]) state.epiSurveyStatus[viaturaId] = {};
+                    state.epiSurveyStatus[viaturaId][pessoaKey] = true;
+                    
+                    state.surveyStatus[viaturaId].epis = todosEpisObrigatoriosVistoriados(viaturaId);
+                } else if (state.surveyStatus[viaturaId][categoria] !== undefined) {
+                    state.surveyStatus[viaturaId][categoria] = true;
+                }
+            }
+        });
+
+        renderViaturaDashboard();
+        updateMenuStatus();
+        updateVistoriaModeUI();
+    });
+}
+
+/**
+ * Reinicia a vistoria atual da viatura selecionada.
+ * Limpa avarias e campos preenchidos localmente.
+ * Se o usuário for Alisson, permite limpar os registros de hoje no banco para resetar o status.
+ */
+async function reiniciarVistoria() {
+    const vistoriador = getVistoriadorAtivo();
+    const viaturaId = state.selectedViatura;
+    const viatura = getViaturaById(viaturaId);
+
+    if (!viaturaId) return;
+
+    let msg = `Deseja reiniciar a vistoria da ${viatura?.nome || 'viatura'}?\n\nIsso limpará as marcações de avarias e campos preenchidos nesta tela.`;
+    
+    const isAlisson = (vistoriador === "Alisson");
+    if (!confirm(msg)) return;
+
+    // 1. Limpeza Local
+    state.vehicleDamages[viaturaId] = [];
+    state.tabletDamages[viaturaId] = [];
+    
+    if (document.getElementById("km")) document.getElementById("km").value = "";
+    if (document.getElementById("tablet-observacoes")) document.getElementById("tablet-observacoes").value = "";
+
+    // 2. Se for Alisson, perguntar se quer limpar o banco (status/bolinhas)
+    if (isAlisson) {
+        if (confirm("Deseja também APAGAR os registros de vistorias realizados HOJE para esta viatura no banco de dados?\n\nIsso fará com que as bolinhas verdes voltem a ficar cinzas para todos.")) {
+            try {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                // Buscamos todas as vistorias de hoje e filtramos a viatura na memória
+                // Isso evita o erro de "índice composto" do Firebase
+                const q = query(
+                    collection(db, "vistorias"), 
+                    where("dataEnvio", ">=", hoje)
+                );
+                
+                const snapshot = await getDocs(q);
+                const docsParaDeletar = snapshot.docs.filter(docSnap => String(docSnap.data().viaturaId) === String(viaturaId));
+
+                if (docsParaDeletar.length > 0) {
+                    const promessas = docsParaDeletar.map(docSnap => deleteDoc(firestoreDoc(db, "vistorias", docSnap.id)));
+                    await Promise.all(promessas);
+                    alert("Registros de hoje removidos com sucesso. O painel será atualizado automaticamente.");
+                } else {
+                    alert("Nenhum registro de hoje encontrado para esta viatura.");
+                }
+            } catch (error) {
+                console.error("Erro ao reiniciar no banco:", error);
+                alert("Erro ao limpar registros no banco de dados.");
+            }
+        }
+    }
+
+    // 3. Atualizar UI
+    const activeTab = document.querySelector(".tab-content.active");
+    if (activeTab && categoryNames[activeTab.id]) {
+        renderItems(activeTab.id);
+    }
+    
+    renderViaturaDashboard();
+    updateMenuStatus();
+    renderDamageMarkers();
+    renderDamageList();
+    renderTabletDamageMarkers();
+    renderTabletDamageList();
+
+    if (!isAlisson) alert("Campos e avarias limpos localmente. Você pode começar novamente.");
+}
+
 function bindWindowFunctions() {
     Object.assign(window, {
         toggleMenu,
@@ -1704,6 +1870,7 @@ function bindWindowFunctions() {
         editarEpiFuncionarioExtra,
         removerFuncionarioExtra,
         removerEpiFuncionarioExtra,
+        removerVistoriador,
         editarNomeViatura,
         editarResponsavelViatura,
         selecionarTecnicoViatura,
@@ -1744,7 +1911,8 @@ function bindWindowFunctions() {
         setTabletDamageType,
         marcarAvariaTablet,
         removerAvariaTablet,
-        limparAvariasTablet
+        limparAvariasTablet,
+        reiniciarVistoria
     });
 }
 
@@ -1781,6 +1949,8 @@ document.addEventListener("DOMContentLoaded", () => {
         updateMenuStatus();
         updateVistoriaModeUI();
         selecionarVistoriadorAtivo(true);
+            // Inicia a sincronização automática das bolinhas
+            sincronizarStatusViaturasRealtime();
         if (sessionStorage.getItem("abrirPainelAdmin") === "1") {
             sessionStorage.removeItem("abrirPainelAdmin");
             showPage("admin");

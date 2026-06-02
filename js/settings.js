@@ -1,5 +1,5 @@
 import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
-import { db, firestoreDoc, getDoc, serverTimestamp, setDoc } from "./firebase.js";
+import { db, firestoreDoc, onSnapshot, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
 const SETTINGS_COLLECTION = "configuracoes";
@@ -228,39 +228,28 @@ function applyVistoriadores(data = []) {
 export async function carregarConfiguracoes() {
     try {
         const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
-        const snapshot = await getDoc(ref);
-        if (snapshot.exists()) {
-            const data = snapshot.data();
-            applyChecklistData(data.checklistData || checklistData);
-            setViaturas(data.viaturas || defaultViaturas);
-            applyViaturaResponsaveis(data.viaturaResponsaveis || viaturaResponsaveis);
-            applyChecklistDataByViatura(data.checklistDataByViatura || {});
-            if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
-            applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
-            applyVistoriadores(data.vistoriadores || defaultVistoriadores);
-            applyDefaultVehicleInventories();
-            applyConfigHistory(data.configHistory || []);
-            ensureChecklistForAllViaturas();
-            return;
-        }
-
-        applyChecklistData(checklistData);
-        setViaturas(defaultViaturas);
-        applyConfigHistory([]);
-        applyFuncionariosExtras(funcionariosExtras);
-        applyVistoriadores(defaultVistoriadores);
-        applyDefaultVehicleInventories();
-        ensureChecklistForAllViaturas();
-        await salvarConfiguracoes();
+        
+        // Usando onSnapshot para sincronização em tempo real das configurações
+        onSnapshot(ref, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                applyChecklistData(data.checklistData || checklistData);
+                setViaturas(data.viaturas || defaultViaturas);
+                applyViaturaResponsaveis(data.viaturaResponsaveis || viaturaResponsaveis);
+                applyChecklistDataByViatura(data.checklistDataByViatura || {});
+                if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
+                applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
+                applyVistoriadores(data.vistoriadores || defaultVistoriadores);
+                applyDefaultVehicleInventories();
+                applyConfigHistory(data.configHistory || []);
+                ensureChecklistForAllViaturas();
+                
+                // Notifica a UI principal (script.js) para atualizar a tela
+                window.refreshAppAfterConfigChange?.();
+            }
+        });
     } catch (error) {
         console.warn("Não foi possível carregar configurações remotas. Usando configuração local.", error);
-        applyChecklistData(checklistData);
-        setViaturas(defaultViaturas);
-        applyConfigHistory([]);
-        applyFuncionariosExtras(funcionariosExtras);
-        applyVistoriadores(defaultVistoriadores);
-        applyDefaultVehicleInventories();
-        ensureChecklistForAllViaturas();
     }
 }
 

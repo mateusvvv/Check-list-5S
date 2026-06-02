@@ -175,6 +175,21 @@
             flex: 0 0 120px !important;
             align-self: center !important;
         }
+
+        .btn-reset-survey, .btn-change-mode {
+            background-color: #ffffff !important;
+            color: #0f52a0 !important;
+            border: 1px solid #0f52a0 !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        .btn-reset-survey {
+            margin-left: 10px !important;
+        }
+        .btn-reset-survey:hover, .btn-change-mode:hover {
+            background-color: #eef6ff !important;
+            color: #0a3d7a !important;
+            border-color: #0a3d7a !important;
+        }
     </style>
 </head>
 <body>
@@ -215,7 +230,7 @@
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
                 <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Funcionários</a></li>
-                <li class="nav-admin-link"><a href="#" onclick="showPage('admin')">🔐 Painel Admin</a></li>
+                <li class="nav-admin-link"><a href="#" id="menu-admin" onclick="showPage('admin')">🔐 Painel Admin</a></li>
                 <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()">Sair</button></li>
             </ul>
         </nav>
@@ -233,7 +248,8 @@
                 </div>
                 <div class="vistoria-mode-bar">
                     <span id="vistoria-mode-label">Modo: Vistoria completa</span>
-                    <button type="button" onclick="configurarModoVistoria()">Alterar modo</button>
+                    <button type="button" class="btn-change-mode" onclick="configurarModoVistoria()">Alterar modo</button>
+                    <button type="button" class="btn-reset-survey" onclick="reiniciarVistoria()">Reiniciar vistoria</button>
                 </div>
                 <div class="checking-meta">
                     <div class="input-group">
@@ -642,6 +658,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=42"></script>
+    <script type="module" src="script.js?v=46"></script>
 </body>
 </html>
