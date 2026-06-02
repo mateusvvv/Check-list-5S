@@ -36,7 +36,19 @@ export function sortVistoriasPorCategoria(dados) {
     return dados.sort((a, b) => {
         const viaturaDiff = Number(a.viaturaId || 0) - Number(b.viaturaId || 0);
         if (viaturaDiff !== 0) return viaturaDiff;
-        return Object.keys(categoryNames).indexOf(a.categoria) - Object.keys(categoryNames).indexOf(b.categoria);
+        
+        const catA = Object.keys(categoryNames).indexOf(a.categoria);
+        const catB = Object.keys(categoryNames).indexOf(b.categoria);
+        if (catA !== catB) return catA - catB;
+
+        // Destaque: Técnico sempre antes do Auxiliar na listagem de EPIs
+        if (a.categoria === "epis" && b.categoria === "epis") {
+            const isAuxA = String(a.epiResponsavelTipo || "").toLowerCase().includes("auxiliar");
+            const isAuxB = String(b.epiResponsavelTipo || "").toLowerCase().includes("auxiliar");
+            if (isAuxA !== isAuxB) return isAuxA ? 1 : -1;
+        }
+
+        return 0;
     });
 }
 
@@ -323,7 +335,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
     const tipoVistoria = options.tipoVistoria || inferirTipoVistoria(dados, options.categorias || []);
     const tipoVistoriaLabel = getTipoVistoriaLabel(tipoVistoria);
     const columnWidth = 90;
-    const contentStartY = 44;
+    const contentStartY = 55;
     const columns = [{ x: 10, y: contentStartY }, { x: 108, y: contentStartY }];
     const cursor = { col: 0, y: contentStartY };
     const ordemPaginas = [["ferramentas", "epis"], ["viaturas"], ["tablets"]];
@@ -338,9 +350,9 @@ export async function gerarPDF(titulo, dados, options = {}) {
 
     function addPdfHeader() {
         doc.setFillColor(15, 82, 160);
-        doc.rect(0, 0, 210, 34, "F");
+        doc.rect(0, 0, 210, 45, "F");
         doc.setFillColor(236, 246, 255);
-        doc.rect(0, 34, 210, 4, "F");
+        doc.rect(0, 45, 210, 4, "F");
         doc.setTextColor(255, 255, 255);
 
         if (logoData) {
@@ -357,9 +369,32 @@ export async function gerarPDF(titulo, dados, options = {}) {
         doc.setFontSize(10);
         const titleLines = doc.splitTextToSize(reportName, 112).slice(0, 2);
         doc.text(titleLines, 64, 12);
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.text(`${tipoVistoriaLabel} | Data e hora do arquivo: ${generatedAt}`, 64, 25);
+        doc.text(`${tipoVistoriaLabel} | Data e hora: ${generatedAt}`, 64, 20);
+
+        // Resumo dos responsáveis no topo (Grid compacta)
+        const responsaveis = getResponsaveisPorCategoria(dados);
+        const startX = 64;
+        const colWidth = 35;
+        const row1Y = 30; // Etiqueta da categoria
+        const row2Y = 35; // Nome do responsável
+
+        responsaveis.forEach((grupo, i) => {
+            const currentX = startX + (i * colWidth);
+            if (currentX > 200) return;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6.5);
+            doc.text(grupo.label.toUpperCase(), currentX, row1Y);
+            
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            const nomesStr = grupo.nomes.join(", ");
+            doc.text(doc.splitTextToSize(nomesStr, colWidth - 2)[0], currentX, row2Y);
+        });
+
         doc.setTextColor(51, 51, 51);
     }
 
@@ -505,16 +540,23 @@ export async function gerarPDF(titulo, dados, options = {}) {
             ? `Tablet ${formatTwoDigits(v.tabletId || v.viaturaId)} / Viatura ${formatTwoDigits(v.viaturaId)}`
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
         addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
-        addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`);
-        if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`);
-        if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`);
-        if (v.auxiliarTecnico) addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`);
-        if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`);
+        addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
+        if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
+        if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
+        if (v.auxiliarTecnico) addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
+        if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
+
+        // Mensagem de destaque para identificar de quem são os EPIs (Técnico ou Auxiliar)
         if (v.categoria === "epis" && v.epiResponsavelNome) {
-            addColumnText(`EPIs vistoriados: ${v.epiResponsavelTipo || "Funcionário"} - ${v.epiResponsavelNome}`);
+            const labelRole = String(v.epiResponsavelTipo || "Funcionário").toUpperCase();
+            addColumnText("--------------------------------------------------", { color: [15, 82, 160] });
+            addColumnText(`CONFERÊNCIA DE EPI: ${labelRole}`, { bold: true, size: 9, color: [15, 82, 160] });
+            addColumnText(`NOME: ${v.epiResponsavelNome}`, { bold: true, size: 9 });
+            addColumnText("--------------------------------------------------", { color: [15, 82, 160] });
         }
-        if (v.dataVistoria) addColumnText(`Data da vistoria: ${String(v.dataVistoria).split("-").reverse().join("/")}`);
-        addColumnText(`Data: ${dataObj.toLocaleString("pt-BR")}`);
+
+        const dateRef = v.dataVistoria ? String(v.dataVistoria).split("-").reverse().join("/") : dataObj.toLocaleDateString("pt-BR");
+        addColumnText(`Data e hora: ${dateRef} às ${dataObj.toLocaleTimeString("pt-BR")}`, { color: [100, 100, 100], bold: true });
 
         if (v.km) addColumnText(`KM: ${v.km}`);
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
@@ -569,8 +611,6 @@ export async function gerarPDF(titulo, dados, options = {}) {
 
     addPdfHeader();
     resetCursor();
-    addPageLabel("Resumo dos responsáveis por etapa");
-    addResponsaveisResumo();
 
     const dadosPorCategoria = {};
     sortVistoriasPorCategoria(dados).forEach((vistoria) => {
@@ -578,11 +618,15 @@ export async function gerarPDF(titulo, dados, options = {}) {
         dadosPorCategoria[vistoria.categoria].push(vistoria);
     });
 
+    // Variável para controlar a economia de página: o primeiro grupo de conteúdo não quebra página
+    let isFirstContentGroup = true;
     for (const categoriasDaPagina of ordemPaginas) {
         const dadosDaPagina = categoriasDaPagina.flatMap(category => dadosPorCategoria[category] || []);
         if (dadosDaPagina.length === 0) continue;
 
-        addContentPage();
+        if (!isFirstContentGroup) addContentPage();
+        else isFirstContentGroup = false;
+
         const pageTitle = categoriasDaPagina.length > 1
             ? "Ferramentas e EPIs"
             : categoriasDaPagina[0] === "viaturas"
