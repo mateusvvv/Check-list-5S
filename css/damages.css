@@ -28,17 +28,18 @@
 
 .tablet-meta {
     display: grid;
-    grid-template-columns: minmax(180px, 260px) 1fr;
-    gap: 16px;
+    grid-template-columns: minmax(170px, 240px);
+    gap: 10px;
     align-items: end;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
 }
 
 .tablet-association {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
+    justify-content: center;
+    min-height: 36px;
+    padding: 6px 10px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: #fff;
@@ -46,8 +47,13 @@
 
 .tablet-association span {
     color: var(--primary-blue);
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     font-weight: 800;
+    line-height: 1.15;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .tablet-association small {

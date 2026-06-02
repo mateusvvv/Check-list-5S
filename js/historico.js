@@ -3,7 +3,7 @@ import {
     limparHistoricoConfig,
     logoutAdmin,
     renderAdminHistory
-} from "./admin.js";
+} from "./admin.js?v=5";
 import { carregarConfiguracoes } from "./settings.js";
 
 function voltarPainelAdmin() {
@@ -11,8 +11,16 @@ function voltarPainelAdmin() {
     window.location.href = "index.html";
 }
 
+async function atualizarHistoricoConfig() {
+    const container = document.getElementById("admin-config-history-list");
+    if (container) container.innerHTML = '<p class="admin-history-empty">Atualizando histórico...</p>';
+    await carregarConfiguracoes();
+    renderAdminHistory();
+}
+
 function bindHistoricoFunctions() {
     Object.assign(window, {
+        atualizarHistoricoConfig,
         limparHistoricoConfig,
         logoutAdmin,
         renderAdminHistory,
@@ -37,7 +45,10 @@ document.addEventListener("DOMContentLoaded", () => {
         setVisible("header", Boolean(user), "flex");
         setVisible("main", Boolean(user));
 
-        await carregarConfiguracoes();
-        renderAdminHistory();
+        await atualizarHistoricoConfig();
+    });
+
+    window.addEventListener("focus", () => {
+        if (auth.currentUser) atualizarHistoricoConfig();
     });
 });

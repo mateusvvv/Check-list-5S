@@ -3,7 +3,11 @@ import { state } from "./state.js";
 
 export function updateTabletInfo(viaturaId = state.selectedViatura) {
     const label = document.getElementById("tablet-current-label");
-    if (label) label.innerText = `Tablet ${viaturaId.toString().padStart(2, "0")}`;
+    const responsavel = document.getElementById("tablet-vistoriador")?.value
+        || document.getElementById("vistoriador-atual")?.value
+        || "";
+
+    if (label) label.innerText = responsavel || "Selecione o responsável";
 }
 
 export function updateVehicleMapImage(viaturaId = state.selectedViatura) {

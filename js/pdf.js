@@ -58,16 +58,43 @@ function addWrappedPdfText(pdf, text, x, y, width, lineHeight = 4) {
     return y;
 }
 
+function limparTextoRelatorio(value) {
+    return String(value ?? "")
+        .replace(/\bSansung\b/gi, "Samsung")
+        .replace(/\bBoch\b/gi, "Bosch")
+        .replace(/\bMaquina\b/g, "Máquina")
+        .replace(/\bmaquina\b/g, "máquina")
+        .replace(/\bFlexivel\b/g, "Flexível")
+        .replace(/\bflexivel\b/g, "flexível")
+        .replace(/\bAluminio\b/g, "Alumínio")
+        .replace(/\baluminio\b/g, "alumínio")
+        .replace(/\bAmperimétro\b/gi, "Amperímetro")
+        .replace(/\bImpresora\b/gi, "Impressora")
+        .replace(/\bMassarico\b/gi, "Maçarico")
+        .replace(/\bGuicho\b/gi, "Guincho")
+        .replace(/\bVERGALHÂO\b/gi, "Vergalhão")
+        .replace(/\bKir localizador\b/gi, "Kit localizador")
+        .replace(/\bsobresalente\b/gi, "sobressalente")
+        .replace(/\bPolda galho\b/gi, "poda galho")
+        .replace(/\bresponsaveie\b/gi, "responsáveis")
+        .replace(/\bresponsabiliade\b/gi, "responsabilidade")
+        .replace(/\bnegrio\b/gi, "negrito")
+        .replace(/\s*\+\s*/g, " + ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
 function adicionarTermoResponsabilidade(pdf, startY) {
     let y = ensurePdfSpace(pdf, startY, 60);
     const termo = [
-        "TERMO DE RESPONSABILIDADE DE USO DE FERRAMENTAS",
-        "Na condição de funcionário da empresa DIGITAL, inscrita no CNPJ/MF sob o nº 07.578.965/0001-05, com sede na cidade de Belo Jardim, Estado de Pernambuco, declaro receber, neste ato, o equipamento de trabalho administrativo, neste ato designado de BEM, em perfeito estado de conservação e funcionamento, e comprometo-me, pelo presente TERMO DE RESPONSABILIDADE, a usá-lo, exclusivamente, no desempenho de minhas funções, bem como a conservá-lo no mesmo estado, e, ainda, a devolvê-lo à empresa, por sua solicitação ou quando vier a me desligar de seus quadros funcionais, ocasião em que será devolvida a via deste Termo por mim assinada, ora entregue à empresa.",
-        "Estou ciente de que o consumo em ligações ou o consumo de outros serviços da operadora realizado que não estejam no grupo de serviços gratuitos informados pela empresa, ou ainda, danos porventura causados ao BEM, decorrentes de culpa minha, autorizarão a empresa a proceder aos descontos de meus créditos salariais ou rescisórios, conforme autorizam os artigos 462 § 1º e 477, § 5º, ambos da CLT.",
+        "TERMO DE RESPONSABILIDADE E ASSINATURA DOS RESPONSÁVEIS",
+        "Na condição de funcionário da empresa DIGITAL, inscrita no CNPJ/MF sob o nº 07.578.965/0001-05, com sede na cidade de Belo Jardim, Estado de Pernambuco, declaro receber, neste ato, os equipamentos, ferramentas, EPIs, veículo e tablet relacionados neste relatório, em perfeito estado de conservação e funcionamento, comprometendo-me a utilizá-los exclusivamente no desempenho de minhas funções.",
+        "Comprometo-me a conservar os bens no mesmo estado em que foram recebidos e a devolvê-los à empresa quando solicitado ou no momento de meu desligamento do quadro funcional.",
+        "Estou ciente de que danos causados aos bens por mau uso, negligência ou culpa poderão autorizar a empresa a proceder aos descontos cabíveis em meus créditos salariais ou rescisórios, conforme a legislação vigente.",
         "Comprometo-me assim especificamente a:",
-        "Não emprestar ou permitir o uso do BEM por terceiros;",
-        "A acionar de imediato o Departamento Responsável ao detectar qualquer problema no equipamento para prévia manutenção;",
-        "Em caso de furto ou roubo do equipamento, prestar queixa à delegacia policial e apresentar à empresa a cópia do Boletim de Ocorrência ou informar ao Departamento responsável o mais rápido possível."
+        "Não emprestar ou permitir o uso dos bens por terceiros;",
+        "Acionar imediatamente o departamento responsável ao detectar qualquer problema nos equipamentos;",
+        "Em caso de furto ou roubo, registrar boletim de ocorrência e apresentar cópia à empresa ou informar o departamento responsável o mais rápido possível."
     ];
 
     pdf.setFontSize(10);
@@ -86,7 +113,7 @@ function adicionarTermoResponsabilidade(pdf, startY) {
     pdf.line(10, y, 92, y);
     pdf.line(112, y, 194, y);
     y += 5;
-    pdf.text("Técnico responsável da viatura", 17, y);
+    pdf.text("Técnico responsável pela viatura", 17, y);
     pdf.text("Auxiliar técnico", 137, y);
     y += 8;
     pdf.text("Nome:", 10, y);
@@ -146,6 +173,24 @@ function buildReportTitle(viaturaId, categorias) {
         return `Vistoria Viatura ${formatTwoDigits(viaturaId)} - ${categoryNames[categorias[0]]}`;
     }
     return `Vistoria Viatura ${formatTwoDigits(viaturaId)}`;
+}
+
+function getResponsaveisPorCategoria(dados) {
+    return Object.keys(categoryNames)
+        .map((category) => {
+            const nomes = [...new Set(
+                dados
+                    .filter(vistoria => vistoria.categoria === category)
+                    .map(vistoria => vistoria.vistoriador || "Não identificado")
+            )];
+
+            return {
+                category,
+                label: categoryNames[category],
+                nomes
+            };
+        })
+        .filter(item => item.nomes.length > 0);
 }
 
 function carregarImagem(src) {
@@ -217,11 +262,12 @@ export async function gerarPDF(titulo, dados, options = {}) {
     const doc = new jsPDF();
     const reportName = options.reportName || titulo.replace(/_/g, " ");
     const columnWidth = 90;
-    const contentStartY = 42;
+    const contentStartY = 44;
     const columns = [{ x: 10, y: contentStartY }, { x: 108, y: contentStartY }];
     const cursor = { col: 0, y: contentStartY };
-    const ordemPaginas = [["ferramentas", "epis"], ["viaturas", "tablets"]];
+    const ordemPaginas = [["ferramentas", "epis"], ["viaturas"], ["tablets"]];
     let logoData = null;
+    const generatedAt = new Date().toLocaleString("pt-BR");
 
     try {
         logoData = await carregarImagemDataUrl("assets/logo.png");
@@ -230,15 +276,15 @@ export async function gerarPDF(titulo, dados, options = {}) {
     }
 
     function addPdfHeader() {
-        doc.setFillColor(255, 255, 255);
-        doc.rect(0, 0, 210, 32, "F");
-        doc.setDrawColor(220, 226, 235);
-        doc.line(10, 32, 200, 32);
-        doc.setTextColor(51, 51, 51);
+        doc.setFillColor(15, 82, 160);
+        doc.rect(0, 0, 210, 34, "F");
+        doc.setFillColor(236, 246, 255);
+        doc.rect(0, 34, 210, 4, "F");
+        doc.setTextColor(255, 255, 255);
 
         if (logoData) {
             const logoWidth = 48;
-            const logoHeight = Math.min(18, logoWidth * (logoData.height / logoData.width));
+            const logoHeight = Math.min(20, logoWidth * (logoData.height / logoData.width));
             doc.addImage(logoData.dataUrl, "PNG", 10, 7, logoWidth, logoHeight);
         } else {
             doc.setFont("helvetica", "bold");
@@ -249,10 +295,10 @@ export async function gerarPDF(titulo, dados, options = {}) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         const titleLines = doc.splitTextToSize(reportName, 112).slice(0, 2);
-        doc.text(titleLines, 68, 12);
+        doc.text(titleLines, 64, 12);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 68, 25);
+        doc.text(`Data e hora do arquivo: ${generatedAt}`, 64, 25);
         doc.setTextColor(51, 51, 51);
     }
 
@@ -281,16 +327,45 @@ export async function gerarPDF(titulo, dados, options = {}) {
     }
 
     function addColumnText(text, opts = {}) {
-        const x = columns[cursor.col].x;
         const size = opts.size || 8;
         const lineHeight = opts.lineHeight || 4;
         doc.setFont("helvetica", opts.bold ? "bold" : "normal");
         doc.setFontSize(size);
-        const lines = doc.splitTextToSize(text, columnWidth);
+        doc.setTextColor(...(opts.color || [51, 51, 51]));
+        const lines = doc.splitTextToSize(limparTextoRelatorio(text), columnWidth);
         lines.forEach((line) => {
             ensureColumnSpace(lineHeight + 2);
+            const x = columns[cursor.col].x;
             doc.text(line, x, cursor.y);
             cursor.y += lineHeight;
+        });
+        doc.setTextColor(51, 51, 51);
+    }
+
+    function addPageLabel(label) {
+        ensureColumnSpace(14);
+        const x = columns[cursor.col].x;
+        doc.setDrawColor(15, 82, 160);
+        doc.setTextColor(15, 82, 160);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(limparTextoRelatorio(label), x, cursor.y);
+        doc.line(x, cursor.y + 2, x + columnWidth, cursor.y + 2);
+        doc.setTextColor(51, 51, 51);
+        cursor.y += 10;
+    }
+
+    function addResponsaveisResumo() {
+        const grupos = getResponsaveisPorCategoria(dados);
+        if (grupos.length === 0) {
+            addColumnText("Nenhum responsável identificado nas vistorias selecionadas.");
+            return;
+        }
+
+        grupos.forEach((grupo) => {
+            addColumnText(grupo.label, { bold: true, color: [15, 82, 160] });
+            grupo.nomes.forEach(nome => addColumnText(`- ${nome}`));
+            addSectionDivider();
         });
     }
 
@@ -303,12 +378,61 @@ export async function gerarPDF(titulo, dados, options = {}) {
     }
 
     function addColumnImage(imageData) {
-        const x = columns[cursor.col].x;
         const imageWidth = columnWidth;
         const imageHeight = imageWidth * (imageData.height / imageData.width);
         ensureColumnSpace(imageHeight + 8);
+        const x = columns[cursor.col].x;
         doc.addImage(imageData.dataUrl, "PNG", x, cursor.y, imageWidth, imageHeight);
         cursor.y += imageHeight + 6;
+    }
+
+    function addChecklistItem(item) {
+        const status = item.status || "pendente";
+        const itemOk = String(status).toLowerCase() === "ok";
+        const quantidade = Number(item.quantidade || 0);
+        const valor = Number(item.valorUnitario || 0);
+        const total = Number(item.total || quantidade * valor);
+        const statusLabel = itemOk ? "OK" : status.toUpperCase();
+        const statusColor = itemOk ? [22, 128, 78] : [190, 82, 24];
+        const itemColor = itemOk ? [22, 128, 78] : [190, 82, 24];
+        const itemName = limparTextoRelatorio(item.item);
+        const detailParts = [
+            `Qtd.: ${quantidade || "-"}`,
+            `Valor: R$ ${valor.toFixed(2)}`,
+            `Total: R$ ${total.toFixed(2)}`,
+            `Status: ${statusLabel}`
+        ];
+
+        if (item.ca) detailParts.push(`C.A.: ${limparTextoRelatorio(item.ca)}`);
+        if (item.dataEntrega) detailParts.push(`Entrega: ${limparTextoRelatorio(item.dataEntrega)}`);
+        if (item.observacao) detailParts.push(`Motivo/observação: ${limparTextoRelatorio(item.observacao)}`);
+
+        const nameLines = doc.splitTextToSize(itemName, columnWidth - 4);
+        const detailLines = doc.splitTextToSize(detailParts.join(" | "), columnWidth - 4);
+        const rowHeight = 2 + (nameLines.length * 3.4) + (detailLines.length * 2.8);
+        ensureColumnSpace(rowHeight + 2);
+        const x = columns[cursor.col].x;
+
+        doc.setDrawColor(...itemColor);
+        doc.line(x, cursor.y - 1.5, x, cursor.y + rowHeight - 2);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.1);
+        doc.setTextColor(...itemColor);
+        nameLines.forEach((line) => {
+            doc.text(line, x + 2, cursor.y);
+            cursor.y += 3.4;
+        });
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.2);
+        doc.setTextColor(...statusColor);
+        detailLines.forEach((line) => {
+            doc.text(line, x + 2, cursor.y);
+            cursor.y += 2.8;
+        });
+        doc.setTextColor(51, 51, 51);
+        cursor.y += 1.5;
     }
 
     async function addVistoria(v) {
@@ -319,12 +443,12 @@ export async function gerarPDF(titulo, dados, options = {}) {
         const equipamento = v.categoria === "tablets"
             ? `Tablet ${formatTwoDigits(v.tabletId || v.viaturaId)} / Viatura ${formatTwoDigits(v.viaturaId)}`
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
-        addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5 });
-        addColumnText(`Vistoriador: ${v.vistoriador}`);
+        addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
+        addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`);
         if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`);
-        if (v.tecnicoCpf) addColumnText(`CPF Técnico: ${v.tecnicoCpf}`);
-        if (v.auxiliarTecnico) addColumnText(`Auxiliar Técnico: ${v.auxiliarTecnico}`);
-        if (v.auxiliarCpf) addColumnText(`CPF Auxiliar: ${v.auxiliarCpf}`);
+        if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`);
+        if (v.auxiliarTecnico) addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`);
+        if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`);
         if (v.categoria === "epis" && v.epiResponsavelNome) {
             addColumnText(`EPIs vistoriados: ${v.epiResponsavelTipo || "Funcionário"} - ${v.epiResponsavelNome}`);
         }
@@ -334,43 +458,58 @@ export async function gerarPDF(titulo, dados, options = {}) {
         if (v.km) addColumnText(`KM: ${v.km}`);
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
 
-        if (v.avarias && v.avarias.length > 0) {
-            addColumnText("Avarias visuais:", { bold: true });
-            v.avarias.forEach((avaria) => {
+        if (v.categoria === "viaturas") {
+            const avariasViatura = Array.isArray(v.avarias) ? v.avarias : [];
+            addColumnText("Mapa visual da viatura:", { bold: true, color: [15, 82, 160] });
+            if (avariasViatura.length > 0) {
+                addColumnText("Avarias marcadas:", { bold: true });
+            } else {
+                addColumnText("Nenhuma avaria marcada.", { color: [22, 128, 78] });
+            }
+            avariasViatura.forEach((avaria) => {
                 const linhaAvaria = `${getDamageMarkerLabel(avaria.type)} - ${damageTypeNames[avaria.type] || avaria.type} - ${vehicleViewNames[avaria.view] || avaria.view}`;
                 addColumnText(linhaAvaria);
             });
-            const vehicleImage = await criarMapaAvariasDataUrl(getVehicleMapConfig(v.viaturaId).src, v.avarias, { useTypeLabels: true });
-            addColumnImage(vehicleImage);
+            try {
+                const vehicleImage = await criarMapaAvariasDataUrl(getVehicleMapConfig(v.viaturaId).src, avariasViatura, { useTypeLabels: true });
+                addColumnImage(vehicleImage);
+            } catch (error) {
+                console.warn("Não foi possível adicionar o mapa da viatura ao PDF.", error);
+                addColumnText("Não foi possível carregar o desenho da viatura.", { color: [190, 82, 24] });
+            }
         }
 
-        if (v.avariasTablet && v.avariasTablet.length > 0) {
-            addColumnText("Avarias do tablet:", { bold: true });
-            v.avariasTablet.forEach((avaria) => {
+        if (v.categoria === "tablets") {
+            const avariasTablet = Array.isArray(v.avariasTablet) ? v.avariasTablet : [];
+            addColumnText("Mapa visual do tablet:", { bold: true, color: [15, 82, 160] });
+            if (avariasTablet.length > 0) {
+                addColumnText("Avarias marcadas:", { bold: true });
+            } else {
+                addColumnText("Nenhuma avaria marcada.", { color: [22, 128, 78] });
+            }
+            avariasTablet.forEach((avaria) => {
                 const linhaAvaria = `${getDamageMarkerLabel(avaria.type)} - ${damageTypeNames[avaria.type] || avaria.type} - ${avaria.view}`;
                 addColumnText(linhaAvaria);
             });
-            const tabletImage = await criarMapaAvariasDataUrl("assets/tablet-mapa.png", v.avariasTablet, { useTypeLabels: true });
-            addColumnImage(tabletImage);
+            try {
+                const tabletImage = await criarMapaAvariasDataUrl("assets/tablet-mapa.png", avariasTablet, { useTypeLabels: true });
+                addColumnImage(tabletImage);
+            } catch (error) {
+                console.warn("Não foi possível adicionar o mapa do tablet ao PDF.", error);
+                addColumnText("Não foi possível carregar o desenho do tablet.", { color: [190, 82, 24] });
+            }
         }
 
-        addColumnText("Itens:", { bold: true });
-        v.itens.forEach(item => {
-            const s = item.status || "pendente";
-            const quantidade = Number(item.quantidade || 0);
-            const valor = Number(item.valorUnitario || 0);
-            const total = Number(item.total || quantidade * valor);
-            let linha = `${quantidade || "-"}x ${item.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)} - ${s === "ok" ? "[OK]" : `[${s.toUpperCase()}]`}`;
-            if (item.ca) linha += ` - C.A.: ${item.ca}`;
-            if (item.dataEntrega) linha += ` - Entrega: ${item.dataEntrega}`;
-            if (item.observacao) linha += ` - Motivo: ${item.observacao}`;
-            addColumnText(linha);
-        });
+        addColumnText("Itens:", { bold: true, color: [15, 82, 160] });
+        v.itens.forEach(item => addChecklistItem(item));
 
         addSectionDivider();
     }
 
     addPdfHeader();
+    resetCursor();
+    addPageLabel("Resumo dos responsáveis por etapa");
+    addResponsaveisResumo();
 
     const dadosPorCategoria = {};
     sortVistoriasPorCategoria(dados).forEach((vistoria) => {
@@ -378,20 +517,25 @@ export async function gerarPDF(titulo, dados, options = {}) {
         dadosPorCategoria[vistoria.categoria].push(vistoria);
     });
 
-    let wrotePage = false;
     for (const categoriasDaPagina of ordemPaginas) {
         const dadosDaPagina = categoriasDaPagina.flatMap(category => dadosPorCategoria[category] || []);
         if (dadosDaPagina.length === 0) continue;
 
-        if (wrotePage) addContentPage();
-        resetCursor();
+        addContentPage();
+        const pageTitle = categoriasDaPagina.length > 1
+            ? "Ferramentas e EPIs"
+            : categoriasDaPagina[0] === "viaturas"
+                ? "Viatura"
+                : "Tablets";
+        addPageLabel(pageTitle);
         for (const vistoria of dadosDaPagina) await addVistoria(vistoria);
-        wrotePage = true;
     }
 
     doc.addPage();
     addPdfHeader();
-    adicionarTermoResponsabilidade(doc, contentStartY);
+    resetCursor();
+    addPageLabel("Assinatura dos responsáveis e termo de responsabilidade");
+    adicionarTermoResponsabilidade(doc, cursor.y);
     doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
 }
 
@@ -422,9 +566,21 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
             querySnapshot.forEach(doc => {
                 const data = doc.data();
                 if (String(data.viaturaId) !== String(viaturaId)) return;
+                if (data.categoria === "epis") {
+                    if (!porCategoria.epis) porCategoria.epis = [];
+                    const pessoaKey = data.epiResponsavelCpf || data.epiResponsavelNome || "sem-responsavel";
+                    const jaIncluida = porCategoria.epis.some(vistoria =>
+                        (vistoria.epiResponsavelCpf || vistoria.epiResponsavelNome || "sem-responsavel") === pessoaKey
+                    );
+                    if (!jaIncluida) porCategoria.epis.push(data);
+                    return;
+                }
                 if (!porCategoria[data.categoria]) porCategoria[data.categoria] = data;
             });
-            dadosViatura = categorias.map(category => porCategoria[category]).filter(Boolean);
+            dadosViatura = categorias.flatMap(category => {
+                const vistoria = porCategoria[category];
+                return Array.isArray(vistoria) ? vistoria : (vistoria ? [vistoria] : []);
+            });
             sortVistoriasPorCategoria(dadosViatura);
         } catch (error) {
             console.warn("Não foi possível ler o histórico no Firebase. Usando vistorias locais da sessão.", error);

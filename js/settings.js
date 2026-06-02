@@ -1,4 +1,4 @@
-import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, viaturaResponsaveis } from "./config.js";
+import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
 import { db, firestoreDoc, getDoc, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
@@ -221,6 +221,10 @@ function applyConfigHistory(history = []) {
         : [];
 }
 
+function applyVistoriadores(data = []) {
+    setVistoriadores(Array.isArray(data) && data.length ? data : defaultVistoriadores);
+}
+
 export async function carregarConfiguracoes() {
     try {
         const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
@@ -233,6 +237,7 @@ export async function carregarConfiguracoes() {
             applyChecklistDataByViatura(data.checklistDataByViatura || {});
             if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
             applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
+            applyVistoriadores(data.vistoriadores || defaultVistoriadores);
             applyDefaultVehicleInventories();
             applyConfigHistory(data.configHistory || []);
             ensureChecklistForAllViaturas();
@@ -243,6 +248,7 @@ export async function carregarConfiguracoes() {
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
         applyFuncionariosExtras(funcionariosExtras);
+        applyVistoriadores(defaultVistoriadores);
         applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
         await salvarConfiguracoes();
@@ -252,6 +258,7 @@ export async function carregarConfiguracoes() {
         setViaturas(defaultViaturas);
         applyConfigHistory([]);
         applyFuncionariosExtras(funcionariosExtras);
+        applyVistoriadores(defaultVistoriadores);
         applyDefaultVehicleInventories();
         ensureChecklistForAllViaturas();
     }
@@ -279,6 +286,7 @@ export async function salvarConfiguracoes() {
             Object.entries(employeeEpisByPerson).map(([key, items]) => [key, cloneEmployeeEpis(items)])
         ),
         funcionariosExtras: funcionariosExtras.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)),
+        vistoriadores: vistoriadores.map((vistoriador, index) => normalizeVistoriador(vistoriador, index)),
         viaturaResponsaveis: Object.fromEntries(
             Object.entries(viaturaResponsaveis)
                 .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))

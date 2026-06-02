@@ -1799,7 +1799,79 @@ export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) 
     return { id, nome: `Viatura ${formatTwoDigits(id)}`, ativa: true };
 });
 export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet" };
-export const vistoriadoresTablet = ["Matheus", "Italo"];
+export const defaultVistoriadores = [
+    { id: "vistoriador-alisson", nome: "Alisson", email: "alisson.tavares@digitalonline.com.br", tipo: "geral", padrao: true },
+    { id: "vistoriador-marcos", nome: "Marcos", email: "marcos@digitalonline.com.br", tipo: "geral", padrao: true },
+    { id: "vistoriador-matheus", nome: "Matheus", email: "matheus@digitalonline.com.br", tipo: "tablets", padrao: true },
+    { id: "vistoriador-italo", nome: "Italo", email: "italo@digitalonline.com.br", tipo: "tablets", padrao: true }
+];
+
+export const vistoriadores = defaultVistoriadores.map(vistoriador => ({ ...vistoriador }));
+export const vistoriadoresTablet = [];
+
+function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+export function normalizeVistoriador(vistoriador = {}, index = 0) {
+    const nome = String(vistoriador.nome || "").trim();
+    const email = normalizeEmail(vistoriador.email);
+    const tipo = String(vistoriador.tipo || "geral") === "tablets" ? "tablets" : "geral";
+    return {
+        id: String(vistoriador.id || `vistoriador-${normalizePessoaKey(nome || email)}-${index}`),
+        nome,
+        email,
+        tipo,
+        padrao: Boolean(vistoriador.padrao)
+    };
+}
+
+function syncVistoriadoresTablet() {
+    vistoriadoresTablet.splice(
+        0,
+        vistoriadoresTablet.length,
+        ...vistoriadores.filter(vistoriador => vistoriador.tipo === "tablets").map(vistoriador => vistoriador.nome)
+    );
+}
+
+export function setVistoriadores(data = []) {
+    const porEmail = new Map();
+    defaultVistoriadores.forEach((vistoriador, index) => {
+        const normalized = normalizeVistoriador({ ...vistoriador, padrao: true }, index);
+        porEmail.set(normalized.email, normalized);
+    });
+
+    if (Array.isArray(data)) {
+        data.forEach((vistoriador, index) => {
+            const normalized = normalizeVistoriador(vistoriador, index);
+            if (!normalized.nome || !normalized.email) return;
+            const atual = porEmail.get(normalized.email) || {};
+            porEmail.set(normalized.email, {
+                ...atual,
+                ...normalized,
+                padrao: Boolean(atual.padrao || normalized.padrao)
+            });
+        });
+    }
+
+    vistoriadores.splice(0, vistoriadores.length, ...[...porEmail.values()].sort((a, b) => {
+        if (a.padrao !== b.padrao) return a.padrao ? -1 : 1;
+        return a.nome.localeCompare(b.nome, "pt-BR");
+    }));
+    syncVistoriadoresTablet();
+}
+
+export function getVistoriadorByEmail(email) {
+    const normalizedEmail = normalizeEmail(email);
+    return vistoriadores.find(vistoriador => vistoriador.email === normalizedEmail) || null;
+}
+
+export function getVistoriadorByName(nome) {
+    const normalizedName = String(nome || "").trim().toLowerCase();
+    return vistoriadores.find(vistoriador => vistoriador.nome.toLowerCase() === normalizedName) || null;
+}
+
+setVistoriadores(defaultVistoriadores);
 
 export const damageTypeNames = {
     amassado: "Amassado",

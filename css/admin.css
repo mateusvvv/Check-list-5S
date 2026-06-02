@@ -123,25 +123,6 @@
     font-weight: 700;
 }
 
-.btn-header-logout {
-    align-self: center;
-    min-height: 34px;
-    border: 1px solid rgba(255, 255, 255, 0.68);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    cursor: pointer;
-    font-weight: 700;
-    padding: 7px 10px;
-    white-space: nowrap;
-    transition: all 0.2s;
-}
-
-.btn-header-logout:hover {
-    background: #ffffff;
-    color: var(--primary-blue);
-}
-
 .login-box input {
     box-sizing: border-box;
     width: 100%;
@@ -174,6 +155,37 @@
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
+}
+
+.history-page-header {
+    min-height: 76px;
+    padding: 12px 24px;
+}
+
+.history-page-header .logo {
+    flex: 0 0 auto;
+}
+
+.history-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.history-header-button {
+    min-height: 38px;
+    border: 1px solid var(--primary-blue);
+    border-radius: 4px;
+    padding: 8px 14px;
+    background: #ffffff;
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.history-header-button:hover {
+    background: var(--secondary-blue);
 }
 
 .admin-buttons-container {
@@ -347,6 +359,32 @@
     overflow-x: auto;
 }
 
+.history-load-more {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 12px;
+    color: #475569;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.history-load-more button {
+    min-height: 36px;
+    border: 1px solid var(--primary-blue);
+    border-radius: 5px;
+    padding: 8px 14px;
+    background: #ffffff;
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.history-load-more button:hover {
+    background: var(--secondary-blue);
+}
+
 .status-ok {
     color: green;
     font-weight: bold;
@@ -412,6 +450,36 @@
 .admin-config-tabs button.active {
     background: var(--primary-blue);
     color: #ffffff;
+}
+
+.admin-people-switch {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.admin-people-switch button {
+    border: 1px solid var(--primary-blue);
+    border-radius: 4px;
+    padding: 9px 12px;
+    background: #ffffff;
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.admin-people-switch button.active {
+    background: var(--primary-blue);
+    color: #ffffff;
+}
+
+.admin-people-panel {
+    display: none;
+}
+
+.admin-people-panel.active {
+    display: block;
 }
 
 .admin-config-panel {

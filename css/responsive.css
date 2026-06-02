@@ -11,16 +11,16 @@
     }
 
     header {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: space-between;
         align-items: center;
-        gap: 10px;
-        padding: 0.75rem 12px;
+        gap: 6px;
+        padding: 0.55rem 10px;
     }
 
     .logo {
-        width: 132px;
-        height: 34px;
+        width: 96px;
+        height: 30px;
     }
 
     .logo img {
@@ -29,29 +29,35 @@
     }
 
     .user-selector {
-        order: 3;
-        width: 100%;
-        margin-left: 0;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        padding: 8px;
+        order: 2;
+        width: auto;
+        margin-left: auto;
+        flex: 0 1 auto;
+        padding: 0;
+        border-color: rgba(255, 255, 255, 0.1);
+        background: transparent;
     }
 
     .user-selector select {
-        flex: 1 1 100%;
-        width: 100%;
-        font-size: 0.95rem;
+        width: 116px;
+        min-height: 30px;
+        padding: 3px 5px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-overflow: ellipsis;
     }
 
     .menu-container {
-        margin-left: auto;
+        order: 3;
+        margin-left: 0;
         flex-shrink: 0;
     }
 
     .menu-btn {
-        min-width: 86px;
-        padding: 8px 12px;
-        font-size: 0.95rem;
+        min-width: 76px;
+        min-height: 34px;
+        padding: 7px 10px;
+        font-size: 0.84rem;
         text-align: center;
     }
 
@@ -75,7 +81,19 @@
     }
 
     .tablet-meta {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        align-items: end;
+        margin-bottom: 12px;
+    }
+
+    .tablet-association {
+        min-height: 34px;
+        padding: 5px 8px;
+    }
+
+    .tablet-association span {
+        font-size: 0.78rem;
     }
 
     .damage-type {
@@ -165,6 +183,18 @@
         grid-template-columns: 1fr;
         gap: 8px;
         align-items: stretch;
+    }
+
+    .history-load-more {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        text-align: center;
+    }
+
+    .history-load-more button {
+        width: 100%;
     }
 
     .admin-responsaveis-grid {
@@ -579,6 +609,30 @@
 @media (max-width: 420px) {
     .checking-meta {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 360px) {
+    header {
+        gap: 5px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .logo {
+        width: 84px;
+    }
+
+    .user-selector select {
+        width: 104px;
+        font-size: 0.68rem;
+    }
+
+    .menu-btn {
+        min-width: 68px;
+        padding-left: 8px;
+        padding-right: 8px;
+        font-size: 0.78rem;
     }
 }
 

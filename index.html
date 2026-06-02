@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=16">
     <style>
         /* Estilos Gerais para Gestão de Funcionários (Admin) */
         .admin-extra-employee-row {
@@ -205,7 +205,6 @@
                 <option value="Matheus">Matheus</option>
                 <option value="Italo">Italo</option>
             </select>
-            <button type="button" class="btn-header-logout" onclick="logoutAdmin()">Sair</button>
         </div>
         <nav class="menu-container">
             <button class="menu-btn" onclick="toggleMenu()">☰ Menu</button>
@@ -217,6 +216,7 @@
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
                 <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Funcionários</a></li>
                 <li class="nav-admin-link"><a href="#" onclick="showPage('admin')">🔐 Painel Admin</a></li>
+                <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()">Sair</button></li>
             </ul>
         </nav>
     </header>
@@ -270,33 +270,45 @@
             <!-- Página 1: Ferramentas -->
             <section id="ferramentas" class="tab-content active">
                 <div class="card">
-                    <h2>🔧 Ferramentas e Equipamentos</h2>
+                    <div class="checklist-section-header">
+                        <h2>🔧 Ferramentas e Equipamentos</h2>
+                        <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('ferramentas')">Marcar tudo OK</button>
+                    </div>
                     <div id="lista-ferramentas" class="checklist-items">
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
                     <button class="btn-submit" onclick="finalizarVistoria('ferramentas')">Finalizar Ferramentas</button>
+                    <button type="button" id="btn-pdf-ferramentas" class="btn-category-pdf" onclick="gerarPdfCategoria('ferramentas')">📁 Gerar PDF de Ferramentas</button>
                 </div>
             </section>
 
             <!-- Página 2: EPIs -->
             <section id="epis" class="tab-content">
                 <div class="card">
-                    <h2>🦺 Equipamentos de Proteção Individual</h2>
+                    <div class="checklist-section-header">
+                        <h2>🦺 Equipamentos de Proteção Individual</h2>
+                        <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('epis')">Marcar tudo OK</button>
+                    </div>
                     <div class="epi-person-selector">
                         <label for="epi-pessoa">EPIs de</label>
                         <select id="epi-pessoa" onchange="selecionarPessoaEpi()"></select>
+                        <div id="epi-pessoa-buttons" class="epi-person-buttons"></div>
                     </div>
                     <div id="lista-epis" class="checklist-items">
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
                     <button class="btn-submit" onclick="finalizarVistoria('epis')">Finalizar EPIs</button>
+                    <button type="button" id="btn-pdf-epis" class="btn-category-pdf" onclick="gerarPdfCategoria('epis')">📁 Gerar PDF de EPIs</button>
                 </div>
             </section>
 
             <!-- Página 3: Viaturas -->
             <section id="viaturas" class="tab-content">
                 <div class="card">
-                    <h2>🚗 Vistoria de Viaturas</h2>
+                    <div class="checklist-section-header">
+                        <h2>🚗 Vistoria de Viaturas</h2>
+                        <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('viaturas')">Marcar tudo OK</button>
+                    </div>
                     <div class="input-group km-input">
                         <label for="km">KM Atual:</label>
                         <input type="number" id="km" placeholder="Km atual">
@@ -335,13 +347,17 @@
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
                     <button class="btn-submit" onclick="finalizarVistoria('viaturas')">Finalizar Vistoria Viatura</button>
+                    <button type="button" id="btn-pdf-viaturas" class="btn-category-pdf" onclick="gerarPdfCategoria('viaturas')">📁 Gerar PDF de Viatura</button>
                 </div>
             </section>
 
             <!-- Página 4: Tablets -->
             <section id="tablets" class="tab-content">
                 <div class="card">
-                    <h2>📱 Vistoria de Tablets</h2>
+                    <div class="checklist-section-header">
+                        <h2>📱 Vistoria de Tablets</h2>
+                        <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('tablets')">Marcar tudo OK</button>
+                    </div>
                     <div class="tablet-meta">
                         <div class="input-group">
                             <label for="tablet-vistoriador">Responsável:</label>
@@ -350,10 +366,6 @@
                                 <option value="Matheus">Matheus</option>
                                 <option value="Italo">Italo</option>
                             </select>
-                        </div>
-                        <div class="tablet-association">
-                            <span id="tablet-current-label">Tablet 01</span>
-                            <small>Vinculado à Viatura selecionada</small>
                         </div>
                     </div>
 
@@ -396,6 +408,7 @@
                         <p class="placeholder">Aguardando lista de itens...</p>
                     </div>
                     <button class="btn-submit" onclick="finalizarVistoria('tablets')">Finalizar Vistoria Tablet</button>
+                    <button type="button" id="btn-pdf-tablets" class="btn-category-pdf" onclick="gerarPdfCategoria('tablets')">📁 Gerar PDF de Tablet</button>
                 </div>
             </section>
 
@@ -486,18 +499,37 @@
                             <div class="admin-config-header">
                                 <h3>Funcionários</h3>
                             </div>
-                            <div id="admin-funcionarios-alisson-only" class="admin-history-empty">Somente Alisson pode gerenciar técnicos e auxiliares.</div>
+                            <div id="admin-funcionarios-alisson-only" class="admin-history-empty">Somente Alisson pode gerenciar funcionários e vistoriadores.</div>
                             <div id="admin-funcionarios-manager">
-                                <div class="admin-item-form admin-employee-form" autocomplete="off">
-                                    <input type="text" id="admin-funcionario-nome" value="" placeholder="Nome do técnico ou auxiliar" autocomplete="new-password">
-                                    <input type="text" id="admin-funcionario-cpf" value="" placeholder="CPF" autocomplete="new-password">
-                                    <select id="admin-funcionario-funcao">
-                                        <option value="Técnico">Técnico</option>
-                                        <option value="Auxiliar técnico">Auxiliar técnico</option>
-                                    </select>
-                                    <button type="button" onclick="adicionarFuncionarioExtra()">Adicionar funcionário</button>
+                                <div class="admin-people-switch">
+                                    <button type="button" id="admin-people-tab-funcionarios" class="active" onclick="showAdminPeopleTab('funcionarios')">Adicionar técnico/auxiliar</button>
+                                    <button type="button" id="admin-people-tab-vistoriadores" onclick="showAdminPeopleTab('vistoriadores')">Adicionar vistoriador</button>
                                 </div>
-                                <div id="admin-funcionarios-list" class="admin-config-list"></div>
+                                <div id="admin-people-panel-funcionarios" class="admin-people-panel active">
+                                    <div class="admin-item-form admin-employee-form" autocomplete="off">
+                                        <input type="text" id="admin-funcionario-nome" value="" placeholder="Nome do técnico ou auxiliar" autocomplete="new-password">
+                                        <input type="text" id="admin-funcionario-cpf" value="" placeholder="CPF" autocomplete="new-password">
+                                        <select id="admin-funcionario-funcao">
+                                            <option value="Técnico">Técnico</option>
+                                            <option value="Auxiliar técnico">Auxiliar técnico</option>
+                                        </select>
+                                        <button type="button" onclick="adicionarFuncionarioExtra()">Adicionar funcionário</button>
+                                    </div>
+                                    <div id="admin-funcionarios-list" class="admin-config-list"></div>
+                                </div>
+                                <div id="admin-people-panel-vistoriadores" class="admin-people-panel">
+                                    <div class="admin-item-form admin-vistoriador-form" autocomplete="off">
+                                        <input type="text" id="admin-vistoriador-nome" value="" placeholder="Nome do vistoriador" autocomplete="new-password">
+                                        <input type="email" id="admin-vistoriador-email" value="" placeholder="E-mail" autocomplete="new-password">
+                                        <input type="password" id="admin-vistoriador-senha" value="" placeholder="Senha" autocomplete="new-password">
+                                        <select id="admin-vistoriador-tipo">
+                                            <option value="geral">Vistorias gerais</option>
+                                            <option value="tablets">Somente tablets</option>
+                                        </select>
+                                        <button type="button" onclick="adicionarVistoriador()">Adicionar vistoriador</button>
+                                    </div>
+                                    <div id="admin-vistoriadores-list" class="admin-config-list"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -610,6 +642,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=29"></script>
+    <script type="module" src="script.js?v=42"></script>
 </body>
 </html>

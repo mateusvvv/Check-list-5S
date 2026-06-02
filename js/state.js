@@ -4,6 +4,7 @@ export const state = {
     selectedViatura: "1",
     viaturas: [...defaultViaturas],
     surveyStatus: {},
+    epiSurveyStatus: {},
     vehicleDamages: {},
     tabletDamages: {},
     vistoriaMode: {},
@@ -19,6 +20,7 @@ export const state = {
 export function ensureViaturaState(id) {
     id = String(id);
     if (!state.surveyStatus[id]) state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+    if (!state.epiSurveyStatus[id]) state.epiSurveyStatus[id] = {};
     if (!state.vehicleDamages[id]) state.vehicleDamages[id] = [];
     if (!state.tabletDamages[id]) state.tabletDamages[id] = [];
     if (!state.vistoriaMode[id]) state.vistoriaMode[id] = "completa";
@@ -90,12 +92,25 @@ export function todasEtapasConcluidas(viaturaId = state.selectedViatura) {
 export function salvarVistoriaLocal(vistoria) {
     const viaturaId = String(vistoria.viaturaId);
     if (!state.vistoriasLocais[viaturaId]) state.vistoriasLocais[viaturaId] = {};
+    if (vistoria.categoria === "epis") {
+        if (!Array.isArray(state.vistoriasLocais[viaturaId].epis)) state.vistoriasLocais[viaturaId].epis = [];
+        const pessoaKey = vistoria.epiResponsavelCpf || vistoria.epiResponsavelNome || "sem-responsavel";
+        const index = state.vistoriasLocais[viaturaId].epis.findIndex(item =>
+            (item.epiResponsavelCpf || item.epiResponsavelNome || "sem-responsavel") === pessoaKey
+        );
+        if (index >= 0) state.vistoriasLocais[viaturaId].epis[index] = vistoria;
+        else state.vistoriasLocais[viaturaId].epis.push(vistoria);
+        return;
+    }
     state.vistoriasLocais[viaturaId][vistoria.categoria] = vistoria;
 }
 
 export function buscarVistoriasLocaisViatura(viaturaId, categorias, sortFn) {
     const porCategoria = state.vistoriasLocais[String(viaturaId)] || {};
-    return sortFn(categorias.map(category => porCategoria[category]).filter(Boolean));
+    return sortFn(categorias.flatMap(category => {
+        const vistoria = porCategoria[category];
+        return Array.isArray(vistoria) ? vistoria : (vistoria ? [vistoria] : []);
+    }));
 }
 
 export function buscarVistoriasLocaisHoje(categorias, sortFn, getInicioFimHoje, getDataEnvioDate) {
@@ -104,10 +119,11 @@ export function buscarVistoriasLocaisHoje(categorias, sortFn, getInicioFimHoje, 
     Object.values(state.vistoriasLocais).forEach((porCategoria) => {
         categorias.forEach((category) => {
             const vistoria = porCategoria[category];
-            const dataEnvio = getDataEnvioDate(vistoria);
-            if (vistoria && dataEnvio >= inicio && dataEnvio <= fim) {
-                dados.push(vistoria);
-            }
+            const vistorias = Array.isArray(vistoria) ? vistoria : (vistoria ? [vistoria] : []);
+            vistorias.forEach(item => {
+                const dataEnvio = getDataEnvioDate(item);
+                if (dataEnvio >= inicio && dataEnvio <= fim) dados.push(item);
+            });
         });
     });
     return sortFn(dados);

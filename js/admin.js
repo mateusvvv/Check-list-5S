@@ -1,11 +1,14 @@
-import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, normalizeEmployeeEpiItem, normalizeChecklistItem, viaturaResponsaveis, vehicleViewNames } from "./config.js";
-import { addDoc, auth, collection, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores } from "./config.js";
+import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
-import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js";
+import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=7";
 import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
 import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
 
 let authReadyCallback = async () => {};
+const HISTORICO_PAGE_SIZE = 20;
+let historicoFiltradoAtual = [];
+let historicoVisibleCount = HISTORICO_PAGE_SIZE;
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -32,19 +35,31 @@ function formatDateTimeBR(value) {
     return Number.isNaN(date.getTime()) ? "Data indisponível" : date.toLocaleString("pt-BR");
 }
 
-const vistoriadorPorEmail = {
-    "alisson.tavares@digitalonline.com.br": "Alisson",
-    "marcos@digitalonline.com.br": "Marcos",
-    "italo@digitalonline.com.br": "Italo",
-    "matheus@digitalonline.com.br": "Matheus"
-};
-
 function getVistoriadorResponsavel() {
     const email = String(auth.currentUser?.email || "").trim().toLowerCase();
     return document.getElementById("vistoriador-atual")?.value
-        || vistoriadorPorEmail[email]
+        || getVistoriadorByEmail(email)?.nome
         || auth.currentUser?.email
         || "Não identificado";
+}
+
+function getViaturaLabel(viaturaId) {
+    const viatura = state.viaturas.find(item => item.id === String(viaturaId));
+    return viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`;
+}
+
+function getPessoaHistoricoLabel(pessoaKey = "") {
+    if (!pessoaKey) return "";
+    const pessoa = getFuncionariosData().find(funcionario => (
+        getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf) === pessoaKey
+    ));
+    return pessoa?.nome ? ` de ${pessoa.nome}` : "";
+}
+
+function getChecklistHistoryContext(viaturaId, category, pessoaKey = "") {
+    const categoria = categoryNames[category] || category;
+    const pessoa = category === "epis" ? getPessoaHistoricoLabel(pessoaKey) : "";
+    return `${categoria}${pessoa} em ${getViaturaLabel(viaturaId)}`;
 }
 
 function registrarHistoricoConfig(tipo, descricao) {
@@ -68,7 +83,7 @@ function isValidDateBR(value) {
 
 function isAlissonAdmin() {
     const email = String(auth.currentUser?.email || "").trim().toLowerCase();
-    return getVistoriadorResponsavel() === "Alisson" || vistoriadorPorEmail[email] === "Alisson";
+    return getVistoriadorResponsavel() === "Alisson" || getVistoriadorByEmail(email)?.nome === "Alisson";
 }
 
 function normalizeSearch(value) {
@@ -210,6 +225,7 @@ function renderAdminConfig() {
     renderAdminViaturaOptions();
     renderAdminChecklist();
     renderAdminFuncionariosExtras();
+    renderAdminVistoriadores();
     renderAdminHistory();
 }
 
@@ -303,9 +319,13 @@ export async function selecionarTecnicoViatura(id, nome) {
         return;
     }
 
+    const anterior = viaturaResponsaveis[viaturaId].tecnico || "Sem técnico";
     viaturaResponsaveis[viaturaId].tecnico = tecnicoNome;
     if (tecnico) viaturaResponsaveis[viaturaId].tecnicoCpf = tecnicoCpf;
 
+    if (anterior !== tecnicoNome) {
+        registrarHistoricoConfig("Técnico alterado", `${getViaturaLabel(viaturaId)}: técnico alterado de "${anterior}" para "${tecnicoNome || "Sem técnico"}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -330,9 +350,13 @@ export async function selecionarAuxiliarViatura(id, nome) {
         return;
     }
 
+    const anterior = viaturaResponsaveis[viaturaId].auxiliar || "Sem auxiliar";
     viaturaResponsaveis[viaturaId].auxiliar = auxiliarNome;
     if (auxiliar) viaturaResponsaveis[viaturaId].auxiliarCpf = auxiliarCpf;
 
+    if (anterior !== auxiliarNome) {
+        registrarHistoricoConfig("Auxiliar alterado", `${getViaturaLabel(viaturaId)}: auxiliar alterado de "${anterior}" para "${auxiliarNome || "Sem auxiliar"}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -366,6 +390,7 @@ export async function limparHistoricoConfig() {
 
     state.configHistory = [];
     await salvarConfiguracoes();
+    await carregarConfiguracoes();
     renderAdminHistory();
 }
 
@@ -389,7 +414,11 @@ export async function adicionarViatura() {
 export async function editarNomeViatura(id, nome) {
     const viatura = state.viaturas.find(item => item.id === String(id));
     if (!viatura) return;
+    const nomeAnterior = viatura.nome;
     viatura.nome = nome.trim() || `Viatura ${formatTwoDigits(id)}`;
+    if (nomeAnterior !== viatura.nome) {
+        registrarHistoricoConfig("Viatura renomeada", `${nomeAnterior} foi renomeada para ${viatura.nome}.`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -404,7 +433,18 @@ export async function editarResponsavelViatura(id, campo, valor) {
         refreshAppAfterConfigChange();
         return;
     }
+    const labels = {
+        tecnico: "Técnico",
+        tecnicoCpf: "CPF do técnico",
+        auxiliar: "Auxiliar",
+        auxiliarCpf: "CPF do auxiliar"
+    };
+    const anterior = viaturaResponsaveis[viaturaId][campo] || "Vazio";
     viaturaResponsaveis[viaturaId][campo] = valor.trim();
+    const novoValor = viaturaResponsaveis[viaturaId][campo] || "Vazio";
+    if (anterior !== novoValor) {
+        registrarHistoricoConfig(`${labels[campo]} alterado`, `${getViaturaLabel(viaturaId)}: ${labels[campo]} alterado de "${anterior}" para "${novoValor}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -413,6 +453,7 @@ export async function alternarViaturaAtiva(id) {
     const viatura = state.viaturas.find(item => item.id === String(id));
     if (!viatura) return;
     viatura.ativa = viatura.ativa === false;
+    registrarHistoricoConfig(viatura.ativa ? "Viatura ativada" : "Viatura desativada", `${viatura.nome} foi ${viatura.ativa ? "ativada" : "desativada"}.`);
     if (state.selectedViatura === String(id) && viatura.ativa === false) {
         setSelectedViatura(getActiveViaturas()[0]?.id || id);
     }
@@ -513,13 +554,20 @@ function syncFuncionarioExtraEpis(funcionario, oldKey = "") {
 
 function requireAlissonAdmin() {
     if (isAlissonAdmin()) return true;
-    alert("Somente Alisson pode gerenciar técnicos e auxiliares.");
+    alert("Somente Alisson pode gerenciar funcionários e vistoriadores.");
     renderAdminFuncionariosExtras();
     return false;
 }
 
 function getFuncionarioExtra(index) {
     return funcionariosExtras[Number(index)] || null;
+}
+
+export function showAdminPeopleTab(tab) {
+    ["funcionarios", "vistoriadores"].forEach(item => {
+        document.getElementById(`admin-people-tab-${item}`)?.classList.toggle("active", tab === item);
+        document.getElementById(`admin-people-panel-${item}`)?.classList.toggle("active", tab === item);
+    });
 }
 
 export function renderAdminFuncionariosExtras() {
@@ -604,6 +652,99 @@ export function renderAdminFuncionariosExtras() {
     }).join("");
 }
 
+export function renderAdminVistoriadores() {
+    const list = document.getElementById("admin-vistoriadores-list");
+    if (!list) return;
+
+    list.innerHTML = vistoriadores.map(vistoriador => `
+        <div class="admin-config-row">
+            <div>
+                <strong>${escapeHtml(vistoriador.nome)}</strong>
+                <p class="substitution-note">${escapeHtml(vistoriador.email)} - ${vistoriador.tipo === "tablets" ? "Somente tablets" : "Vistorias gerais"}${vistoriador.padrao ? " - padrão" : ""}</p>
+            </div>
+        </div>
+    `).join("");
+}
+
+function normalizeAdminEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function clearVistoriadorForm() {
+    ["admin-vistoriador-nome", "admin-vistoriador-email", "admin-vistoriador-senha"].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = "";
+    });
+    const tipo = document.getElementById("admin-vistoriador-tipo");
+    if (tipo) tipo.value = "geral";
+}
+
+async function salvarNovoVistoriador({ nome, email, tipo }) {
+    const vistoriador = normalizeVistoriador({
+        id: `vistoriador-${Date.now()}`,
+        nome,
+        email,
+        tipo,
+        padrao: false
+    }, vistoriadores.length);
+    vistoriadores.push(vistoriador);
+    registrarHistoricoConfig("Vistoriador adicionado", `${nome} foi adicionado como ${tipo === "tablets" ? "vistoriador de tablets" : "vistoriador geral"}.`);
+    await salvarConfiguracoes();
+    clearVistoriadorForm();
+    refreshAppAfterConfigChange();
+    renderAdminVistoriadores();
+}
+
+export async function adicionarVistoriador() {
+    if (!requireAlissonAdmin()) return;
+
+    const nome = document.getElementById("admin-vistoriador-nome")?.value.trim() || "";
+    const email = normalizeAdminEmail(document.getElementById("admin-vistoriador-email")?.value || "");
+    const senha = document.getElementById("admin-vistoriador-senha")?.value || "";
+    const tipo = document.getElementById("admin-vistoriador-tipo")?.value === "tablets" ? "tablets" : "geral";
+
+    if (!nome || !email || !senha) {
+        alert("Informe nome, e-mail e senha do novo vistoriador.");
+        return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert("Informe um e-mail válido para o vistoriador.");
+        return;
+    }
+
+    if (senha.length < 6) {
+        alert("A senha precisa ter pelo menos 6 caracteres.");
+        return;
+    }
+
+    if (vistoriadores.some(vistoriador => vistoriador.email === email)) {
+        alert("Já existe um vistoriador cadastrado com este e-mail.");
+        return;
+    }
+
+    if (vistoriadores.some(vistoriador => vistoriador.nome.toLowerCase() === nome.toLowerCase())) {
+        alert("Já existe um vistoriador cadastrado com este nome.");
+        return;
+    }
+
+    try {
+        await criarUsuarioAuthSecundario(email, senha);
+        await salvarNovoVistoriador({ nome, email, tipo });
+        alert("Vistoriador criado com sucesso.");
+    } catch (error) {
+        if (error?.code === "auth/email-already-in-use") {
+            if (!confirm("Este e-mail já existe no Firebase Auth. Deseja vincular esse usuário como vistoriador do sistema?")) return;
+            await salvarNovoVistoriador({ nome, email, tipo });
+            alert("Vistoriador vinculado ao sistema com sucesso.");
+            return;
+        }
+
+        console.error("Erro ao criar vistoriador:", error);
+        alert(`Erro ao criar vistoriador: ${error?.message || error}`);
+    }
+}
+
 export async function adicionarFuncionarioExtra() {
     if (!requireAlissonAdmin()) return;
 
@@ -648,6 +789,13 @@ export async function editarFuncionarioExtra(index, campo, valor) {
     if (!funcionario || !["nome", "cpf", "funcao", "status"].includes(campo)) return;
 
     const oldKey = getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
+    const labels = {
+        nome: "Nome",
+        cpf: "CPF",
+        funcao: "Função",
+        status: "Status"
+    };
+    const anterior = funcionario[campo] || "Vazio";
     funcionario[campo] = String(valor || "").trim();
     if (!funcionario.nome) {
         renderAdminFuncionariosExtras();
@@ -655,6 +803,10 @@ export async function editarFuncionarioExtra(index, campo, valor) {
     }
 
     syncFuncionarioExtraEpis(funcionario, oldKey);
+    const novoValor = funcionario[campo] || "Vazio";
+    if (anterior !== novoValor) {
+        registrarHistoricoConfig("Funcionário alterado", `${funcionario.nome}: ${labels[campo]} alterado de "${anterior}" para "${novoValor}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -701,6 +853,7 @@ export async function adicionarEpiFuncionarioExtra(index) {
         substituicoes: []
     }));
     syncFuncionarioExtraEpis(funcionario);
+    registrarHistoricoConfig("EPI adicionado", `${nome} foi adicionado para ${funcionario.nome}.`);
 
     // Limpar campos de entrada do EPI após adicionar para que "sumam"
     ['qtd', 'nome', 'ca', 'entrega', 'obs'].forEach(field => {
@@ -720,9 +873,22 @@ export async function editarEpiFuncionarioExtra(index, epiIndex, campo, valor) {
     const epi = funcionario?.epis?.[Number(epiIndex)];
     if (!epi || !["quantidade", "nome", "ca", "dataEntrega", "observacao"].includes(campo)) return;
 
+    const labels = {
+        quantidade: "Quantidade",
+        nome: "Nome",
+        ca: "C.A.",
+        dataEntrega: "Data de entrega",
+        observacao: "Observação"
+    };
+    const nomeAnterior = epi.nome || "EPI";
+    const anterior = epi[campo] || "Vazio";
     epi[campo] = campo === "quantidade" ? Number(valor || 1) : String(valor || "").trim();
     funcionario.epis[Number(epiIndex)] = normalizeEmployeeEpiItem(epi, Number(epiIndex));
     syncFuncionarioExtraEpis(funcionario);
+    const novoValor = funcionario.epis[Number(epiIndex)][campo] || "Vazio";
+    if (String(anterior) !== String(novoValor)) {
+        registrarHistoricoConfig("EPI alterado", `${funcionario.nome}: ${labels[campo]} de "${nomeAnterior}" alterado de "${anterior}" para "${novoValor}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -750,8 +916,10 @@ export async function removerEpiFuncionarioExtra(index, epiIndex) {
     if (!funcionario?.epis?.[Number(epiIndex)]) return;
     if (!confirm("Tem certeza que deseja remover este EPI?")) return;
 
+    const epi = funcionario.epis[Number(epiIndex)];
     funcionario.epis.splice(Number(epiIndex), 1);
     syncFuncionarioExtraEpis(funcionario);
+    registrarHistoricoConfig("EPI removido", `${epi.nome || "EPI"} foi removido de ${funcionario.nome}.`);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -777,6 +945,7 @@ export async function adicionarItemChecklist() {
         substituicoes: []
     }));
     if (input) input.value = "";
+    registrarHistoricoConfig("Item adicionado", `${nome} foi adicionado em ${getChecklistHistoryContext(viaturaId, category, pessoaKey)}.`);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -784,7 +953,11 @@ export async function adicionarItemChecklist() {
 export async function editarItemChecklist(viaturaId, category, index, nome, pessoaKey = "") {
     const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
     items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
+    const nomeAnterior = items[index].nome;
     items[index].nome = nome.trim() || items[index].nome;
+    if (nomeAnterior !== items[index].nome) {
+        registrarHistoricoConfig("Item alterado", `${getChecklistHistoryContext(viaturaId, category, pessoaKey)}: "${nomeAnterior}" foi alterado para "${items[index].nome}".`);
+    }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -793,13 +966,19 @@ export async function alternarItemChecklist(viaturaId, category, index, pessoaKe
     const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
     items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
     items[index].ativo = items[index].ativo === false;
+    registrarHistoricoConfig(
+        items[index].ativo ? "Item ativado" : "Item desativado",
+        `${getChecklistHistoryContext(viaturaId, category, pessoaKey)}: "${items[index].nome}" foi ${items[index].ativo ? "ativado" : "desativado"}.`
+    );
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
 
 export async function removerItemChecklist(viaturaId, category, index, pessoaKey = "") {
     if (!confirm("Deseja remover este item do checklist?")) return;
-    getChecklistItemsForPessoa(category, viaturaId, pessoaKey).splice(index, 1);
+    const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
+    const [removido] = items.splice(index, 1);
+    registrarHistoricoConfig("Item removido", `${removido?.nome || "Item"} foi removido de ${getChecklistHistoryContext(viaturaId, category, pessoaKey)}.`);
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
 }
@@ -913,6 +1092,8 @@ export function aplicarFiltros() {
     }
 
     atualizarCardsEstatisticas(filtrados);
+    historicoFiltradoAtual = filtrados;
+    historicoVisibleCount = HISTORICO_PAGE_SIZE;
     renderHistoricoTable(filtrados);
 }
 
@@ -981,6 +1162,8 @@ function atualizarCardsEstatisticas(dados) {
     document.getElementById("stat-total").innerText = total;
     document.getElementById("stat-pending").innerText = pendentes;
     document.getElementById("stat-ok").innerText = total - pendentes;
+    const users = document.getElementById("stat-users");
+    if (users) users.innerText = vistoriadores.length;
 }
 
 function renderHistoricoTable(dados) {
@@ -989,10 +1172,13 @@ function renderHistoricoTable(dados) {
 
     if (dados.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
+        renderHistoricoPager(0, 0);
         return;
     }
 
-    dados.forEach((data) => {
+    const dadosVisiveis = dados.slice(0, historicoVisibleCount);
+
+    dadosVisiveis.forEach((data) => {
         const dateObj = getDataReferenciaFiltro(data);
         const status = getStatusVistoria(data);
         const statusHTML = status === "pendente"
@@ -1017,7 +1203,41 @@ function renderHistoricoTable(dados) {
             </tr>
         `;
     });
+    renderHistoricoPager(dadosVisiveis.length, dados.length);
     atualizarContadorSelecionadas();
+}
+
+function renderHistoricoPager(visibleCount, totalCount) {
+    const tableScroll = document.querySelector("#history-tbody")?.closest(".table-scroll");
+    if (!tableScroll) return;
+
+    let pager = document.getElementById("history-load-more");
+    if (!pager) {
+        pager = document.createElement("div");
+        pager.id = "history-load-more";
+        pager.className = "history-load-more";
+        tableScroll.insertAdjacentElement("afterend", pager);
+    }
+
+    if (totalCount <= HISTORICO_PAGE_SIZE || visibleCount >= totalCount) {
+        pager.innerHTML = totalCount > HISTORICO_PAGE_SIZE
+            ? `<span>Mostrando ${visibleCount} de ${totalCount} registros.</span>`
+            : "";
+        pager.style.display = pager.innerHTML ? "flex" : "none";
+        return;
+    }
+
+    const remainingCount = totalCount - visibleCount;
+    const nextCount = Math.min(HISTORICO_PAGE_SIZE, remainingCount);
+    pager.style.display = "flex";
+    pager.innerHTML = `
+        <span>Mostrando ${visibleCount} de ${totalCount} registros.</span>
+        <button type="button">Ver mais ${nextCount}</button>
+    `;
+    pager.querySelector("button")?.addEventListener("click", () => {
+        historicoVisibleCount += HISTORICO_PAGE_SIZE;
+        renderHistoricoTable(historicoFiltradoAtual);
+    });
 }
 
 export function toggleSelecionarVistoria(id, checked) {

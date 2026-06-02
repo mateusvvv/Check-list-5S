@@ -4,16 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico de Alterações - Checklist 5S</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
-    <header style="display: none;">
+    <header class="history-page-header" style="display: none;">
         <div class="logo">
             <img src="assets/logo.png" alt="Logo">
         </div>
-        <div class="admin-header-actions">
-            <button type="button" class="btn-header-logout" onclick="voltarPainelAdmin()">Voltar</button>
-            <button type="button" class="btn-header-logout" onclick="logoutAdmin()">Sair</button>
+        <div class="history-header-actions">
+            <button type="button" class="history-header-button" onclick="voltarPainelAdmin()">Voltar</button>
         </div>
     </header>
 
@@ -27,6 +26,7 @@
                         <h2 class="admin-title">Histórico de Alterações</h2>
                     </div>
                     <div class="history-page-actions">
+                        <button type="button" class="history-action-button" onclick="atualizarHistoricoConfig()">Atualizar</button>
                         <button type="button" class="btn-danger" onclick="limparHistoricoConfig()">Limpar histórico</button>
                     </div>
                 </div>
@@ -38,6 +38,6 @@
         </div>
     </main>
 
-    <script type="module" src="js/historico.js"></script>
+    <script type="module" src="js/historico.js?v=2"></script>
 </body>
 </html>

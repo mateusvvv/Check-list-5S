@@ -7,6 +7,37 @@
     transition: background 0.2s;
 }
 
+.checklist-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.checklist-section-header h2 {
+    margin: 0;
+}
+
+.btn-mark-ok {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border: 1px solid #b7dfc1;
+    border-radius: 4px;
+    background: #f5fbf6;
+    color: #1f7a35;
+    font: 700 0.75rem/1 inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.btn-mark-ok:hover,
+.btn-mark-ok:focus-visible {
+    border-color: #28a745;
+    background: #d4edda;
+    color: #155724;
+}
+
 .checklist-item:hover {
     background-color: var(--secondary-blue);
 }
@@ -186,4 +217,23 @@
     border-radius: 5px;
     cursor: pointer;
     font-weight: bold;
+}
+
+.btn-category-pdf {
+    display: none;
+    margin-top: 10px;
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #2f6da3;
+    border-radius: 5px;
+    background: #eef6ff;
+    color: #1f4f7a;
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.btn-category-pdf:hover,
+.btn-category-pdf:focus-visible {
+    border-color: var(--primary-blue);
+    background: #dceeff;
 }

@@ -1,4 +1,4 @@
-import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, getVistoriadorByEmail, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadores, vistoriadoresTablet } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -21,7 +21,7 @@ import {
     setTabletDamageType,
     updateTabletInfo,
     updateVehicleMapImage
-} from "./js/damages.js";
+} from "./js/damages.js?v=2";
 import {
     aplicarFiltros,
     carregarHistorico,
@@ -55,17 +55,19 @@ import {
     selecionarTecnicoViatura,
     setAuthReadyCallback,
     showAdminConfigTab,
+    showAdminPeopleTab,
     substituirItemChecklist,
+    adicionarVistoriador,
     resolverPendenciasSelecionadas,
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js";
+} from "./js/admin.js?v=5";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
     setPdfUiCallbacks
-} from "./js/pdf.js";
+} from "./js/pdf.js?v=7";
 import {
     getCategoriasConcluidas,
     getActiveViaturas,
@@ -84,15 +86,8 @@ function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
 }
 
-const vistoriadorPorEmail = {
-    "alisson.tavares@digitalonline.com.br": "Alisson",
-    "marcos@digitalonline.com.br": "Marcos",
-    "italo@digitalonline.com.br": "Italo",
-    "matheus@digitalonline.com.br": "Matheus"
-};
-
 function getVistoriadorPorEmail(email) {
-    return vistoriadorPorEmail[String(email || "").trim().toLowerCase()] || "";
+    return getVistoriadorByEmail(email)?.nome || "";
 }
 
 function getVistoriadorAutenticado() {
@@ -114,6 +109,32 @@ function escapeJsString(value) {
         .replace(/\r?\n/g, "\\n");
 }
 
+function renderSelectOptions(select, options, placeholder, currentValue = "") {
+    if (!select) return;
+    const selectedValue = currentValue || select.value || "";
+    select.innerHTML = [
+        `<option value="">${escapeHtml(placeholder)}</option>`,
+        ...options.map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+    ].join("");
+    select.value = options.some(option => option.value === selectedValue) ? selectedValue : "";
+}
+
+function renderVistoriadorOptions() {
+    const vistoriadorOptions = vistoriadores.map(vistoriador => ({
+        value: vistoriador.nome,
+        label: vistoriador.nome
+    }));
+    renderSelectOptions(document.getElementById("vistoriador-atual"), vistoriadorOptions, "Selecione o Vistoriador");
+    renderSelectOptions(document.getElementById("filter-vistoriador"), vistoriadorOptions, "Todos");
+    renderSelectOptions(
+        document.getElementById("tablet-vistoriador"),
+        vistoriadores
+            .filter(vistoriador => vistoriador.tipo === "tablets")
+            .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
+        "Selecione o Responsável"
+    );
+}
+
 function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
     return vistoriadoresTablet.includes(vistoriador);
 }
@@ -126,7 +147,7 @@ function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
 
 function getAccessDeniedMessage(category, vistoriador) {
     if (category === "tablets") {
-        return "A vistoria de tablets só pode ser acessada por Italo ou Matheus.";
+        return `A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`;
     }
 
     if (isTabletOnlyUser(vistoriador)) {
@@ -159,6 +180,7 @@ function syncTabletVistoriador() {
     if (!tabletSelect) return;
 
     tabletSelect.value = isTabletOnlyUser(vistoriador) ? vistoriador : "";
+    updateTabletInfo();
 }
 
 function updateAccessByVistoriador() {
@@ -214,22 +236,28 @@ function selecionarResponsavelTablet() {
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     const responsavel = tabletSelect?.value || "";
 
-    if (!vistoriadorSelect || !vistoriadoresTablet.includes(responsavel)) return;
+    if (!vistoriadoresTablet.includes(responsavel)) {
+        updateTabletInfo();
+        return;
+    }
 
-    vistoriadorSelect.value = responsavel;
-    selecionarVistoriadorAtivo(true);
+    if (vistoriadorSelect && !isTabletOnlyUser() && !getVistoriadorAutenticado()) {
+        vistoriadorSelect.value = responsavel;
+        selecionarVistoriadorAtivo(true);
+    }
+    updateTabletInfo();
 }
 
 function solicitarVistoriadorTablet() {
     const vistoriadorAutenticado = getVistoriadorAutenticado();
     if (vistoriadorAutenticado && !isTabletOnlyUser(vistoriadorAutenticado)) {
-        alert("A vistoria de tablets só pode ser acessada por Italo ou Matheus.");
+        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
     const atual = isTabletOnlyUser() ? getVistoriadorAtivo() : "";
     const resposta = prompt(
-        "Para acessar a vistoria de tablets, informe o vistoriador logado: ITALO ou MATHEUS.",
+        `Para acessar a vistoria de tablets, informe o vistoriador logado: ${vistoriadoresTablet.join(" ou ").toUpperCase()}.`,
         atual
     );
 
@@ -239,7 +267,7 @@ function solicitarVistoriadorTablet() {
     const vistoriador = vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
 
     if (!vistoriador) {
-        alert("A vistoria de tablets só pode ser acessada por Italo ou Matheus.");
+        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
@@ -1064,21 +1092,83 @@ function getSelectedEpiPessoaKey() {
     return document.getElementById("epi-pessoa")?.value || "";
 }
 
+function getEpiSurveyMap(viaturaId = state.selectedViatura) {
+    const id = String(viaturaId);
+    if (!state.epiSurveyStatus[id]) state.epiSurveyStatus[id] = {};
+    return state.epiSurveyStatus[id];
+}
+
+function getEpiPessoasObrigatorias(viaturaId = state.selectedViatura) {
+    return getEpiPessoaOptions(viaturaId);
+}
+
+function todosEpisObrigatoriosVistoriados(viaturaId = state.selectedViatura) {
+    const pessoas = getEpiPessoasObrigatorias(viaturaId);
+    const vistoriadas = getEpiSurveyMap(viaturaId);
+    return pessoas.length > 0 && pessoas.every(pessoa => vistoriadas[pessoa.key]);
+}
+
+function getEpiPessoasPendentes(viaturaId = state.selectedViatura) {
+    const vistoriadas = getEpiSurveyMap(viaturaId);
+    return getEpiPessoasObrigatorias(viaturaId).filter(pessoa => !vistoriadas[pessoa.key]);
+}
+
+function scrollParaBotaoGerarPdf(category) {
+    const button = document.getElementById(`btn-pdf-${category}`);
+    const generalButton = document.getElementById("btn-encerrar-geral");
+    const target = button && button.offsetParent !== null
+        ? button
+        : generalButton && generalButton.offsetParent !== null
+            ? generalButton
+            : null;
+
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderEpiPessoaButtons() {
+    const container = document.getElementById("epi-pessoa-buttons");
+    if (!container) return;
+
+    const pessoas = getEpiPessoaOptions(state.selectedViatura);
+    const vistoriadas = getEpiSurveyMap(state.selectedViatura);
+    const selectedKey = getSelectedEpiPessoaKey();
+
+    container.innerHTML = pessoas.length
+        ? pessoas.map(pessoa => `
+            <button type="button" class="epi-person-button ${pessoa.key === selectedKey ? "active" : ""} ${vistoriadas[pessoa.key] ? "done" : ""}" data-epi-key="${escapeHtml(pessoa.key)}">
+                ${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}
+            </button>
+        `).join("")
+        : `<span class="placeholder">Nenhum técnico ou auxiliar cadastrado.</span>`;
+
+    container.querySelectorAll(".epi-person-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const select = document.getElementById("epi-pessoa");
+            if (select) select.value = button.dataset.epiKey || "";
+            selecionarPessoaEpi();
+        });
+    });
+}
+
 function renderEpiPessoaOptions() {
     const select = document.getElementById("epi-pessoa");
     if (!select) return;
 
     const valorAtual = select.value;
     const pessoas = getEpiPessoaOptions(state.selectedViatura);
+    const vistoriadas = getEpiSurveyMap(state.selectedViatura);
     select.innerHTML = pessoas.length
         ? pessoas.map(pessoa => `
-            <option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}</option>
+            <option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)}${vistoriadas[pessoa.key] ? " (vistoriado)" : ""}</option>
         `).join("")
         : `<option value="">Nenhum técnico ou auxiliar cadastrado</option>`;
     select.value = pessoas.some(pessoa => pessoa.key === valorAtual) ? valorAtual : (pessoas[0]?.key || "");
+    renderEpiPessoaButtons();
 }
 
 function selecionarPessoaEpi() {
+    renderEpiPessoaButtons();
     renderItems("epis");
 }
 
@@ -1182,6 +1272,22 @@ function renderItems(pageId) {
 
 function limparErroItem(pageId, index) {
     document.getElementById(`row-${pageId}-${index}`)?.classList.remove("error");
+}
+
+function marcarTodosComoOk(pageId) {
+    const containerMapping = {
+        ferramentas: "lista-ferramentas",
+        epis: "lista-epis",
+        viaturas: "lista-viaturas",
+        tablets: "lista-tablets"
+    };
+    const container = document.getElementById(containerMapping[pageId]);
+    if (!container) return;
+
+    container.querySelectorAll(`input[type="radio"][name^="status-${pageId}-"][value="ok"]`).forEach(input => {
+        input.checked = true;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
 }
 
 function formatCurrency(value) {
@@ -1293,29 +1399,51 @@ function configurarModoVistoria() {
 function updateMenuStatus() {
     const status = state.surveyStatus[state.selectedViatura];
     let concluidas = 0;
+    const vistoriaParcial = isVistoriaParcial(state.selectedViatura);
 
     Object.keys(categoryNames).forEach(category => {
         const link = document.getElementById(`menu-${category}`);
-        if (!link) return;
+        const btnPdfCategoria = document.getElementById(`btn-pdf-${category}`);
 
-        if (status[category]) {
+        if (link && status[category]) {
             link.classList.add("completed");
             concluidas++;
-        } else {
+        } else if (link) {
             link.classList.remove("completed");
+        }
+
+        if (btnPdfCategoria) {
+            btnPdfCategoria.style.display = vistoriaParcial && status[category] ? "block" : "none";
         }
     });
 
     const vistoriaCompleta = todasEtapasConcluidas(state.selectedViatura);
-    const vistoriaParcial = isVistoriaParcial(state.selectedViatura);
     const btnEncerrar = document.getElementById("btn-encerrar-geral");
 
     if (btnEncerrar) {
-        btnEncerrar.style.display = (vistoriaCompleta || (vistoriaParcial && concluidas > 0)) ? "block" : "none";
-        btnEncerrar.innerText = vistoriaParcial && !vistoriaCompleta
-            ? `📁 Gerar PDF parcial da Viatura ${state.selectedViatura.padStart(2, "0")}`
-            : `📁 Encerrar Vistoria Viatura ${state.selectedViatura.padStart(2, "0")} (Gerar PDF)`;
+        btnEncerrar.style.display = (!vistoriaParcial && vistoriaCompleta) ? "block" : "none";
+        btnEncerrar.innerText = `📁 Encerrar Vistoria Viatura ${state.selectedViatura.padStart(2, "0")} (Gerar PDF)`;
     }
+}
+
+async function gerarPdfCategoria(category) {
+    if (!categoryNames[category]) return;
+
+    if (!isVistoriaParcial(state.selectedViatura)) {
+        alert("O PDF por etapa fica disponível no modo de vistoria parcial.");
+        return;
+    }
+
+    if (!state.surveyStatus[state.selectedViatura]?.[category]) {
+        alert(`Finalize ${categoryNames[category]} antes de gerar o PDF desta etapa.`);
+        return;
+    }
+
+    await gerarRelatorioViatura(state.selectedViatura, {
+        confirmar: false,
+        resetarStatus: true,
+        categorias: [category]
+    });
 }
 
 async function finalizarVistoria(category) {
@@ -1327,12 +1455,13 @@ async function finalizarVistoria(category) {
     const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
-    const vistoriador = category === "tablets" && !isTabletOnlyUser(vistoriadorGeral)
-        ? vistoriadorTablet
-        : vistoriadorGeral;
+    const vistoriador = category === "tablets" ? vistoriadorTablet : vistoriadorGeral;
+    const vistoriadorAcesso = category === "tablets" ? vistoriador : vistoriadorGeral;
 
-    if (!podeAcessarCategoria(category, vistoriadorGeral)) {
-        alert(`${vistoriadorGeral} pode realizar apenas vistorias de tablets.`);
+    if (!podeAcessarCategoria(category, vistoriadorAcesso)) {
+        alert(category === "tablets"
+            ? `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`
+            : `${vistoriadorGeral} pode realizar apenas vistorias de tablets.`);
         showPage("tablets");
         return;
     }
@@ -1344,7 +1473,7 @@ async function finalizarVistoria(category) {
 
     if (!vistoriador) {
         alert(category === "tablets"
-            ? "Por favor, selecione Matheus ou Italo como responsável pela vistoria do tablet."
+            ? `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`
             : "Por favor, selecione quem está realizando a vistoria no topo da página.");
         return;
     }
@@ -1473,6 +1602,7 @@ async function enviarVistoriaAoFirebase() {
         await addDoc(collection(db, "vistorias"), docData);
         const categoriaSalva = state.dadosTemporariosVistoria.categoria;
         const viaturaSalva = state.selectedViatura;
+        const epiPessoaKeySalva = categoriaSalva === "epis" ? getSelectedEpiPessoaKey() : "";
 
         salvarVistoriaLocal({
             ...state.dadosTemporariosVistoria,
@@ -1493,12 +1623,34 @@ async function enviarVistoriaAoFirebase() {
             renderTabletDamageList();
         }
 
-        state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
+        if (categoriaSalva === "epis") {
+            if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
+            state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
+        } else {
+            state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
+        }
         renderViaturaDashboard();
         updateMenuStatus();
         state.vistoriasCache = [];
         state.dadosTemporariosVistoria = null;
+
+        if (categoriaSalva === "epis" && !state.surveyStatus[state.selectedViatura][categoriaSalva]) {
+            const pendentes = getEpiPessoasPendentes(viaturaSalva);
+            const proximaPessoa = pendentes[0];
+            if (proximaPessoa) {
+                const select = document.getElementById("epi-pessoa");
+                if (select) select.value = proximaPessoa.key;
+                selecionarPessoaEpi();
+            } else {
+                renderEpiPessoaOptions();
+            }
+            alert(`✅ EPIs salvos para esta pessoa. Ainda falta vistoriar: ${pendentes.map(pessoa => `${pessoa.tipo} - ${pessoa.nome}`).join(", ")}.`);
+            return;
+        }
+
+        if (categoriaSalva === "epis") renderEpiPessoaOptions();
         alert("✅ Vistoria salva com sucesso!");
+        scrollParaBotaoGerarPdf(categoriaSalva);
 
         if (!isVistoriaParcial(viaturaSalva) && categoriaSalva === "tablets" && todasEtapasConcluidas(viaturaSalva)) {
             await gerarRelatorioViatura(viaturaSalva, {
@@ -1526,6 +1678,8 @@ function bindWindowFunctions() {
         showHome,
         showPage,
         selecionarPessoaEpi,
+        marcarTodosComoOk,
+        gerarPdfCategoria,
         finalizarVistoria,
         selectViatura,
         loginAdmin,
@@ -1558,8 +1712,10 @@ function bindWindowFunctions() {
         removerViatura,
         renderAdminChecklist,
         showAdminConfigTab,
+        showAdminPeopleTab,
         abrirPaginaHistoricoVistorias,
         adicionarItemChecklist,
+        adicionarVistoriador,
         editarItemChecklist,
         alternarItemChecklist,
         removerItemChecklist,
@@ -1601,6 +1757,7 @@ window.onclick = function(event) {
 
 document.addEventListener("DOMContentLoaded", () => {
     const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
+    renderVistoriadorOptions();
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
     const checkingDate = document.getElementById("checking-date");
@@ -1610,6 +1767,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
     setAuthReadyCallback(async () => {
+        const vistoriadorAtual = getVistoriadorAtivo();
+        renderVistoriadorOptions();
+        const vistoriadorSelect = document.getElementById("vistoriador-atual");
+        if (vistoriadorAtual && vistoriadorSelect) vistoriadorSelect.value = vistoriadorAtual;
         selecionarVistoriadorPorLogin();
         renderTecnicoDatalist();
         preencherResponsaveisViatura();
@@ -1631,6 +1792,12 @@ document.addEventListener("DOMContentLoaded", () => {
 bindWindowFunctions();
 
 window.refreshAppAfterConfigChange = function() {
+    const vistoriadorAtual = getVistoriadorAtivo();
+    renderVistoriadorOptions();
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    if (vistoriadorAtual && vistoriadorSelect && [...vistoriadorSelect.options].some(option => option.value === vistoriadorAtual)) {
+        vistoriadorSelect.value = vistoriadorAtual;
+    }
     renderTecnicoDatalist();
     preencherResponsaveisViatura();
     renderViaturaDashboard();
