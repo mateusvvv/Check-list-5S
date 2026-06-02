@@ -190,6 +190,221 @@
             color: #0a3d7a !important;
             border-color: #0a3d7a !important;
         }
+
+        /* Menu de clique longo (Long Press) */
+        .long-press-menu {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            position: fixed;
+            z-index: 10000;
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            padding: 8px 0;
+            min-width: 180px;
+            transition: transform 0.1s ease-out, opacity 0.2s ease;
+        }
+
+        .long-press-menu.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .long-press-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+
+        .long-press-item:hover {
+            background-color: #f0f7ff;
+            color: #0f52a0;
+        }
+
+        .long-press-title {
+            padding: 8px 20px;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 5px;
+            color: #0f52a0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        /* Ajuste específico para Celular: Centraliza o menu na tela */
+        @media (max-width: 480px) {
+            .long-press-menu {
+                position: fixed !important;
+                left: 50% !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) scale(1.1) !important;
+                width: 65% !important;
+                max-width: 220px;
+                border-radius: 12px;
+            }
+        }
+
+        /* Efeito de Elevação nos Cards de Viatura */
+        .viatura-card {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+            border: 1px solid #e2e8f0;
+        }
+
+        .viatura-card:hover:not(.disabled) {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+            border-color: #0f52a0;
+        }
+
+        /* Brilho nos indicadores concluídos */
+        .dot.done {
+            background-color: #2ecc71 !important;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+            position: relative;
+        }
+
+        /* Animação suave para as bolinhas concluídas */
+        @keyframes pulse-done {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .dot.done {
+            animation: pulse-done 2s infinite ease-in-out;
+        }
+
+        /* Backdrop blur para modais */
+        .modal {
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            background-color: rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .modal-content {
+            border-radius: 15px !important;
+            border: none !important;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+        }
+
+        /* --- Dark Mode (Modo Escuro) --- */
+        body.dark-mode {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* Containers Principais */
+        body.dark-mode header,
+        body.dark-mode main,
+        body.dark-mode .container {
+            background-color: #0f172a !important;
+        }
+
+        /* Títulos e Textos Principais */
+        body.dark-mode h1, 
+        body.dark-mode h2, 
+        body.dark-mode h3, 
+        body.dark-mode h4 {
+            color: #f8fafc !important;
+        }
+
+        /* Ajuste do Bloco de Cabeçalho (Painel de Viaturas, Modo de Vistoria, Metadados) */
+        body.dark-mode .header-info {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        body.dark-mode .vistoria-mode-bar,
+        body.dark-mode .checking-meta {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* Cards, Itens e Modais */
+        body.dark-mode .card, 
+        body.dark-mode .viatura-card,
+        body.dark-mode .modal-content,
+        body.dark-mode .checklist-item,
+        body.dark-mode .employee-card,
+        body.dark-mode .admin-config-panel,
+        body.dark-mode .revisao-modal-content,
+        body.dark-mode .admin-extra-employee-row,
+        body.dark-mode .admin-history-row,
+        body.dark-mode .stat-card {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        /* Estilo dos itens do Checklist e Labels (QTD, VALOR, TOTAL, STATUS) */
+        body.dark-mode .checklist-item-header label,
+        body.dark-mode .checklist-item .item-label,
+        body.dark-mode .status-opt span,
+        body.dark-mode .checklist-extra-fields label span,
+        body.dark-mode .input-group label {
+            color: #cbd5e1 !important; /* Cinza claro com ótimo contraste */
+            font-weight: 500;
+        }
+
+        /* Campos de Entrada (Inputs/Selects) */
+        body.dark-mode input, 
+        body.dark-mode select, 
+        body.dark-mode textarea {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+
+        /* Campos somente leitura (Total) */
+        body.dark-mode input[readonly] {
+            background-color: #334155 !important;
+            color: #94a3b8 !important;
+        }
+
+        /* Menu de Contexto (Long Press) */
+        body.dark-mode .long-press-menu {
+            background: rgba(30, 41, 59, 0.95) !important;
+            border-color: #475569 !important;
+        }
+        body.dark-mode .long-press-item {
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .long-press-item:hover {
+            background-color: #334155 !important;
+            color: #38bdf8 !important;
+        }
+
+        /* Textos Secundários */
+        body.dark-mode .viatura-responsaveis, 
+        body.dark-mode .viatura-disabled-label,
+        body.dark-mode .employee-meta span,
+        body.dark-mode .admin-history-meta small,
+        body.dark-mode .placeholder {
+            color: #94a3b8 !important;
+        }
+
+        /* Menu sanduíche mobile */
+        body.dark-mode .nav-links {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode .nav-links li a {
+            color: #f1f5f9 !important;
+        }
     </style>
 </head>
 <body>
@@ -215,10 +430,6 @@
         <div class="user-selector">
             <select id="vistoriador-atual" onchange="selecionarVistoriadorAtivo()">
                 <option value="">Selecione o Vistoriador</option>
-                <option value="Alisson">Alisson</option>
-                <option value="Marcos">Marcos</option>
-                <option value="Matheus">Matheus</option>
-                <option value="Italo">Italo</option>
             </select>
         </div>
         <nav class="menu-container">
@@ -230,6 +441,7 @@
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
                 <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Funcionários</a></li>
+                <li><a href="#" id="menu-dark-mode" onclick="toggleDarkMode()">🌓 Modo Escuro</a></li>
                 <li class="nav-admin-link"><a href="#" id="menu-admin" onclick="showPage('admin')">🔐 Painel Admin</a></li>
                 <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()">Sair</button></li>
             </ul>
@@ -572,10 +784,6 @@
                             <label>Vistoriador</label>
                             <select id="filter-vistoriador" onchange="aplicarFiltros()">
                                 <option value="">Todos</option>
-                                <option value="Alisson">Alisson</option>
-                                <option value="Marcos">Marcos</option>
-                                <option value="Matheus">Matheus</option>
-                                <option value="Italo">Italo</option>
                             </select>
                         </div>
                         <div class="input-group filter-field">
@@ -626,6 +834,15 @@
             </section>
         </div>
     </main>
+
+    <!-- Menu de Clique Longo (Atalhos) -->
+    <div id="long-press-menu" class="long-press-menu">
+        <div class="long-press-title" id="lp-menu-title">Viatura</div>
+        <div class="long-press-item" onclick="handleLongPressAction('ferramentas')">🔧 Ferramentas</div>
+        <div class="long-press-item" onclick="handleLongPressAction('epis')">🦺 EPIs</div>
+        <div class="long-press-item" onclick="handleLongPressAction('viaturas')">🚗 Viatura</div>
+        <div class="long-press-item" onclick="handleLongPressAction('tablets')">📱 Tablet</div>
+    </div>
 
     <!-- Modal de Detalhes -->
     <div id="details-modal" class="modal">

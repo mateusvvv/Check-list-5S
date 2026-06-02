@@ -1826,7 +1826,7 @@ export function normalizeVistoriador(vistoriador = {}, index = 0) {
     };
 }
 
-function syncVistoriadoresTablet() {
+export function syncVistoriadoresTablet() {
     vistoriadoresTablet.splice(
         0,
         vistoriadoresTablet.length,

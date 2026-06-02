@@ -90,6 +90,33 @@ import {
 import { salvarConfiguracoes } from "./js/settings.js";
 
 let funcionarioItensEditandoKey = "";
+let longPressTimer = null;
+let isLongPressActive = false;
+let lastPressedViaturaId = null;
+let menuJustOpened = false; // Trava para o menu não fechar rápido demais
+const LONG_PRESS_DELAY = 600; // Tempo em ms para considerar clique longo
+
+function initDarkMode() {
+    const savedMode = localStorage.getItem("darkMode");
+    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    if (savedMode === "enabled" || (savedMode === null && systemPrefersDark)) {
+        document.body.classList.add("dark-mode");
+    }
+
+    // Ouve mudanças na preferência do sistema em tempo real
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+        if (localStorage.getItem("darkMode") === null) {
+            document.body.classList.toggle("dark-mode", e.matches);
+        }
+    });
+}
+
+function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
+    const isEnabled = document.body.classList.contains("dark-mode");
+    localStorage.setItem("darkMode", isEnabled ? "enabled" : "disabled");
+}
 
 function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
@@ -1342,6 +1369,81 @@ function atualizarTotalItem(pageId, index) {
     if (totalInput) totalInput.value = formatCurrency(quantidade * valor);
 }
 
+function startLongPress(e, viaturaId) {
+    cancelLongPress();
+    isLongPressActive = false;
+    lastPressedViaturaId = viaturaId;
+    
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+
+    longPressTimer = setTimeout(() => {
+        isLongPressActive = true;
+        showLongPressMenu(x, y, viaturaId);
+    }, LONG_PRESS_DELAY);
+}
+
+function cancelLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+}
+
+function showLongPressMenu(x, y, viaturaId) {
+    const menu = document.getElementById("long-press-menu");
+    const titleLabel = document.getElementById("lp-menu-title");
+    const viatura = getViaturaById(viaturaId);
+    
+    if (!menu || !titleLabel) return;
+    titleLabel.innerText = viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`;
+    
+    // No PC segue o mouse, no Celular o CSS via media query cuida da centralização (left: 50%)
+    if (window.innerWidth > 480) {
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+    } else {
+        // Reset de posições inline para o CSS fixo do mobile funcionar
+        menu.style.left = "";
+        menu.style.top = "";
+    }
+
+    isLongPressActive = true;
+    menuJustOpened = true; 
+    menu.classList.add("active");
+
+    // Destrava após 500ms para permitir fechar clicando fora
+    setTimeout(() => { menuJustOpened = false; }, 500);
+
+    if (navigator.vibrate) navigator.vibrate(50); // Vibração leve no celular
+}
+
+function hideLongPressMenu() {
+    if (menuJustOpened) return; // Impede fechar se acabou de abrir
+    document.getElementById("long-press-menu")?.classList.remove("active");
+}
+
+function handleLongPressAction(category) {
+    if (!lastPressedViaturaId) return;
+    
+    const vistoriador = getVistoriadorAtivo();
+    if (!podeAcessarCategoria(category, vistoriador)) {
+        alert(getAccessDeniedMessage(category, vistoriador));
+        hideLongPressMenu();
+        return;
+    }
+
+    selectViatura(lastPressedViaturaId);
+    showPage(category);
+    hideLongPressMenu();
+    // Pequeno delay para resetar o estado e evitar disparo de clique normal
+    setTimeout(() => { isLongPressActive = false; }, 150);
+}
+
 function salvarItemComEnter(event, pageId) {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -1371,7 +1473,18 @@ function renderViaturaDashboard() {
 
         const card = document.createElement("div");
         card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""}`;
-        card.onclick = () => selectViatura(id);
+        
+        card.addEventListener('mousedown', (e) => startLongPress(e, id));
+        card.addEventListener('touchstart', (e) => startLongPress(e, id), { passive: true });
+        card.addEventListener('mouseup', cancelLongPress);
+        card.addEventListener('mouseleave', cancelLongPress);
+        card.addEventListener('touchend', cancelLongPress);
+        card.addEventListener('touchmove', cancelLongPress);
+
+        card.onclick = () => {
+            if (!isLongPressActive) selectViatura(id);
+        };
+
         card.innerHTML = `
             <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
             ${isDisabled ? `<span class="viatura-disabled-label">Desativada</span>` : ""}
@@ -1743,7 +1856,11 @@ function sincronizarStatusViaturasRealtime() {
             
             if (state.surveyStatus[viaturaId]) {
                 if (categoria === 'epis') {
-                    const pessoaKey = data.epiResponsavelCpf || data.epiResponsavelNome || "sem-responsavel";
+                    // Normalizamos os campos para evitar que espaços extras quebrem a comparação
+                    const nome = String(data.epiResponsavelNome || "").trim();
+                    const cpf = String(data.epiResponsavelCpf || "").trim();
+                    const pessoaKey = getFuncionarioKeyFromFields(nome, cpf);
+
                     if (!state.epiSurveyStatus[viaturaId]) state.epiSurveyStatus[viaturaId] = {};
                     state.epiSurveyStatus[viaturaId][pessoaKey] = true;
                     
@@ -1912,7 +2029,9 @@ function bindWindowFunctions() {
         marcarAvariaTablet,
         removerAvariaTablet,
         limparAvariasTablet,
-        reiniciarVistoria
+        reiniciarVistoria,
+        toggleDarkMode,
+        handleLongPressAction
     });
 }
 
@@ -1921,9 +2040,18 @@ window.onclick = function(event) {
         const dropdown = document.getElementById("menu-list");
         if (dropdown.classList.contains("show")) dropdown.classList.remove("show");
     }
+    hideLongPressMenu();
 };
 
+window.addEventListener('scroll', () => {
+    if (window.innerWidth > 480) {
+        // No PC, fechamos o menu de clique longo automaticamente ao rolar a página
+        document.getElementById("long-press-menu")?.classList.remove("active");
+    }
+}, { passive: true });
+
 document.addEventListener("DOMContentLoaded", () => {
+    initDarkMode();
     const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
     renderVistoriadorOptions();
     const vistoriadorSelect = document.getElementById("vistoriador-atual");

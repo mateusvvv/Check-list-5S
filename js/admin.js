@@ -1,4 +1,4 @@
-import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores } from "./config.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
 import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=8";
@@ -727,6 +727,7 @@ async function salvarNovoVistoriador({ nome, email, tipo }) {
         padrao: false
     }, vistoriadores.length);
     vistoriadores.push(vistoriador);
+    syncVistoriadoresTablet();
     registrarHistoricoConfig("Vistoriador adicionado", `${nome} foi adicionado como ${tipo === "tablets" ? "vistoriador de tablets" : "vistoriador geral"}.`);
     await salvarConfiguracoes();
     clearVistoriadorForm();
