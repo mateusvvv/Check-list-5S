@@ -1290,19 +1290,19 @@ function renderItems(pageId) {
             <div class="status-options">
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="ok" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>✅ OK</span>
+                    <span class="label-ok">✅ OK</span>
                 </label>
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="pendente" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>⚠️ Pendente</span>
+                    <span class="label-pendente">⚠️ Pendente</span>
                 </label>
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="perdeu" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>❌ Perdeu</span>
+                    <span class="label-perdeu">❌ Perdeu</span>
                 </label>
                 <label class="status-opt">
                     <input type="radio" name="status-${pageId}-${index}" value="quebrou" onchange="limparErroItem('${pageId}', ${index})">
-                    <span>🛠️ Quebrou</span>
+                    <span class="label-quebrou">🛠️ Quebrou</span>
                 </label>
                 ${ultimaSubstituicao ? `
                     <button type="button" class="status-opt substitution-status" onclick="mostrarSubstituicaoItem('${escapeJsString(ultimaSubstituicao.data)}', '${escapeJsString(descricaoSubstituicao)}')">

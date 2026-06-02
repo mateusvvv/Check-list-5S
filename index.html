@@ -266,6 +266,39 @@
             border-color: #0f52a0;
         }
 
+        /* Destaque para Viatura Selecionada (Modo Claro) */
+        .viatura-card.active {
+            border: 2px solid #0f52a0 !important;
+            background-color: #f0f7ff !important;
+            box-shadow: 0 10px 25px rgba(15, 82, 160, 0.2) !important;
+            transform: translateY(-5px);
+        }
+
+        .viatura-card.active .viatura-name {
+            color: #0f52a0 !important;
+            font-weight: 800 !important;
+        }
+
+        /* Cores para Etiquetas de Status (Sempre Pretas conforme solicitado) */
+        .label-ok,
+        .label-pendente,
+        .label-perdeu,
+        .label-quebrou { 
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+
+        /* Nomes de Técnicos nos Cards (Retornando ao padrão anterior) */
+        .viatura-responsaveis {
+            color: #475569 !important;
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            display: block;
+            margin-top: 5px;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 5px;
+        }
+
         /* Brilho nos indicadores concluídos */
         .dot.done {
             background-color: #2ecc71 !important;
@@ -294,6 +327,13 @@
             border-radius: 15px !important;
             border: none !important;
             box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+        }
+
+        /* Ajuste de Hover no Menu (Modo Claro) */
+        .nav-links li a:hover {
+            background-color: #f0f7ff !important;
+            color: #0f52a0 !important;
+            border-radius: 5px;
         }
 
         /* --- Dark Mode (Modo Escuro) --- */
@@ -334,7 +374,8 @@
         }
 
         /* Cards, Itens e Modais */
-        body.dark-mode .card, 
+        body.dark-mode .card,
+        body.dark-mode .auth-card,
         body.dark-mode .viatura-card,
         body.dark-mode .modal-content,
         body.dark-mode .checklist-item,
@@ -342,6 +383,8 @@
         body.dark-mode .admin-config-panel,
         body.dark-mode .revisao-modal-content,
         body.dark-mode .admin-extra-employee-row,
+        body.dark-mode .auth-screen,
+        body.dark-mode #admin-login-section,
         body.dark-mode .admin-history-row,
         body.dark-mode .stat-card {
             background-color: #1e293b !important;
@@ -353,17 +396,17 @@
         /* Estilo dos itens do Checklist e Labels (QTD, VALOR, TOTAL, STATUS) */
         body.dark-mode .checklist-item-header label,
         body.dark-mode .checklist-item .item-label,
-        body.dark-mode .status-opt span,
         body.dark-mode .checklist-extra-fields label span,
         body.dark-mode .input-group label {
             color: #cbd5e1 !important; /* Cinza claro com ótimo contraste */
             font-weight: 500;
         }
 
-        /* Campos de Entrada (Inputs/Selects) */
-        body.dark-mode input, 
-        body.dark-mode select, 
-        body.dark-mode textarea {
+        /* Campos de Entrada (Inputs/Selects) na tela de login e formulários */
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea,
+        body.dark-mode .login-box input {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
@@ -373,6 +416,11 @@
         body.dark-mode input[readonly] {
             background-color: #334155 !important;
             color: #94a3b8 !important;
+        }
+
+        /* Erros de Login no Modo Escuro */
+        body.dark-mode .login-error {
+            color: #f87171 !important; /* Vermelho mais suave para fundo escuro */
         }
 
         /* Menu de Contexto (Long Press) */
@@ -388,13 +436,30 @@
             color: #38bdf8 !important;
         }
 
+        /* Cores das Etiquetas de Status no Modo Escuro (Mantendo Pretas) */
+        body.dark-mode .label-ok,
+        body.dark-mode .label-pendente,
+        body.dark-mode .label-perdeu,
+        body.dark-mode .label-quebrou {
+            color: #000000 !important; 
+        }
+
         /* Textos Secundários */
-        body.dark-mode .viatura-responsaveis, 
         body.dark-mode .viatura-disabled-label,
         body.dark-mode .employee-meta span,
         body.dark-mode .admin-history-meta small,
         body.dark-mode .placeholder {
             color: #94a3b8 !important;
+        }
+
+        body.dark-mode .viatura-responsaveis {
+            color: #94a3b8 !important;
+            border-top-color: #334155;
+        }
+
+        /* No modo escuro, se a viatura estiver ativa, o nome do técnico brilha mais */
+        body.dark-mode .viatura-card.active .viatura-responsaveis {
+            color: #cbd5e1 !important;
         }
 
         /* Menu sanduíche mobile */
@@ -406,10 +471,30 @@
             color: #f1f5f9 !important;
         }
 
+        /* Ajuste do hover no menu para evitar bloco branco no modo escuro */
+        body.dark-mode .nav-links li a:hover {
+            background-color: #334155 !important;
+            color: #38bdf8 !important;
+        }
+
         /* Destaque verde para itens concluídos no menu (Modo Escuro) */
         body.dark-mode .nav-links li a.completed {
             color: #2ecc71 !important;
             font-weight: bold;
+        }
+
+        /* Destaque para Viatura Selecionada (Modo Escuro) */
+        body.dark-mode .viatura-card.active {
+            border: 2px solid #38bdf8 !important;
+            background-color: #2e3b52 !important;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.45) !important;
+            transform: translateY(-5px);
+        }
+
+        body.dark-mode .viatura-card.active .viatura-name {
+            color: #38bdf8 !important;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
         }
     </style>
 </head>
