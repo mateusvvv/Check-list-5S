@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
+    <script>
+        // Aplica o modo escuro imediatamente ao carregar para evitar "piscada" branca
+        if (localStorage.getItem("darkMode") === "enabled") {
+            document.body.classList.add("dark-mode");
+        }
+    </script>
     <header class="history-page-header" style="display: none;">
         <div class="logo">
             <img src="assets/logo.png" alt="Logo">

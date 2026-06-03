@@ -698,7 +698,7 @@ export function renderAdminVistoriadores() {
             </div>
             <div class="admin-config-actions">
                 ${vistoriador.padrao
-                    ? '<button type="button" class="btn-muted" disabled>Padrão</button>'
+                    ? ''
                     : `<button type="button" class="btn-danger" onclick="removerVistoriador('${escapeJsString(vistoriador.id)}')">Remover</button>`}
             </div>
         </div>
@@ -1526,7 +1526,8 @@ export function verDetalhes(docId) {
             const valor = Number(p.valorUnitario || 0);
             const total = Number(p.total || quantidade * valor);
             const epiMeta = `${p.ca ? ` - C.A.: ${escapeHtml(p.ca)}` : ""}${p.dataEntrega ? ` - Entrega: ${escapeHtml(p.dataEntrega)}` : ""}`;
-            html += `<li><strong>${labelStatus} ${quantidade || "-"}x ${p.item} - R$ ${valor.toFixed(2)} - Total R$ ${total.toFixed(2)}${epiMeta}:</strong> ${p.observacao || "Sem observação"}</li>`;
+            const formatarMoeda = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            html += `<li><strong>${labelStatus} ${quantidade || "-"}x ${p.item} - R$ ${formatarMoeda(valor)} - Total R$ ${formatarMoeda(total)}${epiMeta}:</strong> ${p.observacao || "Sem observação"}</li>`;
         });
         html += "</ul>";
     } else {

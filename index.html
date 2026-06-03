@@ -257,7 +257,22 @@
         /* Efeito de Elevação nos Cards de Viatura */
         .viatura-card {
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-            border: 1px solid #e2e8f0;
+            border: 2px solid #e2e8f0; /* Fixamos 2px para evitar o deslocamento dos nomes */
+            display: flex !important;
+            flex-direction: column !important;
+            height: auto !important; /* Remove qualquer altura fixa que esteja vindo de arquivos externos */
+            min-height: 180px !important; /* Altura mínima robusta para o PC */
+            min-height: 210px !important; /* Aumentado para suportar nomes longos em múltiplas linhas */
+            min-height: 220px !important; /* Altura mínima aumentada para suportar nomes longos */
+            max-height: none !important; /* Garante que nada limite o crescimento do card */
+            padding: 15px 15px 20px 15px !important; /* Aumentamos o padding inferior */
+            padding: 15px !important;
+            padding: 15px 15px 25px 15px !important; /* Padding inferior maior para os ícones respirarem */
+            box-sizing: border-box !important;
+            overflow: visible !important; /* Garante que sombras e conteúdos internos sejam renderizados */
+            overflow: hidden !important; /* Garante que o conteúdo não saia da borda arredondada */
+            overflow: visible !important; /* Evita que o brilho ou ícones sejam cortados */
+            justify-content: flex-start !important;
         }
 
         .viatura-card:hover:not(.disabled) {
@@ -268,7 +283,7 @@
 
         /* Destaque para Viatura Selecionada (Modo Claro) */
         .viatura-card.active {
-            border: 2px solid #0f52a0 !important;
+            border-color: #0f52a0 !important;
             background-color: #f0f7ff !important;
             box-shadow: 0 10px 25px rgba(15, 82, 160, 0.2) !important;
             transform: translateY(-5px);
@@ -276,7 +291,7 @@
 
         .viatura-card.active .viatura-name {
             color: #0f52a0 !important;
-            font-weight: 800 !important;
+            font-weight: 700 !important; /* Ajustado para um negrito mais estável */
         }
 
         /* Cores para Etiquetas de Status (Sempre Pretas conforme solicitado) */
@@ -295,8 +310,51 @@
             font-weight: 600 !important;
             display: block;
             margin-top: 5px;
-            border-top: 1px solid #f1f5f9;
+            border-top: 1px solid #e2e8f0;
             padding-top: 5px;
+            flex-grow: 1 !important; /* Ocupa o espaço central para empurrar os ícones para baixo */
+            flex: 1 0 auto !important; /* Garante que o bloco de nomes empurre os ícones para a base */
+            flex: 0 0 auto !important; /* Não deixa o texto crescer infinitamente sem expandir o card */
+            flex: 1 1 auto !important; /* Permite que este bloco cresça e empurre os ícones para baixo */
+            word-wrap: break-word !important; /* Garante que nomes longos quebrem a linha corretamente */
+            margin-bottom: 10px !important;
+        }
+
+        /* Garante que os ícones de status fiquem sempre alinhados na base do card */
+        .status-dots {
+            margin-top: auto !important;
+            margin-top: auto !important; /* Este é o segredo: empurra os ícones para o final do bloco */
+            margin-top: auto !important; /* Empurra os ícones para o final do bloco */
+            padding-top: 10px !important;
+            display: flex !important;
+            position: static !important; /* Garante que não haja posicionamento absoluto vindo de fora */
+            flex-shrink: 0 !important; /* Impede que os ícones sejam esmagados */
+            justify-content: center !important;
+            gap: 12px !important;
+            gap: 8px !important; /* Espaçamento menor entre os ícones */
+            width: 100% !important;
+        }
+
+        /* Ajuste fino nos ícones (emojis) para não cortarem */
+        .dot {
+            font-size: 1.3rem !important;
+            font-size: 1.1rem !important; /* Emojis um pouco menores */
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            width: 28px !important; /* Círculos menores para caber na tela */
+            height: 28px !important;
+            border-radius: 50% !important;
+            background-color: #f8fafc !important;
+        }
+
+        /* Força a grade de viaturas a aceitar alturas automáticas no PC */
+        .viaturas-grid {
+            grid-auto-rows: 1fr !important; /* Faz todos os cards da mesma linha terem a mesma altura */
+            align-items: stretch !important;
         }
 
         /* Brilho nos indicadores concluídos */
@@ -383,20 +441,23 @@
         body.dark-mode .admin-config-panel,
         body.dark-mode .revisao-modal-content,
         body.dark-mode .admin-extra-employee-row,
+        body.dark-mode .admin-config-row,
         body.dark-mode .auth-screen,
         body.dark-mode #admin-login-section,
         body.dark-mode .admin-history-row,
         body.dark-mode .stat-card {
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
-            border-color: #334155 !important;
+            border: 2px solid #334155 !important;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+            height: auto !important; /* Reforço para o modo escuro */
         }
 
         /* Estilo dos itens do Checklist e Labels (QTD, VALOR, TOTAL, STATUS) */
         body.dark-mode .checklist-item-header label,
         body.dark-mode .checklist-item .item-label,
         body.dark-mode .checklist-extra-fields label span,
+        body.dark-mode .filters-bar label,
         body.dark-mode .input-group label {
             color: #cbd5e1 !important; /* Cinza claro com ótimo contraste */
             font-weight: 500;
@@ -416,6 +477,32 @@
         body.dark-mode input[readonly] {
             background-color: #334155 !important;
             color: #94a3b8 !important;
+        }
+
+        /* Ajuste do Bloco de Filtros e Ações em Massa */
+        body.dark-mode .filters-bar, 
+        body.dark-mode .bulk-actions-bar {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* Ajuste da Tabela de Histórico no Modo Escuro */
+        body.dark-mode .history-table th {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+            border-bottom-color: #334155 !important;
+        }
+
+        body.dark-mode .history-table td {
+            border-bottom-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Correção do Bloco Branco ao passar o mouse no histórico */
+        body.dark-mode .history-table tr:hover td {
+            background-color: #334155 !important;
+            color: #38bdf8 !important;
         }
 
         /* Erros de Login no Modo Escuro */
@@ -454,7 +541,7 @@
 
         body.dark-mode .viatura-responsaveis {
             color: #94a3b8 !important;
-            border-top-color: #334155;
+            border-top-color: #334155 !important;
         }
 
         /* No modo escuro, se a viatura estiver ativa, o nome do técnico brilha mais */

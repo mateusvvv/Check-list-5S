@@ -488,14 +488,15 @@ export async function gerarPDF(titulo, dados, options = {}) {
         const quantidade = Number(item.quantidade || 0);
         const valor = Number(item.valorUnitario || 0);
         const total = Number(item.total || quantidade * valor);
+        const formatarMoeda = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const statusLabel = itemOk ? "OK" : status.toUpperCase();
         const statusColor = itemOk ? [22, 128, 78] : [190, 82, 24];
         const itemColor = itemOk ? [22, 128, 78] : [190, 82, 24];
         const itemName = limparTextoRelatorio(item.item);
         const detailParts = [
             `Qtd.: ${quantidade || "-"}`,
-            `Valor: R$ ${valor.toFixed(2)}`,
-            `Total: R$ ${total.toFixed(2)}`,
+            `Valor: R$ ${formatarMoeda(valor)}`,
+            `Total: R$ ${formatarMoeda(total)}`,
             `Status: ${statusLabel}`
         ];
 
