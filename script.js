@@ -1398,6 +1398,22 @@ function showLongPressMenu(x, y, viaturaId) {
     if (!menu || !titleLabel) return;
     titleLabel.innerText = viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`;
     
+    // Atualiza o status visual dos itens no menu rápido
+    const status = state.surveyStatus[viaturaId] || {};
+    const itemsConfig = {
+        ferramentas: '🔧 Ferramentas',
+        epis: '🦺 EPIs',
+        viaturas: '🚗 Viatura',
+        tablets: '📱 Tablet'
+    };
+
+    menu.querySelectorAll(".long-press-item").forEach(item => {
+        const cat = item.getAttribute("data-category");
+        const isDone = !!status[cat];
+        item.classList.toggle("completed", isDone);
+        item.innerHTML = isDone ? `${itemsConfig[cat]} <span style="margin-left: auto;">✅</span>` : itemsConfig[cat];
+    });
+
     // No PC segue o mouse, no Celular o CSS via media query cuida da centralização (left: 50%)
     if (window.innerWidth > 480) {
         menu.style.left = `${x}px`;
@@ -1661,6 +1677,15 @@ async function finalizarVistoria(category) {
     }
 
     const epiPessoa = category === "epis" ? getEpiPessoaByKey(state.selectedViatura, getSelectedEpiPessoaKey()) : null;
+    let msgConfirm = `Deseja finalizar a vistoria de ${categoryNames[category]}?`;
+    if (category === "epis" && epiPessoa) {
+        msgConfirm = `Deseja finalizar a vistoria de EPIs de ${epiPessoa.tipo} - ${epiPessoa.nome}?`;
+    }
+
+    if (!confirm(msgConfirm)) {
+        return;
+    }
+
     const items = getChecklistItemsForPessoa(category, state.selectedViatura, getSelectedEpiPessoaKey()).filter(item => item.ativo !== false);
     const checklistResults = [];
     const quantidadesAumentadas = [];
@@ -1708,6 +1733,14 @@ async function finalizarVistoria(category) {
         return;
     }
 
+    // Feedback visual e bloqueio de duplo clique
+    const btnOriginal = document.querySelector(`#${category} .btn-submit`);
+    const originalText = btnOriginal ? btnOriginal.innerText : "";
+    if (btnOriginal) {
+        btnOriginal.disabled = true;
+        btnOriginal.innerText = "⌛ Enviando...";
+    }
+
     if (quantidadesAumentadas.length > 0) {
         const detalhes = quantidadesAumentadas
             .slice(0, 6)
@@ -1718,6 +1751,10 @@ async function finalizarVistoria(category) {
             : "";
 
         if (!confirm(`Você aumentou a QTD de alguns itens:\n\n${detalhes}${restante}\n\nDeseja realmente salvar assim?`)) {
+            if (btnOriginal) {
+                btnOriginal.disabled = false;
+                btnOriginal.innerText = originalText;
+            }
             return;
         }
     }
@@ -1746,8 +1783,19 @@ async function finalizarVistoria(category) {
     };
 
     const pendentes = checklistResults.filter(r => r.status === "pendente");
-    if (pendentes.length > 0) abrirModalRevisao(pendentes);
-    else await enviarVistoriaAoFirebase();
+    if (pendentes.length > 0) {
+        abrirModalRevisao(pendentes);
+        if (btnOriginal) {
+            btnOriginal.disabled = false;
+            btnOriginal.innerText = originalText;
+        }
+    } else {
+        await enviarVistoriaAoFirebase();
+        if (btnOriginal) {
+            btnOriginal.disabled = false;
+            btnOriginal.innerText = originalText;
+        }
+    }
 }
 
 function abrirModalRevisao(pendentes) {
@@ -1821,6 +1869,10 @@ async function enviarVistoriaAoFirebase() {
         } else {
             state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
         }
+        
+        alert("✅ Vistoria salva com sucesso!");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
         renderViaturaDashboard();
         updateMenuStatus();
         state.vistoriasCache = [];
@@ -1839,10 +1891,6 @@ async function enviarVistoriaAoFirebase() {
             alert(`✅ EPIs salvos para esta pessoa. Ainda falta vistoriar: ${pendentes.map(pessoa => `${pessoa.tipo} - ${pessoa.nome}`).join(", ")}.`);
             return;
         }
-
-        if (categoriaSalva === "epis") renderEpiPessoaOptions();
-        alert("✅ Vistoria salva com sucesso!");
-        scrollParaBotaoGerarPdf(categoriaSalva);
 
         if (!isVistoriaParcial(viaturaSalva) && categoriaSalva === "tablets" && todasEtapasConcluidas(viaturaSalva)) {
             await gerarRelatorioViatura(viaturaSalva, {

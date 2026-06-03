@@ -336,6 +336,11 @@
             transition: background 0.2s;
         }
 
+        .long-press-item.completed {
+            color: #2ecc71 !important;
+            font-weight: bold !important;
+        }
+
         .long-press-item:hover {
             background-color: #f0f7ff;
             color: #0f52a0;
@@ -684,6 +689,11 @@
         body.dark-mode .long-press-item {
             color: #cbd5e1 !important;
         }
+        
+        body.dark-mode .long-press-item.completed {
+            color: #2ecc71 !important;
+        }
+
         body.dark-mode .long-press-item:hover {
             background-color: #334155 !important;
             color: #38bdf8 !important;
@@ -691,13 +701,13 @@
 
         /* Botões de Ação no Modo Escuro */
         body.dark-mode .btn-submit {
-            background-color: #38bdf8 !important;
-            color: #0f172a !important;
-            border-color: #38bdf8 !important;
+            background-color: #2ecc71 !important;
+            color: #ffffff !important;
+            border-color: #2ecc71 !important;
         }
         body.dark-mode .btn-submit:hover {
-            background-color: #0ea5e9 !important;
-            border-color: #0ea5e9 !important;
+            background-color: #27ae60 !important;
+            border-color: #27ae60 !important;
         }
         body.dark-mode .btn-admin-pdf {
             background-color: #334155 !important;
@@ -1557,10 +1567,10 @@
     <!-- Menu de Clique Longo (Atalhos) -->
     <div id="long-press-menu" class="long-press-menu">
         <div class="long-press-title" id="lp-menu-title">Viatura</div>
-        <div class="long-press-item" onclick="handleLongPressAction('ferramentas')">🔧 Ferramentas</div>
-        <div class="long-press-item" onclick="handleLongPressAction('epis')">🦺 EPIs</div>
-        <div class="long-press-item" onclick="handleLongPressAction('viaturas')">🚗 Viatura</div>
-        <div class="long-press-item" onclick="handleLongPressAction('tablets')">📱 Tablet</div>
+        <div class="long-press-item" data-category="ferramentas" onclick="handleLongPressAction('ferramentas')">🔧 Ferramentas</div>
+        <div class="long-press-item" data-category="epis" onclick="handleLongPressAction('epis')">🦺 EPIs</div>
+        <div class="long-press-item" data-category="viaturas" onclick="handleLongPressAction('viaturas')">🚗 Viatura</div>
+        <div class="long-press-item" data-category="tablets" onclick="handleLongPressAction('tablets')">📱 Tablet</div>
     </div>
 
     <!-- Modal de Detalhes -->

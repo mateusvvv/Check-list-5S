@@ -804,6 +804,10 @@ export async function gerarRelatorioComEscolha(options = {}) {
 }
 
 export async function encerrarVistoriaCompleta() {
+    if (!confirm("Deseja realmente encerrar a vistoria e gerar o relatório final?")) {
+        return;
+    }
+
     if (!isVistoriaParcial() && todasEtapasConcluidas(state.selectedViatura)) {
         await gerarRelatorioViatura(state.selectedViatura, {
             confirmar: false,
