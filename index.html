@@ -808,27 +808,32 @@
             .checklist-item {
                 padding: 6px 12px !important;
                 margin-bottom: 0 !important;
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: wrap !important;
-                align-items: flex-start !important;
+                display: grid !important;
+                grid-template-columns: auto 1fr !important; /* Status à esquerda, Conteúdo à direita */
+                grid-template-areas: "status header" "status extra" !important;
+                align-items: center !important;
+                gap: 5px 20px !important;
                 border-width: 1px !important;
                 border-radius: 8px !important;
                 min-height: 62px !important; /* Altura reduzida para caber mais itens */
             }
 
             .checklist-item-header {
+                grid-area: header !important;
                 width: 100% !important;
                 display: grid !important;
-                grid-template-columns: 1fr 40px 165px 175px !important; /* VALOR ampliado e TOTAL movido para a extremidade */
+                grid-template-columns: 50px 145px 175px 1fr !important; /* Financeiro à esquerda */
+                grid-template-areas: 
+                    "label label label label"
+                    "qtd valor total spacer" !important;
                 align-items: start !important;
-                gap: 10px !important;
+                gap: 4px 12px !important;
                 margin-bottom: 2px !important;
-                order: 1 !important;
-                padding: 0 !important; /* Remove o recuo, permitindo que o TOTAL encoste no limite direito */
+                padding: 0 !important;
             }
 
             .item-label {
+                grid-area: label !important;
                 font-size: 0.82rem !important; /* Redução automática para evitar desalinhamento */
                 font-weight: 700 !important;
                 margin: 2px 0 0 0 !important;
@@ -841,14 +846,21 @@
                 line-height: 1.1 !important;
             }
 
+            .item-quantity-field { grid-area: qtd !important; }
+            .item-value-field { grid-area: valor !important; }
+            .item-total-field { grid-area: total !important; }
+
             .item-quantity-field, .item-value-field, .item-total-field {
                 display: flex !important;
                 flex-direction: row !important;
                 align-items: center !important;
                 gap: 5px !important;
                 width: 100% !important;
-                justify-content: flex-end !important;
+                justify-content: flex-start !important;
             }
+
+            .item-value-field { gap: 8px !important; margin-left: 3px !important; } /* Ajusta o espaço interno e desloca o bloco 3px para a direita */
+            .item-value-field { gap: 8px !important; margin-left: 5px !important; } /* Ajusta o espaço interno e desloca o bloco 5px para a direita */
 
             .item-quantity-field label, .item-value-field label, .item-total-field label {
                 margin: 0 !important;
@@ -887,21 +899,23 @@
             .item-value-field input[type=number] { -moz-appearance: textfield; }
 
             .status-options {
-                order: 2 !important;
+                grid-area: status !important;
                 width: auto !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 border: none !important;
                 gap: 6px !important;
                 flex-shrink: 0 !important;
+                justify-content: flex-start !important;
             }
 
             .status-opt { font-size: 0.72rem !important; padding: 2px 6px !important; height: 24px !important; }
 
             .checklist-extra-fields {
-                order: 3 !important;
-                flex: 0 0 45% !important; /* Reduz a largura da área de OBS em aprox. 50% */
-                margin: 0 0 0 auto !important;
+                grid-area: extra !important;
+                width: 100% !important;
+                max-width: 500px !important; /* OBS discreta mas funcional */
+                margin: 0 !important;
                 padding: 0 !important;
                 border: none !important;
                 display: flex !important;
