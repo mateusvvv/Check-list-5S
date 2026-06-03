@@ -2086,10 +2086,8 @@ window.onclick = function(event) {
 };
 
 window.addEventListener('scroll', () => {
-    if (window.innerWidth > 480) {
-        // No PC, fechamos o menu de clique longo automaticamente ao rolar a página
-        document.getElementById("long-press-menu")?.classList.remove("active");
-    }
+    // Fechamos o menu de clique longo automaticamente ao rolar a página (PC e Mobile)
+    document.getElementById("long-press-menu")?.classList.remove("active");
 }, { passive: true });
 
 document.addEventListener("DOMContentLoaded", () => {
