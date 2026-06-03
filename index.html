@@ -279,6 +279,50 @@
             border-color: #0a3d7a !important;
         }
 
+        /* Botão de Finalizar (Submit) Verde */
+        .btn-submit {
+            background-color: #2ecc71 !important;
+            color: #ffffff !important;
+            border: none !important;
+            transition: background-color 0.2s ease !important;
+        }
+        .btn-submit:hover {
+            background-color: #27ae60 !important;
+        }
+
+        /* Botão de Finalizar (Submit) Verde */
+        .btn-submit {
+            background-color: #2ecc71 !important;
+            color: #ffffff !important;
+            border: none !important;
+            transition: background-color 0.2s ease !important;
+        }
+        .btn-submit:hover {
+            background-color: #27ae60 !important;
+        }
+        
+        /* Animação de Check */
+        .btn-submit.success-anim {
+            color: transparent !important;
+            pointer-events: none;
+            background-color: #27ae60 !important;
+        }
+        .btn-submit.success-anim::after {
+            content: '✓';
+            position: absolute;
+            left: 0; top: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            color: white !important;
+            font-size: 1.5rem;
+            font-weight: bold;
+            animation: check-pop 0.4s ease-out forwards;
+        }
+        @keyframes check-pop {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         /* Menu de clique longo (Long Press) */
         .long-press-menu {
             opacity: 0;
@@ -529,6 +573,10 @@
             color: #f1f5f9 !important;
         }
 
+        body.dark-mode .btn-login {
+            background-color: #38bdf8 !important;
+            color: #0f172a !important;
+        }
         /* Containers Principais */
         body.dark-mode header,
         body.dark-mode main,
@@ -580,6 +628,17 @@
             border: 2px solid #334155 !important;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
             height: auto !important; /* Reforço para o modo escuro */
+        }
+
+        body.dark-mode .admin-item-form,
+        body.dark-mode .admin-employee-form,
+        body.dark-mode .admin-vistoriador-form,
+        body.dark-mode .admin-people-panel {
+            background-color: #0f172a !important;
+            border: 1px solid #334155 !important;
+            border-radius: 8px !important;
+            padding: 15px !important;
+            margin-bottom: 15px !important;
         }
 
         /* Estilo dos itens do Checklist e Labels (QTD, VALOR, TOTAL, STATUS) */
@@ -652,6 +711,49 @@
             color: #38bdf8 !important;
         }
 
+        /* Botões de Ação no Modo Escuro */
+        body.dark-mode .btn-submit {
+            background-color: #38bdf8 !important;
+            color: #0f172a !important;
+            border-color: #38bdf8 !important;
+        }
+        body.dark-mode .btn-submit:hover {
+            background-color: #0ea5e9 !important;
+            border-color: #0ea5e9 !important;
+        }
+        body.dark-mode .btn-admin-pdf {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+            border-color: #475569 !important;
+        }
+        body.dark-mode .btn-admin-pdf:hover {
+            background-color: #475569 !important;
+            color: #38bdf8 !important;
+        }
+        body.dark-mode .btn-muted {
+            background-color: #334155 !important;
+            color: #cbd5e1 !important;
+            border-color: #475569 !important;
+        }
+        body.dark-mode .btn-muted:hover {
+            background-color: #475569 !important;
+            color: #f1f5f9 !important;
+        }
+        body.dark-mode .btn-menu-logout {
+            background-color: #ef4444 !important;
+            color: #f1f5f9 !important;
+            border-color: #ef4444 !important;
+        }
+        body.dark-mode .btn-menu-logout:hover {
+            background-color: #dc2626 !important;
+            border-color: #dc2626 !important;
+        }
+        body.dark-mode .btn-reset-survey,
+        body.dark-mode .btn-change-mode {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+            border-color: #475569 !important;
+        }
         /* Cores das Etiquetas de Status no Modo Escuro (Mantendo Pretas) */
         body.dark-mode .label-ok,
         body.dark-mode .label-pendente,
@@ -668,7 +770,9 @@
             color: #94a3b8 !important;
         }
 
-        body.dark-mode .viatura-responsaveis {
+        body.dark-mode .viatura-responsaveis,
+        body.dark-mode .employee-card-header p,
+        body.dark-mode .employee-status-control span {
             color: #94a3b8 !important;
             border-top-color: #334155 !important;
         }
@@ -706,6 +810,46 @@
             font-weight: bold;
         }
 
+        /* Abas do Painel Admin no Modo Escuro */
+        body.dark-mode .admin-config-tabs button,
+        body.dark-mode .admin-people-switch button {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+            border: 1px solid #334155 !important;
+        }
+        body.dark-mode .admin-config-tabs button.active,
+        body.dark-mode .admin-people-switch button.active {
+            background-color: #334155 !important;
+            color: #38bdf8 !important;
+            border-color: #38bdf8 !important;
+        }
+        body.dark-mode .admin-config-tabs button:hover,
+        body.dark-mode .admin-people-switch button:hover {
+            background-color: #334155 !important;
+            color: #38bdf8 !important;
+            border-color: #38bdf8 !important;
+        }
+
+        body.dark-mode .employee-edit-items-btn {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+        }
+        body.dark-mode .employee-edit-items-btn.editing {
+            background-color: #0f52a0 !important;
+            border-color: #38bdf8 !important;
+        }
+
+        body.dark-mode .employee-edit-items-btn {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+        }
+        body.dark-mode .employee-edit-items-btn.editing {
+            background-color: #0f52a0 !important;
+            border-color: #38bdf8 !important;
+        }
+
         /* --- Ajustes específicos para a parte de funcionários no Modo Escuro --- */
         body.dark-mode .employee-epi-table th {
             background-color: #0f172a !important;
@@ -723,6 +867,32 @@
             border-bottom: 1px solid #334155 !important;
             color: #cbd5e1 !important;
         }
+
+        /* Ajuste específico para a tabela de funcionários no mobile (Modo Escuro) */
+        @media (max-width: 480px) {
+            body.dark-mode .employee-epi-table td {
+                background-color: #1e293b !important; /* Fundo escuro para as células em bloco */
+                border-color: #334155 !important;
+            }
+            body.dark-mode .employee-epi-table td::before {
+                color: #38bdf8 !important; 
+            }
+            body.dark-mode .employee-epi-table-wrap {
+                background-color: #0f172a !important;
+            }
+        }
+
+        /* Cores de situação dos funcionários no Modo Escuro */
+        body.dark-mode .employee-status {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        body.dark-mode .employee-status.active { background-color: rgba(46, 204, 113, 0.15); color: #2ecc71 !important; }
+        body.dark-mode .employee-status.vacation { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b !important; }
+        body.dark-mode .employee-status.danger { background-color: rgba(239, 68, 68, 0.15); color: #ef4444 !important; }
+        body.dark-mode .employee-status.dayoff { background-color: rgba(56, 189, 248, 0.15); color: #38bdf8 !important; }
 
         body.dark-mode .employee-epi-table tr:hover td {
             background-color: #334155 !important;
@@ -859,8 +1029,7 @@
                 justify-content: flex-start !important;
             }
 
-            .item-value-field { gap: 8px !important; margin-left: 3px !important; } /* Ajusta o espaço interno e desloca o bloco 3px para a direita */
-            .item-value-field { gap: 8px !important; margin-left: 5px !important; } /* Ajusta o espaço interno e desloca o bloco 5px para a direita */
+            .item-value-field { gap: 8px !important; margin-left: 5px !important; }
 
             .item-quantity-field label, .item-value-field label, .item-total-field label {
                 margin: 0 !important;

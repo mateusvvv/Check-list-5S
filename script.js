@@ -1722,6 +1722,13 @@ async function finalizarVistoria(category) {
         }
     }
 
+    // Aciona a animação de check no botão
+    const btnSubmit = document.querySelector(`#${category} .btn-submit`);
+    if (btnSubmit) {
+        btnSubmit.classList.add('success-anim');
+        setTimeout(() => btnSubmit.classList.remove('success-anim'), 2000);
+    }
+
     state.dadosTemporariosVistoria = {
         viaturaId: state.selectedViatura,
         tabletId: category === "tablets" ? state.selectedViatura : null,
