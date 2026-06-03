@@ -1498,6 +1498,7 @@ export function verDetalhes(docId) {
         html += `<p><strong>EPIs vistoriados:</strong> ${vistoria.epiResponsavelTipo || "Funcionário"} - ${vistoria.epiResponsavelNome}</p>`;
     }
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
+    if (vistoria.categoria === "viaturas" && vistoria.observacoesViatura) html += `<p><strong>Observações:</strong> ${vistoria.observacoesViatura}</p>`;
     if (vistoria.categoria === "tablets") {
         html += `<p><strong>Tablet:</strong> ${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)} vinculado à Viatura ${formatTwoDigits(vistoria.viaturaId)}</p>`;
         if (vistoria.observacoesTablet) html += `<p><strong>Observações:</strong> ${vistoria.observacoesTablet}</p>`;

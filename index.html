@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="style.css?v=16">
     <style>
         /* Estilos Gerais para Gestão de Funcionários (Admin) */
+        * {
+            box-sizing: border-box !important;
+        }
+
         .admin-extra-employee-row {
             width: 98% !important;
             max-width: 1150px;
@@ -126,6 +130,90 @@
                 margin: 0 !important;
                 width: 100% !important;
                 max-width: 100% !important;
+            }
+
+            /* --- Ajustes Exclusivos para PC (Telas Grandes) --- */
+            .container {
+                max-width: 1400px !important;
+                width: 95% !important;
+            }
+
+            .viaturas-grid {
+                display: grid !important;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+                grid-auto-rows: 1fr !important;
+                align-items: stretch !important;
+            }
+
+            .checklist-item {
+                padding: 20px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+
+            .checklist-item-header {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                align-items: flex-end !important;
+                gap: 15px !important;
+                justify-content: space-between !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .item-label {
+                flex: 1 1 250px !important;
+                text-align: left !important;
+                font-size: 1.15rem !important;
+                min-width: 0 !important; /* Impede que o texto empurre o container para fora */
+                margin: 0 !important;
+                overflow-wrap: break-word !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .item-quantity-field, 
+            .item-value-field, 
+            .item-total-field {
+                flex: 1 0 100px !important;
+                max-width: 140px !important;
+                min-width: 80px !important;
+                box-sizing: border-box !important;
+            }
+
+            .item-quantity-field input,
+            .item-value-field input,
+            .item-total-field input {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .status-options {
+                gap: 30px !important;
+                justify-content: center !important;
+                margin-top: 20px !important;
+            }
+
+            .damage-inspection {
+                max-width: 900px !important;
+                margin: 30px auto !important;
+            }
+
+            .vehicle-map, .tablet-map {
+                max-width: 580px !important;
+                margin: 25px auto !important;
+            }
+
+            .vistoria-mode-bar {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            .btn-change-mode, .btn-reset-survey {
+                width: auto !important;
             }
         }
 
@@ -351,10 +439,51 @@
             background-color: #f8fafc !important;
         }
 
-        /* Força a grade de viaturas a aceitar alturas automáticas no PC */
+        /* Grade de viaturas - Padrão (Celular) */
         .viaturas-grid {
-            grid-auto-rows: 1fr !important; /* Faz todos os cards da mesma linha terem a mesma altura */
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+            grid-auto-rows: 1fr !important;
             align-items: stretch !important;
+        }
+
+        /* Ajuste da lista de avarias para ocupar melhor a horizontal */
+        .damage-list {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+            gap: 12px !important;
+            padding: 0 !important;
+            list-style: none !important;
+        }
+
+        .damage-list li {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 10px 15px !important;
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            font-size: 0.9rem !important;
+        }
+
+        .btn-remove-damage {
+            color: #e53e3e !important;
+            font-weight: 600 !important;
+            background: none !important;
+            border: none !important;
+            cursor: pointer !important;
+            padding: 5px 10px !important;
+        }
+
+        /* Ajuste do campo de observações do tablet e viatura */
+        .tablet-observacoes textarea, .viatura-observacoes textarea {
+            width: 100% !important;
+            min-height: 100px !important;
+            margin-bottom: 20px !important;
+            padding: 12px !important;
+            border-radius: 8px !important;
+            resize: vertical !important;
         }
 
         /* Brilho nos indicadores concluídos */
@@ -554,6 +683,13 @@
             background-color: #1e293b !important;
             border-color: #334155 !important;
         }
+
+        body.dark-mode .menu-btn {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+        }
+
         body.dark-mode .nav-links li a {
             color: #f1f5f9 !important;
         }
@@ -570,6 +706,77 @@
             font-weight: bold;
         }
 
+        /* --- Ajustes específicos para a parte de funcionários no Modo Escuro --- */
+        body.dark-mode .employee-epi-table th {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+            border-bottom: 2px solid #334155 !important;
+        }
+
+        body.dark-mode .employee-inline-person-form label span,
+        body.dark-mode .admin-extra-employee-row .admin-responsaveis-grid label span,
+        body.dark-mode .admin-extra-employee-row label span {
+            color: #cbd5e1 !important;
+        }
+
+        body.dark-mode .employee-epi-table td {
+            border-bottom: 1px solid #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        body.dark-mode .employee-epi-table tr:hover td {
+            background-color: #334155 !important;
+        }
+
+        body.dark-mode .employee-inline-editor {
+            background-color: #1e293b !important;
+            border-top: 1px solid #334155 !important;
+        }
+
+        body.dark-mode .employee-items-add-form,
+        body.dark-mode .admin-extra-epi-form,
+        body.dark-mode .admin-extra-epi-row,
+        body.dark-mode .employee-items-editor-row,
+        body.dark-mode .employee-inline-editor-row,
+        body.dark-mode .employee-inline-person-form {
+            background-color: #0f172a !important;
+            border: 1px solid #334155 !important;
+        }
+
+        body.dark-mode .employee-items-editor-row {
+            border-bottom: 1px solid #334155 !important;
+            background-color: transparent !important;
+        }
+
+        body.dark-mode .admin-extra-epi-wrap {
+            border-top-color: #334155 !important;
+        }
+
+        body.dark-mode .employee-delete-btn,
+        body.dark-mode .employee-item-remove-btn {
+            color: #f87171 !important;
+        }
+
+        /* --- Ajustes específicos para Modo Escuro (Danos e Observações) --- */
+        body.dark-mode .damage-inspection {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        body.dark-mode .damage-list li {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        body.dark-mode .btn-remove-damage {
+            color: #f87171 !important;
+        }
+        
+        body.dark-mode .status-options {
+            border-top-color: #334155 !important;
+        }
+
         /* Destaque para Viatura Selecionada (Modo Escuro) */
         body.dark-mode .viatura-card.active {
             border: 2px solid #38bdf8 !important;
@@ -582,6 +789,129 @@
             color: #38bdf8 !important;
             font-weight: bold;
             text-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+        }
+
+        /* Otimização Desktop Extrema para Telas Largas (> 1200px) */
+        @media (min-width: 1200px) {
+            .container { max-width: 98% !important; }
+            .header-info { padding: 15px 20px !important; margin-bottom: 15px !important; }
+            .viaturas-grid { gap: 10px !important; margin-bottom: 15px !important; }
+            .card { padding: 12px 15px !important; margin-bottom: 12px !important; }
+            .checklist-section-header { margin-bottom: 10px !important; }
+
+            .checklist-items {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px 15px !important;
+            }
+
+            .checklist-item {
+                padding: 6px 12px !important;
+                margin-bottom: 0 !important;
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                align-items: flex-start !important;
+                border-width: 1px !important;
+                border-radius: 8px !important;
+                min-height: 62px !important; /* Altura reduzida para caber mais itens */
+            }
+
+            .checklist-item-header {
+                width: 100% !important;
+                display: grid !important;
+                grid-template-columns: 1fr 40px 165px 175px !important; /* VALOR ampliado e TOTAL movido para a extremidade */
+                align-items: start !important;
+                gap: 10px !important;
+                margin-bottom: 2px !important;
+                order: 1 !important;
+                padding: 0 !important; /* Remove o recuo, permitindo que o TOTAL encoste no limite direito */
+            }
+
+            .item-label {
+                font-size: 0.82rem !important; /* Redução automática para evitar desalinhamento */
+                font-weight: 700 !important;
+                margin: 2px 0 0 0 !important;
+                min-width: 0 !important;
+                white-space: normal !important;
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2 !important;
+                -webkit-box-orient: vertical !important;
+                overflow: hidden !important;
+                line-height: 1.1 !important;
+            }
+
+            .item-quantity-field, .item-value-field, .item-total-field {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 5px !important;
+                width: 100% !important;
+                justify-content: flex-end !important;
+            }
+
+            .item-quantity-field label, .item-value-field label, .item-total-field label {
+                margin: 0 !important;
+                font-size: 0.6rem !important;
+                font-weight: 600 !important;
+                color: #64748b !important;
+                text-transform: uppercase !important;
+                flex-shrink: 0 !important; /* Impede que o texto do rótulo esmague o input */
+            }
+
+            .item-quantity-field input, .item-value-field input, .item-total-field input {
+                height: 24px !important;
+                font-size: 0.8rem !important;
+                padding: 0 4px !important;
+                border-radius: 4px !important;
+                flex: 1 !important;
+                width: 0 !important; /* Garante que o flex-grow controle a largura sem cortar */
+                text-align: center !important;
+            }
+
+            /* Equaliza o peso visual dos campos financeiros e garante visibilidade */
+            .item-value-field input, 
+            .item-total-field input { 
+                font-weight: 800 !important; 
+            }
+
+            /* Remove as setas laterais dos campos de número para não apertar os valores */
+            .item-quantity-field input::-webkit-outer-spin-button,
+            .item-quantity-field input::-webkit-inner-spin-button,
+            .item-value-field input::-webkit-outer-spin-button,
+            .item-value-field input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+            .item-quantity-field input[type=number],
+            .item-value-field input[type=number] { -moz-appearance: textfield; }
+
+            .status-options {
+                order: 2 !important;
+                width: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                gap: 6px !important;
+                flex-shrink: 0 !important;
+            }
+
+            .status-opt { font-size: 0.72rem !important; padding: 2px 6px !important; height: 24px !important; }
+
+            .checklist-extra-fields {
+                order: 3 !important;
+                flex: 0 0 45% !important; /* Reduz a largura da área de OBS em aprox. 50% */
+                margin: 0 0 0 auto !important;
+                padding: 0 !important;
+                border: none !important;
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+            }
+
+            .checklist-extra-fields label { flex-direction: row !important; align-items: center !important; gap: 6px !important; margin: 0 !important; flex: 1 1 auto !important; }
+            .checklist-extra-fields label span { font-size: 0.7rem !important; color: #64748b !important; font-weight: 600 !important; text-transform: uppercase !important; }
+            .checklist-extra-fields textarea { height: 24px !important; min-height: 24px !important; padding: 2px 8px !important; font-size: 0.8rem !important; flex: 1 1 auto !important; resize: none !important; border-radius: 4px !important; }
         }
     </style>
 </head>
@@ -719,6 +1049,10 @@
                         <label for="km">KM Atual:</label>
                         <input type="number" id="km" placeholder="Km atual">
                     </div>
+                    <div class="input-group">
+                        <label>Foto da Viatura (Opcional):</label>
+                        <input type="file" id="foto-viatura" accept="image/*" capture="environment" onchange="handleFotoUpload(this, 'viaturas')">
+                    </div>
                     <div class="damage-inspection">
                         <div class="damage-header">
                             <div>
@@ -743,6 +1077,10 @@
                         </div>
 
                         <div class="damage-list-wrap">
+                            <div class="viatura-observacoes">
+                                <label for="viatura-observacoes">Observações</label>
+                                <textarea id="viatura-observacoes" placeholder="Escreva alguma observação, se necessário..."></textarea>
+                            </div>
                             <h4>Avarias marcadas</h4>
                             <ul id="damage-list" class="damage-list">
                                 <li class="empty">Nenhuma avaria marcada.</li>
@@ -772,6 +1110,10 @@
                                 <option value="Matheus">Matheus</option>
                                 <option value="Italo">Italo</option>
                             </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Foto do Tablet (Opcional):</label>
+                            <input type="file" id="foto-tablet" accept="image/*" capture="environment" onchange="handleFotoUpload(this, 'tablets')">
                         </div>
                     </div>
 

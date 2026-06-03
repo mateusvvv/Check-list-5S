@@ -560,6 +560,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText(`Data e hora: ${dateRef} às ${dataObj.toLocaleTimeString("pt-BR")}`, { color: [100, 100, 100], bold: true });
 
         if (v.km) addColumnText(`KM: ${v.km}`);
+        if (v.categoria === "viaturas" && v.observacoesViatura) addColumnText(`Observações: ${v.observacoesViatura}`);
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
 
         if (v.categoria === "viaturas") {
@@ -601,6 +602,16 @@ export async function gerarPDF(titulo, dados, options = {}) {
             } catch (error) {
                 console.warn("Não foi possível adicionar o mapa do tablet ao PDF.", error);
                 addColumnText("Não foi possível carregar o desenho do tablet.", { color: [190, 82, 24] });
+            }
+        }
+
+        if (v.fotoEvidencia) {
+            addColumnText("Foto de evidência capturada:", { bold: true, color: [15, 82, 160] });
+            try {
+                const imgData = await carregarImagemDataUrl(v.fotoEvidencia);
+                addColumnImage(imgData);
+            } catch (e) {
+                console.warn("Falha ao incluir foto de evidência no PDF", e);
             }
         }
 

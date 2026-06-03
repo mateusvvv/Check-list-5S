@@ -1273,11 +1273,11 @@ function renderItems(pageId) {
         return `
         <div class="checklist-item" id="row-${pageId}-${index}">
             <div class="checklist-item-header">
+                <label class="item-label">${escapeHtml(itemName)}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
                 <div class="item-quantity-field">
                     <label for="qtd-${pageId}-${index}">QTD</label>
                     <input type="number" id="qtd-${pageId}-${index}" min="0" step="1" value="${quantidade}" oninput="atualizarTotalItem('${pageId}', ${index})" onkeydown="salvarItemComEnter(event, '${pageId}')">
                 </div>
-                <label class="item-label">${escapeHtml(itemName)}<span class="error-msg">⚠️ Seleção obrigatória</span></label>
                 <div class="item-value-field">
                     <label for="valor-${pageId}-${index}">Valor</label>
                     <input type="number" id="valor-${pageId}-${index}" min="0" step="0.01" value="${valor.toFixed(2)}" oninput="atualizarTotalItem('${pageId}', ${index})">
@@ -1597,6 +1597,37 @@ async function gerarPdfCategoria(category) {
     });
 }
 
+/**
+ * Processa a foto tirada pelo celular, comprime e armazena no estado temporário
+ */
+async function handleFotoUpload(input, categoria) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1000;
+            const scale = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scale;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Armazena a imagem comprimida no state para ser usada no envio
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            if (!state.fotosEvidencia) state.fotosEvidencia = {};
+            state.fotosEvidencia[categoria] = compressedBase64;
+            alert("Foto anexada com sucesso!");
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById("km");
     const dataVistoriaInput = document.getElementById("checking-date");
@@ -1708,8 +1739,10 @@ async function finalizarVistoria(category) {
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
         avarias: category === "viaturas" ? [...state.vehicleDamages[state.selectedViatura]] : [],
+        observacoesViatura: category === "viaturas" ? (document.getElementById("viatura-observacoes")?.value.trim() || "") : "",
         avariasTablet: category === "tablets" ? [...state.tabletDamages[state.selectedViatura]] : [],
-        observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : ""
+        observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : "",
+        fotoEvidencia: state.fotosEvidencia ? state.fotosEvidencia[category] : null
     };
 
     const pendentes = checklistResults.filter(r => r.status === "pendente");
@@ -1764,6 +1797,8 @@ async function enviarVistoriaAoFirebase() {
         if (document.getElementById("km")) document.getElementById("km").value = "";
         if (categoriaSalva === "viaturas") {
             state.vehicleDamages[state.selectedViatura] = [];
+            const observacoesViatura = document.getElementById("viatura-observacoes");
+            if (observacoesViatura) observacoesViatura.value = "";
             renderDamageMarkers();
             renderDamageList();
         }
@@ -1774,6 +1809,11 @@ async function enviarVistoriaAoFirebase() {
             renderTabletDamageMarkers();
             renderTabletDamageList();
         }
+        
+        // Limpa a foto após o envio
+        if (state.fotosEvidencia) state.fotosEvidencia[categoriaSalva] = null;
+        const inputFoto = document.getElementById(categoriaSalva === 'viaturas' ? 'foto-viatura' : 'foto-tablet');
+        if (inputFoto) inputFoto.value = "";
 
         if (categoriaSalva === "epis") {
             if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
@@ -1899,6 +1939,7 @@ async function reiniciarVistoria() {
     state.tabletDamages[viaturaId] = [];
     
     if (document.getElementById("km")) document.getElementById("km").value = "";
+    if (document.getElementById("viatura-observacoes")) document.getElementById("viatura-observacoes").value = "";
     if (document.getElementById("tablet-observacoes")) document.getElementById("tablet-observacoes").value = "";
 
     // 2. Se for Alisson, perguntar se quer limpar o banco (status/bolinhas)
@@ -2023,6 +2064,7 @@ function bindWindowFunctions() {
         sincronizarVistoriadorLogado,
         setDamageType,
         marcarAvaria,
+        handleFotoUpload,
         removerAvaria,
         limparAvariasViatura,
         setTabletDamageType,
