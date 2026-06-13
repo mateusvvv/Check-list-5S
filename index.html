@@ -206,12 +206,6 @@
                 margin: 25px auto !important;
             }
 
-            .vistoria-mode-bar {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-
             .btn-change-mode, .btn-reset-survey {
                 width: auto !important;
             }
@@ -236,7 +230,7 @@
             }
 
             .admin-extra-epi-form input, .admin-extra-epi-row input {
-                width: 100% !important; /* Cada campo em uma linha no mobile para não amontoar */
+                width: 100% !important;
                 flex: 0 0 100% !important;
                 margin-bottom: 5px !important;
             }
@@ -264,6 +258,104 @@
             align-self: center !important;
         }
 
+        /* --- Estilos para o Dropdown de Ações de Vistoria --- */
+        .vistoria-mode-bar {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            width: 100% !important;
+            margin: 15px 0 !important;
+            background: transparent !important;
+            border: none !important;
+        }
+
+        .btn-toggle-actions {
+            background-color: #f1f5f9 !important;
+            border: 1px solid #cbd5e0 !important;
+            color: #475569 !important;
+            padding: 8px 16px !important;
+            border-radius: 20px !important;
+            font-size: 0.9rem !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            transition: all 0.2s !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        }
+
+        .btn-toggle-actions:hover {
+            background-color: #e2e8f0 !important;
+            border-color: #94a3b8 !important;
+        }
+
+        .btn-toggle-actions.active {
+            background-color: #eef6ff !important;
+            border-color: #0f52a0 !important;
+            color: #0f52a0 !important;
+        }
+
+        .btn-toggle-actions .toggle-icon {
+            transition: transform 0.2s ease !important;
+            font-size: 0.7rem !important;
+        }
+
+        .btn-toggle-actions.active .toggle-icon {
+            transform: rotate(180deg) !important;
+        }
+
+        /* Ajuste Mobile para os botões dentro do container expandido */
+        @media (max-width: 480px) {
+            .btn-toggle-actions {
+                padding: 6px 12px !important;
+                font-size: 0.8rem !important;
+            }
+            .vistoria-actions-container.show {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .btn-change-mode, 
+            .btn-reset-survey, 
+            .btn-reset-all {
+                width: 220px !important; /* Mesma largura horizontal para todos */
+                max-width: 90% !important;
+                font-size: 0.85rem !important;
+                padding: 10px !important;
+                min-height: 44px !important;
+                height: 44px !important;
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+        }
+
+        .vistoria-actions-container {
+            display: none !important; /* Escondido por padrão */
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+            justify-content: center !important;
+            margin-top: 12px !important;
+            width: 100% !important;
+            max-width: 600px !important;
+            animation: dropdownFadeIn 0.2s ease-out !important;
+        }
+
+        .vistoria-actions-container.show {
+            display: flex !important; /* Mostra quando o botão toggle é clicado */
+        }
+
+        @keyframes dropdownFadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .btn-reset-survey, .btn-change-mode {
             background-color: #ffffff !important;
             color: #0f52a0 !important;
@@ -273,6 +365,38 @@
         .btn-reset-survey {
             margin-left: 10px !important;
         }
+
+        /* Ajuste Mobile para os botões dentro do container expandido */
+        @media (max-width: 480px) {
+            .btn-toggle-actions {
+                padding: 6px 12px !important;
+                font-size: 0.8rem !important;
+            }
+            .vistoria-actions-container.show {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .btn-change-mode, 
+            .btn-reset-survey, 
+            .btn-reset-all {
+                width: 220px !important; /* Mesma largura horizontal para todos */
+                max-width: 90% !important;
+                font-size: 0.85rem !important;
+                padding: 10px !important;
+                min-height: 44px !important;
+                height: 44px !important;
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+        }
+
         .btn-reset-survey:hover, .btn-change-mode:hover {
             background-color: #eef6ff !important;
             color: #0a3d7a !important;
@@ -384,6 +508,10 @@
             padding: 15px !important;
             padding: 15px 15px 25px 15px !important; /* Padding inferior maior para os ícones respirarem */
             box-sizing: border-box !important;
+            /* Desativa seleção e menu de contexto nativo no mobile */
+            -webkit-user-select: none !important;
+            -webkit-touch-callout: none !important;
+            user-select: none !important;
             overflow: visible !important; /* Garante que sombras e conteúdos internos sejam renderizados */
             overflow: hidden !important; /* Garante que o conteúdo não saia da borda arredondada */
             overflow: visible !important; /* Evita que o brilho ou ícones sejam cortados */
@@ -402,6 +530,35 @@
             background-color: #f0f7ff !important;
             box-shadow: 0 10px 25px rgba(15, 82, 160, 0.2) !important;
             transform: translateY(-5px);
+        }
+
+        /* Estilo para Viatura com Vistoria 100% Concluída */
+        .viatura-card.fully-concluded {
+            background-color: #dcfce7 !important; /* Verde claro de sucesso */
+            border-color: #22c55e !important;    /* Borda verde */
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2) !important;
+        }
+
+        /* Ícone de PDF concluído */
+        .pdf-done-indicator {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 1.4rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+
+        /* Texto de Vistoria Concluída no Dashboard */
+        .viatura-concluded-label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #166534;
+            text-transform: uppercase;
+            margin-top: 4px;
+            display: block;
+        }
+        body.dark-mode .viatura-concluded-label {
+            color: #4ade80;
         }
 
         .viatura-card.active .viatura-name {
@@ -742,6 +899,17 @@
             color: #f1f5f9 !important;
             border-color: #475569 !important;
         }
+
+        body.dark-mode .btn-toggle-actions {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        body.dark-mode .btn-toggle-actions.active {
+            background-color: #334155 !important;
+            border-color: #38bdf8 !important;
+            color: #38bdf8 !important;
+        }
         /* Cores das Etiquetas de Status no Modo Escuro (Mantendo Pretas) */
         body.dark-mode .label-ok,
         body.dark-mode .label-pendente,
@@ -981,6 +1149,11 @@
             transform: translateY(-5px);
         }
 
+        body.dark-mode .viatura-card.fully-concluded {
+            background-color: #064e3b !important; /* Verde escuro para modo escuro */
+            border-color: #10b981 !important;
+        }
+
         body.dark-mode .viatura-card.active .viatura-name {
             color: #38bdf8 !important;
             font-weight: bold;
@@ -1122,6 +1295,137 @@
             .checklist-extra-fields label span { font-size: 0.7rem !important; color: #64748b !important; font-weight: 600 !important; text-transform: uppercase !important; }
             .checklist-extra-fields textarea { height: 24px !important; min-height: 24px !important; padding: 2px 8px !important; font-size: 0.8rem !important; flex: 1 1 auto !important; resize: none !important; border-radius: 4px !important; }
         }
+
+        /* Estilos para os blocos de seleção de pessoa nos EPIs */
+        .epi-person-buttons {
+            display: flex !important;
+            gap: 15px !important;
+            margin-top: 15px !important;
+            flex-wrap: wrap !important;
+        }
+
+        .epi-person-button {
+            flex: 1 1 200px !important;
+            padding: 12px 15px !important;
+            border-radius: 10px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            border: 2px solid transparent !important;
+            text-align: center !important;
+        }
+
+        .epi-person-button.pending {
+            background-color: #fef2f2 !important;
+            border-color: #fca5a5 !important;
+        }
+
+        .epi-person-button.done {
+            background-color: #f0fdf4 !important;
+            border-color: #86efac !important;
+        }
+
+        .epi-person-button.active {
+            border-width: 3px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        }
+
+        .epi-person-button.active.pending { border-color: #ef4444 !important; }
+        .epi-person-button.active.done { border-color: #22c55e !important; }
+
+        .epi-btn-role-name {
+            font-size: 0.9rem !important;
+            font-weight: 700 !important;
+            color: #000000 !important;
+            display: block !important;
+        }
+
+        .epi-btn-status-label {
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            margin-top: 4px !important;
+            display: block !important;
+        }
+
+        .epi-person-button.pending .epi-btn-status-label { color: #dc2626 !important; }
+        .epi-person-button.done .epi-btn-status-label { color: #16a34a !important; }
+
+        /* Dark Mode para seletores de EPI */
+        body.dark-mode .epi-person-button.pending { background-color: rgba(239, 68, 68, 0.1) !important; }
+        body.dark-mode .epi-person-button.done { background-color: rgba(34, 197, 94, 0.1) !important; }
+        body.dark-mode .epi-btn-role-name { color: #000000 !important; }
+
+        /* Estilos para Miniaturas de Fotos */
+        .photo-previews {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+            margin-top: 10px !important;
+        }
+
+        .photo-preview-item {
+            position: relative !important;
+            width: 80px !important;
+            height: 80px !important;
+        }
+
+        .photo-preview-item img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            border-radius: 8px !important;
+            border: 1px solid #cbd5e0 !important;
+        }
+
+        .btn-remove-photo {
+            position: absolute !important;
+            top: -5px !important;
+            right: -5px !important;
+            background: #ef4444 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 22px !important;
+            height: 22px !important;
+            font-size: 14px !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            padding: 0 !important;
+        }
+
+        .photo-counter {
+            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+            color: #0f52a0 !important;
+            margin-left: 8px !important;
+        }
+        body.dark-mode .photo-counter { color: #38bdf8 !important; }
+
+        /* Botão de Upload Customizado */
+        .custom-file-upload {
+            display: inline-block !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 8px 16px !important;
+            background-color: #0f52a0 !important;
+            color: #ffffff !important;
+            border-radius: 6px !important;
+            cursor: pointer !important;
+            font-size: 0.9rem !important;
+            font-weight: 600 !important;
+            margin-top: 8px !important;
+            transition: all 0.2s ease-in-out !important;
+            border: 1px solid #0f52a0 !important;
+        }
+        .custom-file-upload:hover { background-color: #0a3d7a !important; }
+        body.dark-mode .custom-file-upload { background-color: #334155 !important; color: #f1f5f9 !important; border-color: #475569 !important; }
     </style>
 </head>
 <body>
@@ -1176,9 +1480,15 @@
                     <!-- Botões das viaturas gerados via JS -->
                 </div>
                 <div class="vistoria-mode-bar">
-                    <span id="vistoria-mode-label">Modo: Vistoria completa</span>
-                    <button type="button" class="btn-change-mode" onclick="configurarModoVistoria()">Alterar modo</button>
-                    <button type="button" class="btn-reset-survey" onclick="reiniciarVistoria()">Reiniciar vistoria</button>
+                    <button type="button" class="btn-toggle-actions" onclick="toggleVistoriaActions()">
+                        <span id="vistoria-mode-label">Modo: Vistoria completa</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                    <div id="vistoria-actions-container" class="vistoria-actions-container">
+                        <button type="button" class="btn-change-mode" onclick="configurarModoVistoria()">Alterar modo</button>
+                        <button type="button" class="btn-reset-survey" onclick="reiniciarVistoria()">Reiniciar vistoria</button>
+                        <button type="button" class="btn-reset-survey btn-reset-all" onclick="reiniciarTodasVistorias()" style="border-color: #ef4444; color: #ef4444;">Reiniciar todas</button>
+                    </div>
                 </div>
                 <div class="checking-meta">
                     <div class="input-group">
@@ -1259,8 +1569,10 @@
                         <input type="number" id="km" placeholder="Km atual">
                     </div>
                     <div class="input-group">
-                        <label>Foto da Viatura (Opcional):</label>
-                        <input type="file" id="foto-viatura" accept="image/*" capture="environment" onchange="handleFotoUpload(this, 'viaturas')">
+                        <label>Foto da Viatura (Opcional): <span id="count-viaturas" class="photo-counter">(0 fotos)</span></label>
+                        <label for="foto-viatura" class="custom-file-upload">📷 Escolher arquivos</label>
+                        <input type="file" id="foto-viatura" accept="image/*" multiple onchange="handleFotoUpload(this, 'viaturas')" style="display: none;">
+                        <div id="previews-viaturas" class="photo-previews"></div>
                     </div>
                     <div class="damage-inspection">
                         <div class="damage-header">
@@ -1321,8 +1633,10 @@
                             </select>
                         </div>
                         <div class="input-group">
-                            <label>Foto do Tablet (Opcional):</label>
-                            <input type="file" id="foto-tablet" accept="image/*" capture="environment" onchange="handleFotoUpload(this, 'tablets')">
+                            <label>Foto do Tablet (Opcional): <span id="count-tablets" class="photo-counter">(0 fotos)</span></label>
+                            <label for="foto-tablet" class="custom-file-upload">📷 Escolher arquivos</label>
+                            <input type="file" id="foto-tablet" accept="image/*" multiple onchange="handleFotoUpload(this, 'tablets')" style="display: none;">
+                            <div id="previews-tablets" class="photo-previews"></div>
                         </div>
                     </div>
 
@@ -1600,6 +1914,22 @@
             <div class="revisao-actions">
                 <button class="btn-submit btn-confirm-review" onclick="confirmarEnvioFinal()">Confirmar e Salvar Vistoria</button>
                 <button class="btn-submit btn-return-review" onclick="fecharModalRevisao()">Retornar à Vistoria</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Assinatura Digital -->
+    <div id="signature-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="signature-title">Assinatura Digital</h3>
+            <p>Assine no quadro abaixo:</p>
+            <div class="signature-pad-wrapper" style="background: #fff; border: 1px solid #ddd; margin: 10px 0;">
+                <canvas id="signature-pad" width="500" height="200" style="width: 100%; touch-action: none; cursor: crosshair;"></canvas>
+            </div>
+            <div class="revisao-actions">
+                <button class="btn-submit" onclick="confirmarAssinatura()">Confirmar</button>
+                <button class="btn-muted" onclick="limparAssinaturaCanvas()">Limpar</button>
+                <button class="btn-danger" onclick="fecharModalAssinatura()">Cancelar</button>
             </div>
         </div>
     </div>

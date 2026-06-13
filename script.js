@@ -90,11 +90,10 @@ import {
 import { salvarConfiguracoes } from "./js/settings.js";
 
 let funcionarioItensEditandoKey = "";
-let longPressTimer = null;
-let isLongPressActive = false;
-let lastPressedViaturaId = null;
+let lastTapTime = 0;
+let lastTapViaturaId = null;
 let menuJustOpened = false; // Trava para o menu não fechar rápido demais
-const LONG_PRESS_DELAY = 600; // Tempo em ms para considerar clique longo
+const DOUBLE_TAP_DELAY = 300; // Tempo máximo entre toques para considerar clique duplo
 
 function initDarkMode() {
     const savedMode = localStorage.getItem("darkMode");
@@ -1170,7 +1169,7 @@ function getEpiPessoasObrigatorias(viaturaId = state.selectedViatura) {
 function todosEpisObrigatoriosVistoriados(viaturaId = state.selectedViatura) {
     const pessoas = getEpiPessoasObrigatorias(viaturaId);
     const vistoriadas = getEpiSurveyMap(viaturaId);
-    return pessoas.length > 0 && pessoas.every(pessoa => vistoriadas[pessoa.key]);
+    return pessoas.length === 0 || pessoas.every(pessoa => vistoriadas[pessoa.key]);
 }
 
 function getEpiPessoasPendentes(viaturaId = state.selectedViatura) {
@@ -1200,11 +1199,16 @@ function renderEpiPessoaButtons() {
     const selectedKey = getSelectedEpiPessoaKey();
 
     container.innerHTML = pessoas.length
-        ? pessoas.map(pessoa => `
-            <button type="button" class="epi-person-button ${pessoa.key === selectedKey ? "active" : ""} ${vistoriadas[pessoa.key] ? "done" : ""}" data-epi-key="${escapeHtml(pessoa.key)}">
-                ${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}
-            </button>
-        `).join("")
+        ? pessoas.map(pessoa => {
+            const isDone = !!vistoriadas[pessoa.key];
+            const statusText = isDone ? "✓" : "⚠ PENDENTE";
+            return `
+                <button type="button" class="epi-person-button ${pessoa.key === selectedKey ? "active" : ""} ${isDone ? "done" : "pending"}" data-epi-key="${escapeHtml(pessoa.key)}">
+                    <span class="epi-btn-role-name">${escapeHtml(pessoa.tipo)} - ${escapeHtml(pessoa.nome)}</span>
+                    <span class="epi-btn-status-label">${statusText}</span>
+                </button>
+            `;
+        }).join("")
         : `<span class="placeholder">Nenhum técnico ou auxiliar cadastrado.</span>`;
 
     container.querySelectorAll(".epi-person-button").forEach(button => {
@@ -1222,10 +1226,9 @@ function renderEpiPessoaOptions() {
 
     const valorAtual = select.value;
     const pessoas = getEpiPessoaOptions(state.selectedViatura);
-    const vistoriadas = getEpiSurveyMap(state.selectedViatura);
     select.innerHTML = pessoas.length
         ? pessoas.map(pessoa => `
-            <option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)}${vistoriadas[pessoa.key] ? " (vistoriado)" : ""}</option>
+            <option value="${escapeHtml(pessoa.key)}">${escapeHtml(pessoa.tipo)}</option>
         `).join("")
         : `<option value="">Nenhum técnico ou auxiliar cadastrado</option>`;
     select.value = pessoas.some(pessoa => pessoa.key === valorAtual) ? valorAtual : (pessoas[0]?.key || "");
@@ -1369,28 +1372,35 @@ function atualizarTotalItem(pageId, index) {
     if (totalInput) totalInput.value = formatCurrency(quantidade * valor);
 }
 
-function startLongPress(e, viaturaId) {
-    cancelLongPress();
-    isLongPressActive = false;
-    lastPressedViaturaId = viaturaId;
-    
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
+function handleViaturaInteraction(e, viaturaId) {
+    // Impede interação se o menu já estiver aberto
+    if (document.getElementById("long-press-menu")?.classList.contains("active")) return;
 
-    longPressTimer = setTimeout(() => {
-        isLongPressActive = true;
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTapTime;
+
+    // Se o intervalo entre cliques for curto na mesma viatura, abre o painel rápido
+    if (lastTapViaturaId === viaturaId && tapLength < 350 && tapLength > 50) {
+        // Coordenadas para o menu rápido (fallback para centro da tela se e.clientX for 0)
+        const x = e.clientX || (e.touches?.[0]?.clientX) || window.innerWidth / 2;
+        const y = e.clientY || (e.touches?.[0]?.clientY) || window.innerHeight / 2;
+        
         showLongPressMenu(x, y, viaturaId);
-    }, LONG_PRESS_DELAY);
-}
-
-function cancelLongPress() {
-    if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
+        lastTapTime = 0;
+    } else {
+        // Clique simples: apenas seleciona a viatura normalmente
+        selectViatura(viaturaId);
+        lastTapTime = currentTime;
+        lastTapViaturaId = viaturaId;
     }
 }
 
 function showLongPressMenu(x, y, viaturaId) {
+    // Garante que a viatura alvo do menu esteja selecionada internamente
+    if (state.selectedViatura !== viaturaId) {
+        selectViatura(viaturaId);
+    }
+
     const menu = document.getElementById("long-press-menu");
     const titleLabel = document.getElementById("lp-menu-title");
     const viatura = getViaturaById(viaturaId);
@@ -1444,7 +1454,7 @@ function hideLongPressMenu() {
 }
 
 function handleLongPressAction(category) {
-    if (!lastPressedViaturaId) return;
+    if (!lastTapViaturaId) return;
     
     const vistoriador = getVistoriadorAtivo();
     if (!podeAcessarCategoria(category, vistoriador)) {
@@ -1453,11 +1463,9 @@ function handleLongPressAction(category) {
         return;
     }
 
-    selectViatura(lastPressedViaturaId);
+    selectViatura(lastTapViaturaId);
     showPage(category);
     hideLongPressMenu();
-    // Pequeno delay para resetar o estado e evitar disparo de clique normal
-    setTimeout(() => { isLongPressActive = false; }, 150);
 }
 
 function salvarItemComEnter(event, pageId) {
@@ -1480,6 +1488,7 @@ function renderViaturaDashboard() {
         const id = viatura.id;
         const status = state.surveyStatus[id] || {};
         const isActive = state.selectedViatura === id;
+        const isFullyConcluded = status.ferramentas && status.epis && status.viaturas && status.tablets;
         const isDisabled = viatura.ativa === false;
         const responsaveis = viaturaResponsaveis[id] || {};
         const tecnico = responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
@@ -1488,21 +1497,15 @@ function renderViaturaDashboard() {
         const auxiliar = responsaveis.auxiliar || "Sem auxiliar";
 
         const card = document.createElement("div");
-        card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""}`;
+        card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""} ${isFullyConcluded ? "fully-concluded" : ""}`;
         
-        card.addEventListener('mousedown', (e) => startLongPress(e, id));
-        card.addEventListener('touchstart', (e) => startLongPress(e, id), { passive: true });
-        card.addEventListener('mouseup', cancelLongPress);
-        card.addEventListener('mouseleave', cancelLongPress);
-        card.addEventListener('touchend', cancelLongPress);
-        card.addEventListener('touchmove', cancelLongPress);
-
-        card.onclick = () => {
-            if (!isLongPressActive) selectViatura(id);
-        };
+        // Substituído por clique simples/duplo unificado
+        card.onclick = (e) => handleViaturaInteraction(e, id);
 
         card.innerHTML = `
+            ${isFullyConcluded && id !== "2" ? '<span class="pdf-done-indicator" title="Relatório PDF Gerado">📄✅</span>' : ''}
             <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
+            ${isFullyConcluded ? '<span class="viatura-concluded-label">Vistoria concluída</span>' : ''}
             ${isDisabled ? `<span class="viatura-disabled-label">Desativada</span>` : ""}
             <span class="viatura-responsaveis">${escapeHtml(tecnico)} / ${escapeHtml(auxiliar)}</span>
             <div class="status-dots">
@@ -1543,6 +1546,15 @@ function updateVistoriaModeUI() {
         : "Modo: Vistoria completa";
 }
 
+function toggleVistoriaActions() {
+    const container = document.getElementById("vistoria-actions-container");
+    const btn = document.querySelector(".btn-toggle-actions");
+    if (container && btn) {
+        container.classList.toggle("show");
+        btn.classList.toggle("active");
+    }
+}
+
 function configurarModoVistoria() {
     const atual = isVistoriaParcial() ? "PARCIAL" : "COMPLETA";
     const resposta = prompt(
@@ -1564,9 +1576,12 @@ function configurarModoVistoria() {
 }
 
 function updateMenuStatus() {
-    const status = state.surveyStatus[state.selectedViatura];
+    const status = state.surveyStatus[state.selectedViatura] || {};
     let concluidas = 0;
     const vistoriaParcial = isVistoriaParcial(state.selectedViatura);
+
+    // Verifica se há pelo menos um EPI individual concluído para esta viatura (mesmo que não todos)
+    const algumEpiFeito = Object.values(state.epiSurveyStatus[state.selectedViatura] || {}).some(v => v === true);
 
     Object.keys(categoryNames).forEach(category => {
         const link = document.getElementById(`menu-${category}`);
@@ -1588,8 +1603,15 @@ function updateMenuStatus() {
     const btnEncerrar = document.getElementById("btn-encerrar-geral");
 
     if (btnEncerrar) {
-        btnEncerrar.style.display = (!vistoriaParcial && vistoriaCompleta) ? "block" : "none";
-        btnEncerrar.innerText = `📁 Encerrar Vistoria Viatura ${state.selectedViatura.padStart(2, "0")} (Gerar PDF)`;
+        // O botão aparece se a vistoria completa estiver pronta (Modo Completo)
+        // OU se houver QUALQUER progresso (Modo Parcial: qualquer categoria ou EPI individual)
+        const mostrarNoModoParcial = vistoriaParcial && (concluidas > 0 || algumEpiFeito);
+        const mostrarNoModoCompleto = !vistoriaParcial && vistoriaCompleta;
+
+        btnEncerrar.style.display = (mostrarNoModoParcial || mostrarNoModoCompleto) ? "block" : "none";
+        btnEncerrar.innerText = vistoriaParcial 
+            ? `📁 Gerar PDF da Vistoria Parcial (Viatura ${String(state.selectedViatura).padStart(2, "0")})`
+            : `📁 Encerrar Vistoria Viatura ${String(state.selectedViatura).padStart(2, "0")} (Gerar PDF)`;
     }
 }
 
@@ -1607,7 +1629,7 @@ async function gerarPdfCategoria(category) {
     }
 
     await gerarRelatorioViatura(state.selectedViatura, {
-        confirmar: false,
+        confirmar: true,
         resetarStatus: true,
         categorias: [category]
     });
@@ -1617,31 +1639,66 @@ async function gerarPdfCategoria(category) {
  * Processa a foto tirada pelo celular, comprime e armazena no estado temporário
  */
 async function handleFotoUpload(input, categoria) {
-    const file = input.files[0];
-    if (!file) return;
+    const files = Array.from(input.files);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 1000;
-            const scale = MAX_WIDTH / img.width;
-            canvas.width = MAX_WIDTH;
-            canvas.height = img.height * scale;
+    if (!state.fotosEvidencia) state.fotosEvidencia = {};
+    if (!Array.isArray(state.fotosEvidencia[categoria])) {
+        state.fotosEvidencia[categoria] = [];
+    }
 
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            // Armazena a imagem comprimida no state para ser usada no envio
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-            if (!state.fotosEvidencia) state.fotosEvidencia = {};
-            state.fotosEvidencia[categoria] = compressedBase64;
-            alert("Foto anexada com sucesso!");
+    for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800;
+                const scale = MAX_WIDTH / img.width;
+                canvas.width = MAX_WIDTH;
+                canvas.height = img.height * scale;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                state.fotosEvidencia[categoria].push(compressedBase64);
+                renderFotoPreviews(categoria);
+            };
+            img.src = e.target.result;
         };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+    }
+    input.value = ""; // Limpa o input para permitir nova seleção
+}
+
+function renderFotoPreviews(categoria) {
+    const containerId = categoria === 'viaturas' ? 'previews-viaturas' : 'previews-tablets';
+    const counterId = categoria === 'viaturas' ? 'count-viaturas' : 'count-tablets';
+    const container = document.getElementById(containerId);
+    const counter = document.getElementById(counterId);
+    
+    if (!container) return;
+
+    const fotos = state.fotosEvidencia?.[categoria] || [];
+    
+    if (counter) {
+        counter.innerText = `(${fotos.length} foto${fotos.length === 1 ? '' : 's'})`;
+    }
+
+    container.innerHTML = fotos.map((foto, index) => `
+        <div class="photo-preview-item">
+            <img src="${foto}" alt="Preview">
+            <button type="button" class="btn-remove-photo" onclick="removerFoto('${categoria}', ${index})">×</button>
+        </div>
+    `).join("");
+}
+
+function removerFoto(categoria, index) {
+    if (state.fotosEvidencia[categoria]) {
+        state.fotosEvidencia[categoria].splice(index, 1);
+        renderFotoPreviews(categoria);
+    }
 }
 
 async function finalizarVistoria(category) {
@@ -1779,7 +1836,7 @@ async function finalizarVistoria(category) {
         observacoesViatura: category === "viaturas" ? (document.getElementById("viatura-observacoes")?.value.trim() || "") : "",
         avariasTablet: category === "tablets" ? [...state.tabletDamages[state.selectedViatura]] : [],
         observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : "",
-        fotoEvidencia: state.fotosEvidencia ? state.fotosEvidencia[category] : null
+        fotosEvidencia: state.fotosEvidencia ? (state.fotosEvidencia[category] || []) : []
     };
 
     const pendentes = checklistResults.filter(r => r.status === "pendente");
@@ -1873,6 +1930,14 @@ async function enviarVistoriaAoFirebase() {
         alert("✅ Vistoria salva com sucesso!");
         window.scrollTo({ top: 0, behavior: "smooth" });
 
+        // Volta para a página inicial para mostrar o botão de PDF.
+        // Agora volta sempre se for modo parcial (mesmo que apenas 1 EPI tenha sido feito)
+        // ou se a categoria salva foi finalizada por completo.
+        const ehParcial = isVistoriaParcial(viaturaSalva);
+        if (ehParcial || categoriaSalva !== "epis" || state.surveyStatus[viaturaSalva][categoriaSalva]) {
+            showHome();
+        }
+
         renderViaturaDashboard();
         updateMenuStatus();
         state.vistoriasCache = [];
@@ -1894,7 +1959,7 @@ async function enviarVistoriaAoFirebase() {
 
         if (!isVistoriaParcial(viaturaSalva) && categoriaSalva === "tablets" && todasEtapasConcluidas(viaturaSalva)) {
             await gerarRelatorioViatura(viaturaSalva, {
-                confirmar: false,
+                confirmar: true,
                 resetarStatus: true,
                 categorias: Object.keys(categoryNames)
             });
@@ -1962,6 +2027,11 @@ function sincronizarStatusViaturasRealtime() {
         renderViaturaDashboard();
         updateMenuStatus();
         updateVistoriaModeUI();
+
+        // Atualiza os botões de seleção de pessoa na página de EPIs se ela estiver aberta
+        if (document.getElementById("epis")?.classList.contains("active")) {
+            renderEpiPessoaOptions();
+        }
     });
 }
 
@@ -2035,6 +2105,75 @@ async function reiniciarVistoria() {
     renderTabletDamageList();
 
     if (!isAlisson) alert("Campos e avarias limpos localmente. Você pode começar novamente.");
+}
+
+/**
+ * Reinicia as vistorias de TODAS as viaturas.
+ * Se for Alisson, permite limpar o banco de dados de hoje.
+ */
+async function reiniciarTodasVistorias() {
+    const vistoriador = getVistoriadorAtivo();
+    if (!confirm("Deseja realmente reiniciar as vistorias de TODAS as viaturas?\n\nIsso limpará as marcações locais e observações de todos os veículos.")) return;
+
+    const isAlisson = (vistoriador === "Alisson");
+    
+    // 1. Limpeza Local de dados temporários e danos para todas
+    state.viaturas.forEach(v => {
+        state.vehicleDamages[v.id] = [];
+        state.tabletDamages[v.id] = [];
+        if (state.surveyStatus[v.id]) {
+            state.surveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+        }
+        state.epiSurveyStatus[v.id] = {};
+    });
+
+    // Limpar campos visuais da tela atual
+    if (document.getElementById("km")) document.getElementById("km").value = "";
+    if (document.getElementById("viatura-observacoes")) document.getElementById("viatura-observacoes").value = "";
+    if (document.getElementById("tablet-observacoes")) document.getElementById("tablet-observacoes").value = "";
+    if (state.fotosEvidencia) state.fotosEvidencia = {};
+
+    // 2. Se for Alisson, resetar o status global (banco de dados)
+    if (isAlisson) {
+        if (confirm("Deseja também APAGAR os registros de vistorias de todas as viaturas realizados HOJE no banco de dados?\n\nIsso fará com que as bolinhas voltem a ficar cinzas em todos os celulares.")) {
+            try {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                const q = query(
+                    collection(db, "vistorias"), 
+                    where("dataEnvio", ">=", hoje)
+                );
+                
+                const snapshot = await getDocs(q);
+                if (snapshot.docs.length > 0) {
+                    const promessas = snapshot.docs.map(docSnap => deleteDoc(firestoreDoc(db, "vistorias", docSnap.id)));
+                    await Promise.all(promessas);
+                    alert("Painel resetado com sucesso no sistema!");
+                } else {
+                    alert("Nenhum registro de hoje encontrado para apagar.");
+                }
+            } catch (error) {
+                console.error("Erro ao reiniciar todas no banco:", error);
+                alert("Erro ao limpar registros no banco de dados.");
+            }
+        }
+    }
+
+    // 3. Atualizar a Interface
+    renderViaturaDashboard();
+    updateMenuStatus();
+    renderDamageMarkers();
+    renderDamageList();
+    renderTabletDamageMarkers();
+    renderTabletDamageList();
+
+    const activeTab = document.querySelector(".tab-content.active");
+    if (activeTab && categoryNames[activeTab.id]) {
+        renderItems(activeTab.id);
+    }
+
+    if (!isAlisson) alert("Vistorias reiniciadas localmente.");
 }
 
 function bindWindowFunctions() {
@@ -2119,9 +2258,12 @@ function bindWindowFunctions() {
         marcarAvariaTablet,
         removerAvariaTablet,
         limparAvariasTablet,
+        removerFoto,
         reiniciarVistoria,
+        reiniciarTodasVistorias,
         toggleDarkMode,
-        handleLongPressAction
+        handleLongPressAction,
+        toggleVistoriaActions
     });
 }
 

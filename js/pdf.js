@@ -155,7 +155,7 @@ function limparTextoRelatorio(value) {
         .trim();
 }
 
-function adicionarTermoResponsabilidade(pdf, startY) {
+export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}) {
     let y = ensurePdfSpace(pdf, startY, 60);
     const termo = [
         "TERMO DE RESPONSABILIDADE E ASSINATURA DOS RESPONSÁVEIS",
@@ -192,6 +192,14 @@ function adicionarTermoResponsabilidade(pdf, startY) {
     pdf.text("Nome:", 112, y);
     pdf.line(126, y, 194, y);
     y += 9;
+
+    if (signatures.tecnico) {
+        pdf.addImage(signatures.tecnico, 'PNG', 15, y - 18, 70, 15);
+    }
+    if (signatures.auxiliar) {
+        pdf.addImage(signatures.auxiliar, 'PNG', 117, y - 18, 70, 15);
+    }
+
     pdf.text("Assinatura:", 10, y);
     pdf.line(31, y, 92, y);
     pdf.text("Assinatura:", 112, y);
@@ -605,13 +613,16 @@ export async function gerarPDF(titulo, dados, options = {}) {
             }
         }
 
-        if (v.fotoEvidencia) {
-            addColumnText("Foto de evidência capturada:", { bold: true, color: [15, 82, 160] });
-            try {
-                const imgData = await carregarImagemDataUrl(v.fotoEvidencia);
-                addColumnImage(imgData);
-            } catch (e) {
-                console.warn("Falha ao incluir foto de evidência no PDF", e);
+        const fotos = Array.isArray(v.fotosEvidencia) ? v.fotosEvidencia : (v.fotoEvidencia ? [v.fotoEvidencia] : []);
+        if (fotos.length > 0) {
+            addColumnText("Fotos de evidência capturadas:", { bold: true, color: [15, 82, 160] });
+            for (const foto of fotos) {
+                try {
+                    const imgData = await carregarImagemDataUrl(foto);
+                    addColumnImage(imgData);
+                } catch (e) {
+                    console.warn("Falha ao incluir uma das fotos no PDF", e);
+                }
             }
         }
 
@@ -652,7 +663,10 @@ export async function gerarPDF(titulo, dados, options = {}) {
     addPdfHeader();
     resetCursor();
     addPageLabel("Assinatura dos responsáveis e termo de responsabilidade");
-    adicionarTermoResponsabilidade(doc, cursor.y);
+    adicionarTermoResponsabilidade(doc, cursor.y, state.assinaturas || {});
+    
+    // Limpa assinaturas após gerar para a próxima vistoria
+    state.assinaturas = null;
     doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
 }
 

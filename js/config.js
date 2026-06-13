@@ -56,13 +56,35 @@ export const checklistData = {
         "Pochete Carbografite"
     ],
     viaturas: [
-        "Nível de Óleo",
-        "Reservatório do líquido de arrefecimento",
-        "Pressão dos Pneus",
-        "Luzes de Sinalização",
-        "Limpeza Interna",
+        // Estrutura
+        "Fita",
+        "Sapata",
+        "Catraca",
+        "Corpo",
+        // Cabine / Interior
+        "Banco",
+        "Pôr Sol Esq e Dir",
+        "Retrovisor Interno",
+        "Cintos de Segurança",
+        "Tapetes",
+        "Manual do Proprietário",
+        "Documento (CRLV)",
+        // Painel / Comandos
+        "Instrumentos do Painel",
+        "Acendedor de cigarros",
+        "Volante",
+        "Pedais",
+        "Alavanca de Freio de Mão",
+        "Alavanca de Marchas",
+        // Motor / Fluidos
+        "Fluido de Freio",
+        "Líquido de Arrefecimento",
+        "Óleo Lubrificante do Motor",
+        "Bateria",
+        // Segurança / Emergência
         "Estepe",
         "Macaco",
+        "Chave de Rodas",
         "Triângulo"
     ],
     tablets: [
@@ -954,6 +976,33 @@ export const checklistItemDefaults = {
         "Carretel recolhedor com fita de sinalização": { quantidade: 1, valor: 280 },
         "Cone Sinalização Flexível 75cm Laranja e Branco": { quantidade: 4, valor: 80 },
         "Garrafa Térmica 5L Cor Azul": { quantidade: 1, valor: 40 }
+    },
+    viaturas: {
+        "Fita": { quantidade: 1, valor: 0 },
+        "Sapata": { quantidade: 1, valor: 0 },
+        "Catraca": { quantidade: 1, valor: 0 },
+        "Corpo": { quantidade: 1, valor: 0 },
+        "Banco": { quantidade: 1, valor: 0 },
+        "Pôr Sol Esq e Dir": { quantidade: 1, valor: 0 },
+        "Retrovisor Interno": { quantidade: 1, valor: 0 },
+        "Cintos de Segurança": { quantidade: 1, valor: 0 },
+        "Tapetes": { quantidade: 1, valor: 0 },
+        "Manual do Proprietário": { quantidade: 1, valor: 0 },
+        "Documento (CRLV)": { quantidade: 1, valor: 0 },
+        "Instrumentos do Painel": { quantidade: 1, valor: 0 },
+        "Acendedor de cigarros": { quantidade: 1, valor: 0 },
+        "Volante": { quantidade: 1, valor: 0 },
+        "Pedais": { quantidade: 1, valor: 0 },
+        "Alavanca de Freio de Mão": { quantidade: 1, valor: 0 },
+        "Alavanca de Marchas": { quantidade: 1, valor: 0 },
+        "Fluido de Freio": { quantidade: 1, valor: 0 },
+        "Líquido de Arrefecimento": { quantidade: 1, valor: 0 },
+        "Óleo Lubrificante do Motor": { quantidade: 1, valor: 0 },
+        "Bateria": { quantidade: 1, valor: 0 },
+        "Estepe": { quantidade: 1, valor: 0 },
+        "Macaco": { quantidade: 1, valor: 0 },
+        "Chave de Rodas": { quantidade: 1, valor: 0 },
+        "Triângulo": { quantidade: 1, valor: 0 }
     }
 };
 

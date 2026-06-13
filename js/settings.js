@@ -17,6 +17,14 @@ export function normalizeAllChecklistData(data = checklistData) {
 
 function applyChecklistData(data) {
     const normalized = normalizeAllChecklistData(data);
+
+    // Migração: Se a lista global de viaturas contiver itens antigos, força a atualização
+    const itensViatura = normalized.viaturas?.map(i => i.nome) || [];
+    if (itensViatura.includes("Pressão dos Pneus") || itensViatura.includes("Limpeza Interna")) {
+        console.log("Detectada lista de viaturas antiga no banco. Sincronizando novos itens...");
+        normalized.viaturas = cloneChecklistItems(checklistData.viaturas);
+    }
+
     Object.keys(categoryNames).forEach(category => {
         checklistData[category].splice(0, checklistData[category].length, ...normalized[category]);
     });
@@ -27,7 +35,15 @@ function applyChecklistDataByViatura(data = {}) {
     Object.keys(checklistDataByViatura).forEach(viaturaId => delete checklistDataByViatura[viaturaId]);
     Object.entries(data).forEach(([viaturaId, porCategoria]) => {
         if (!defaultIds.has(String(viaturaId))) return;
-        checklistDataByViatura[String(viaturaId)] = normalizeAllChecklistData(porCategoria);
+        const normalized = normalizeAllChecklistData(porCategoria);
+
+        // Migração por viatura específica: se houver lista customizada antiga, remove para usar a nova global
+        const itensViatura = normalized.viaturas?.map(i => i.nome) || [];
+        if (itensViatura.includes("Pressão dos Pneus")) {
+            delete normalized.viaturas; 
+        }
+
+        checklistDataByViatura[String(viaturaId)] = normalized;
     });
 }
 
