@@ -615,7 +615,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
 
         const fotos = Array.isArray(v.fotosEvidencia) ? v.fotosEvidencia : (v.fotoEvidencia ? [v.fotoEvidencia] : []);
         if (fotos.length > 0) {
-            addColumnText("Fotos de evidência capturadas:", { bold: true, color: [15, 82, 160] });
+            addColumnText("FOTOS DE EVIDÊNCIA CAPTURADAS:", { bold: true, size: 11, color: [190, 0, 0] });
             for (const foto of fotos) {
                 try {
                     const imgData = await carregarImagemDataUrl(foto);
