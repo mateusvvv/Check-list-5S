@@ -240,6 +240,19 @@
                 margin-left: 0 !important;
                 margin-top: 10px !important;
             }
+
+            /* Reduzir o tamanho das letras de avaria (A, R, X, F, Q) no Mobile */
+            .damage-type {
+                font-size: 0.78rem !important; /* Diminui o texto nos botões de seleção */
+                padding: 6px 8px !important;
+            }
+
+            .damage-marker {
+                font-size: 0.7rem !important; /* Diminui a letra dentro do círculo no mapa */
+                width: 22px !important;      /* Ajusta o tamanho do círculo para acompanhar a fonte */
+                height: 22px !important;
+                line-height: 22px !important;
+            }
         }
 
         /* Centraliza o cabeçalho da seção para alinhar com os cards */
@@ -537,15 +550,6 @@
             background-color: #dcfce7 !important; /* Verde claro de sucesso */
             border-color: #22c55e !important;    /* Borda verde */
             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2) !important;
-        }
-
-        /* Ícone de PDF concluído */
-        .pdf-done-indicator {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            font-size: 1.4rem;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
         }
 
         /* Texto de Vistoria Concluída no Dashboard */
@@ -1567,6 +1571,16 @@
                     <div class="input-group km-input">
                         <label for="km">KM Atual:</label>
                         <input type="number" id="km" placeholder="Km atual">
+                    </div>
+                    <div class="input-group fuel-input">
+                        <label for="combustivel">Nível de combustível:</label>
+                        <select id="combustivel">
+                            <option value="">Selecione</option>
+                            <option value="1/4">1/4</option>
+                            <option value="1/2">1/2</option>
+                            <option value="3/4">3/4</option>
+                            <option value="1/1">1/1</option>
+                        </select>
                     </div>
                     <div class="input-group">
                         <label>Foto da Viatura (Opcional): <span id="count-viaturas" class="photo-counter">(0 fotos)</span></label>

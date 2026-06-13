@@ -68,8 +68,7 @@ function applyViaturaResponsaveis(data = {}) {
         viaturaResponsaveis[String(viaturaId)] = {
             tecnico: String(responsaveis?.tecnico || ""),
             tecnicoCpf: String(responsaveis?.tecnicoCpf || ""),
-            auxiliar: String(responsaveis?.auxiliar || ""),
-            auxiliarCpf: String(responsaveis?.auxiliarCpf || "")
+            auxiliares: Array.isArray(responsaveis?.auxiliares) ? responsaveis.auxiliares.map(a => ({...a})) : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : [])
         };
     });
 
@@ -297,7 +296,11 @@ export async function salvarConfiguracoes() {
                 .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
                 .map(([viaturaId, responsaveis]) => [
                     viaturaId,
-                    { ...responsaveis }
+                    { 
+                        tecnico: responsaveis.tecnico || "",
+                        tecnicoCpf: responsaveis.tecnicoCpf || "",
+                        auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({...a})) : []
+                    }
                 ])
         ),
         viaturas: state.viaturas,

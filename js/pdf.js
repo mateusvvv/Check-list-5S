@@ -181,31 +181,26 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}) {
 
     y = ensurePdfSpace(pdf, y, 48);
     y += 8;
+    
+    // Assinatura do Técnico
     pdf.line(10, y, 92, y);
-    pdf.line(112, y, 194, y);
-    y += 5;
-    pdf.text("Técnico responsável pela viatura", 17, y);
-    pdf.text("Auxiliar técnico", 137, y);
-    y += 8;
-    pdf.text("Nome:", 10, y);
-    pdf.line(24, y, 92, y);
-    pdf.text("Nome:", 112, y);
-    pdf.line(126, y, 194, y);
-    y += 9;
-
+    pdf.text("Técnico responsável pela viatura", 17, y + 5);
     if (signatures.tecnico) {
-        pdf.addImage(signatures.tecnico, 'PNG', 15, y - 18, 70, 15);
+        pdf.addImage(signatures.tecnico, 'PNG', 15, y - 15, 70, 15);
     }
-    if (signatures.auxiliar) {
-        pdf.addImage(signatures.auxiliar, 'PNG', 117, y - 18, 70, 15);
-    }
+    y += 20;
 
-    pdf.text("Assinatura:", 10, y);
-    pdf.line(31, y, 92, y);
-    pdf.text("Assinatura:", 112, y);
-    pdf.line(133, y, 194, y);
+    // Assinaturas dos Auxiliares
+    const auxiliares = Array.isArray(signatures.auxiliares) ? signatures.auxiliares : [];
+    auxiliares.forEach((sig, i) => {
+        y = ensurePdfSpace(pdf, y, 30);
+        pdf.line(10, y, 92, y);
+        pdf.text(`Auxiliar técnico ${auxiliares.length > 1 ? i + 1 : ""}`, 17, y + 5);
+        if (sig) pdf.addImage(sig, 'PNG', 15, y - 15, 70, 15);
+        y += 20;
+    });
 
-    return y + 10;
+    return y;
 }
 
 function getCategoryFromInput(value) {
@@ -552,8 +547,12 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
         if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
         if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
-        if (v.auxiliarTecnico) addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
-        if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
+        if (v.auxiliares && v.auxiliares.length > 0) {
+            v.auxiliares.forEach((aux, idx) => {
+                addColumnText(`Auxiliar técnico ${v.auxiliares.length > 1 ? idx + 1 : ""}: ${aux.nome}`, { color: [30, 30, 30], bold: true });
+                if (aux.cpf) addColumnText(`CPF do auxiliar: ${aux.cpf}`, { color: [100, 100, 100] });
+            });
+        }
 
         // Mensagem de destaque para identificar de quem são os EPIs (Técnico ou Auxiliar)
         if (v.categoria === "epis" && v.epiResponsavelNome) {
@@ -568,6 +567,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText(`Data e hora: ${dateRef} às ${dataObj.toLocaleTimeString("pt-BR")}`, { color: [100, 100, 100], bold: true });
 
         if (v.km) addColumnText(`KM: ${v.km}`);
+        if (v.combustivel) addColumnText(`Combustível: ${v.combustivel}`);
         if (v.categoria === "viaturas" && v.observacoesViatura) addColumnText(`Observações: ${v.observacoesViatura}`);
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
 

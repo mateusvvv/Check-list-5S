@@ -1503,7 +1503,6 @@ function renderViaturaDashboard() {
         card.onclick = (e) => handleViaturaInteraction(e, id);
 
         card.innerHTML = `
-            ${isFullyConcluded && id !== "2" ? '<span class="pdf-done-indicator" title="Relatório PDF Gerado">📄✅</span>' : ''}
             <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
             ${isFullyConcluded ? '<span class="viatura-concluded-label">Vistoria concluída</span>' : ''}
             ${isDisabled ? `<span class="viatura-disabled-label">Desativada</span>` : ""}
@@ -1532,6 +1531,9 @@ function selectViatura(id) {
     preencherResponsaveisViatura();
     updateVehicleMapImage(id);
     updateTabletInfo(id);
+
+    renderFotoPreviews('viaturas');
+    renderFotoPreviews('tablets');
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab) renderItems(activeTab.id);
@@ -1641,10 +1643,12 @@ async function gerarPdfCategoria(category) {
 async function handleFotoUpload(input, categoria) {
     const files = Array.from(input.files);
     if (files.length === 0) return;
+    const viaturaId = state.selectedViatura;
 
     if (!state.fotosEvidencia) state.fotosEvidencia = {};
-    if (!Array.isArray(state.fotosEvidencia[categoria])) {
-        state.fotosEvidencia[categoria] = [];
+    if (!state.fotosEvidencia[viaturaId]) state.fotosEvidencia[viaturaId] = {};
+    if (!Array.isArray(state.fotosEvidencia[viaturaId][categoria])) {
+        state.fotosEvidencia[viaturaId][categoria] = [];
     }
 
     for (const file of files) {
@@ -1662,7 +1666,8 @@ async function handleFotoUpload(input, categoria) {
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-                state.fotosEvidencia[categoria].push(compressedBase64);
+                state.fotosEvidencia[viaturaId][categoria].push(compressedBase64);
+                localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
                 renderFotoPreviews(categoria);
             };
             img.src = e.target.result;
@@ -1680,7 +1685,8 @@ function renderFotoPreviews(categoria) {
     
     if (!container) return;
 
-    const fotos = state.fotosEvidencia?.[categoria] || [];
+    const viaturaId = state.selectedViatura;
+    const fotos = state.fotosEvidencia?.[viaturaId]?.[categoria] || [];
     
     if (counter) {
         counter.innerText = `(${fotos.length} foto${fotos.length === 1 ? '' : 's'})`;
@@ -1695,14 +1701,17 @@ function renderFotoPreviews(categoria) {
 }
 
 function removerFoto(categoria, index) {
-    if (state.fotosEvidencia[categoria]) {
-        state.fotosEvidencia[categoria].splice(index, 1);
+    const viaturaId = state.selectedViatura;
+    if (state.fotosEvidencia?.[viaturaId]?.[categoria]) {
+        state.fotosEvidencia[viaturaId][categoria].splice(index, 1);
+        localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
         renderFotoPreviews(categoria);
     }
 }
 
 async function finalizarVistoria(category) {
     const kmInput = document.getElementById("km");
+    const combustivelInput = document.getElementById("combustivel");
     const dataVistoriaInput = document.getElementById("checking-date");
     const tecnicoNomeInput = document.getElementById("tecnico-nome");
     const tecnicoCpfInput = document.getElementById("tecnico-cpf");
@@ -1723,6 +1732,11 @@ async function finalizarVistoria(category) {
 
     if (category === "viaturas" && (!kmInput || !kmInput.value)) {
         alert("Por favor, informe o KM atual da viatura antes de finalizar.");
+        return;
+    }
+
+    if (category === "viaturas" && (!combustivelInput || !combustivelInput.value)) {
+        alert("Por favor, informe o nível de combustível antes de finalizar.");
         return;
     }
 
@@ -1832,11 +1846,12 @@ async function finalizarVistoria(category) {
         tipoVistoria: state.vistoriaMode[state.selectedViatura] || "completa",
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
+        combustivel: category === "viaturas" ? (combustivelInput?.value || null) : null,
         avarias: category === "viaturas" ? [...state.vehicleDamages[state.selectedViatura]] : [],
         observacoesViatura: category === "viaturas" ? (document.getElementById("viatura-observacoes")?.value.trim() || "") : "",
         avariasTablet: category === "tablets" ? [...state.tabletDamages[state.selectedViatura]] : [],
         observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : "",
-        fotosEvidencia: state.fotosEvidencia ? (state.fotosEvidencia[category] || []) : []
+        fotosEvidencia: state.fotosEvidencia?.[state.selectedViatura]?.[category] || []
     };
 
     const pendentes = checklistResults.filter(r => r.status === "pendente");
@@ -1900,6 +1915,7 @@ async function enviarVistoriaAoFirebase() {
         });
 
         if (document.getElementById("km")) document.getElementById("km").value = "";
+        if (document.getElementById("combustivel")) document.getElementById("combustivel").value = "";
         if (categoriaSalva === "viaturas") {
             state.vehicleDamages[state.selectedViatura] = [];
             const observacoesViatura = document.getElementById("viatura-observacoes");
@@ -1916,7 +1932,10 @@ async function enviarVistoriaAoFirebase() {
         }
         
         // Limpa a foto após o envio
-        if (state.fotosEvidencia) state.fotosEvidencia[categoriaSalva] = null;
+        if (state.fotosEvidencia?.[viaturaSalva]) {
+            state.fotosEvidencia[viaturaSalva][categoriaSalva] = [];
+            localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
+        }
         const inputFoto = document.getElementById(categoriaSalva === 'viaturas' ? 'foto-viatura' : 'foto-tablet');
         if (inputFoto) inputFoto.value = "";
 
@@ -2292,6 +2311,13 @@ document.addEventListener("DOMContentLoaded", () => {
     preencherResponsaveisViatura();
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
+
+    try {
+        state.fotosEvidencia = JSON.parse(localStorage.getItem("fotosEvidencia") || "{}");
+    } catch (e) {
+        state.fotosEvidencia = {};
+    }
+
     setAuthReadyCallback(async () => {
         const vistoriadorAtual = getVistoriadorAtivo();
         renderVistoriadorOptions();
