@@ -442,6 +442,8 @@ function getTecnicoOptions() {
     });
     [
         { nome: "JOSE RANDSON SILVA", cpf: "125.442.764-36", funcao: "Técnico" },
+        { nome: "LUCAS MATEUS BEZERRA CABRAL", cpf: "144.054.924-92", funcao: "Técnico" },
+        { nome: "ISAEL FORTUNATO DE LIMA", cpf: "182.838.664-27", funcao: "Auxiliar técnico" },
         { nome: "JOSENILDO VINICIUS ALVES LOPES SILVA", cpf: "131.000.574-57", funcao: "Auxiliar técnico" },
         { nome: "MIKE RYAN LIMA CRUZ", cpf: "159.056.184-88", funcao: "Auxiliar técnico" }
     ].forEach(addOption);
@@ -520,7 +522,7 @@ function renderTecnicoDatalist() {
     if (tecnicoAuxiliarDatalist) tecnicoAuxiliarDatalist.innerHTML = options;
 }
 
-function selecionarTecnicoVistoriaAtual(nome) {
+async function selecionarTecnicoVistoriaAtual(nome) {
     const tecnico = findTecnicoByName(nome);
     const tecnicoNomeInput = document.getElementById("tecnico-nome");
     const tecnicoCpfInput = document.getElementById("tecnico-cpf");
@@ -534,6 +536,26 @@ function selecionarTecnicoVistoriaAtual(nome) {
 
     if (tecnicoNomeInput) tecnicoNomeInput.value = tecnicoNome;
     if (tecnico && tecnicoCpfInput) tecnicoCpfInput.value = tecnicoCpf;
+    if (tecnicoNomeInput) updateInputFontSize(tecnicoNomeInput);
+
+    if (viaturaResponsaveis[state.selectedViatura]) {
+        viaturaResponsaveis[state.selectedViatura].tecnico = tecnicoNome;
+        viaturaResponsaveis[state.selectedViatura].tecnicoCpf = tecnicoCpf;
+        await salvarConfiguracoes();
+        renderEpiPessoaOptions();
+        renderViaturaDashboard();
+        renderTeamList();
+    }
+}
+
+async function salvarCpfTecnicoVistoriaAtual(cpf) {
+    const cpfVal = String(cpf || "").trim();
+    if (viaturaResponsaveis[state.selectedViatura]) {
+        viaturaResponsaveis[state.selectedViatura].tecnicoCpf = cpfVal;
+        await salvarConfiguracoes();
+        renderEpiPessoaOptions();
+        renderTeamList();
+    }
 }
 
 function selecionarAuxiliarVistoriaAtual(nome) {
@@ -571,11 +593,23 @@ async function selecionarResponsavelPorPesquisa(nome) {
     if (nomeInput) nomeInput.value = pessoaNome;
     if (pessoa && cpfInput) cpfInput.value = pessoaCpf;
     if (viaturaResponsaveis[state.selectedViatura]) {
+        if (isAuxiliar) {
+            const resp = viaturaResponsaveis[state.selectedViatura];
+            if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
+            
+            if (resp.auxiliares.length > 0) {
+                resp.auxiliares[0] = { nome: pessoaNome, cpf: pessoaCpf };
+            } else {
+                resp.auxiliares.push({ nome: pessoaNome, cpf: pessoaCpf });
+            }
+        }
+
         viaturaResponsaveis[state.selectedViatura][campoNome] = pessoaNome;
         viaturaResponsaveis[state.selectedViatura][campoCpf] = pessoaCpf;
         await salvarConfiguracoes();
     }
     if (pesquisaInput) pesquisaInput.value = "";
+    preencherResponsaveisViatura();
     renderEpiPessoaOptions();
 }
 
@@ -1145,11 +1179,124 @@ function preencherResponsaveisViatura() {
     const auxiliarNomeInput = document.getElementById("auxiliar-nome");
     const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
 
-    if (tecnicoNomeInput) tecnicoNomeInput.value = responsaveis?.tecnico || "";
+    if (tecnicoNomeInput) {
+        tecnicoNomeInput.value = responsaveis?.tecnico || "";
+        updateInputFontSize(tecnicoNomeInput);
+    }
     if (tecnicoCpfInput) tecnicoCpfInput.value = responsaveis?.tecnicoCpf || "";
     if (auxiliarNomeInput) auxiliarNomeInput.value = responsaveis?.auxiliar || "";
     if (auxiliarCpfInput) auxiliarCpfInput.value = responsaveis?.auxiliarCpf || "";
+    
+    renderAuxiliaresList();
     renderEpiPessoaOptions();
+    renderTeamList();
+}
+
+function updateInputFontSize(input) {
+    if (!input) return;
+    const val = input.value || "";
+    // Ajusta a fonte se o nome ultrapassar 25 caracteres para manter visibilidade
+    if (val.length > 25) {
+        const factor = Math.max(0.6, 0.7 - (val.length - 25) * 0.008); // Ajustado para nova base de 0.7rem
+        input.style.fontSize = `${factor}rem`;
+    } else {
+        input.style.fontSize = "";
+    }
+}
+
+function renderAuxiliaresList() {
+    const container = document.getElementById("lista-auxiliares-selecionados");
+    if (!container) return;
+
+    const viaturaId = state.selectedViatura;
+    const responsaveis = viaturaResponsaveis[viaturaId] || {};
+    const auxiliares = Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares : [];
+
+    if (auxiliares.length === 0) {
+        container.innerHTML = '<p class="placeholder" style="grid-column: 1/-1;">Nenhum auxiliar adicionado.</p>';
+        return;
+    }
+
+    container.innerHTML = auxiliares.map((aux, index) => {
+        const nameStyle = (aux.nome || "").length > 28 ? 'style="font-size: 0.68rem;"' : '';
+        return `
+        <div class="assistant-card">
+            <div class="assistant-card-info">
+                <span class="assistant-card-name" ${nameStyle}>${escapeHtml(aux.nome)}</span>
+                <span class="assistant-card-cpf">CPF: ${escapeHtml(aux.cpf || "Não informado")}</span>
+            </div>
+            <button type="button" class="btn-remove-assistant" onclick="removerAuxiliarExtra(${index})" title="Remover auxiliar">
+                <span class="remove-icon">×</span>
+            </button>
+        </div>
+    `; }).join("");
+}
+
+async function adicionarAuxiliarExtra() {
+    const input = document.getElementById("responsavel-pesquisa");
+    const nome = input?.value.trim();
+    if (!nome) {
+        alert("Digite um nome ou pesquise para adicionar um auxiliar.");
+        return;
+    }
+
+    const pessoa = findTecnicoByName(nome);
+    const pessoaNome = pessoa?.nome || nome;
+    const pessoaCpf = pessoa?.cpf || "";
+
+    const viaturaId = state.selectedViatura;
+    if (!viaturaResponsaveis[viaturaId]) {
+        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+    }
+
+    if (!Array.isArray(viaturaResponsaveis[viaturaId].auxiliares)) {
+        viaturaResponsaveis[viaturaId].auxiliares = [];
+        if (viaturaResponsaveis[viaturaId].auxiliar) {
+            viaturaResponsaveis[viaturaId].auxiliares.push({
+                nome: viaturaResponsaveis[viaturaId].auxiliar,
+                cpf: viaturaResponsaveis[viaturaId].auxiliarCpf
+            });
+        }
+    }
+
+    if (viaturaResponsaveis[viaturaId].auxiliares.some(a => a.nome === pessoaNome)) {
+        alert(`O auxiliar "${pessoaNome}" já está na lista.`);
+        input.value = "";
+        return;
+    }
+
+    if (!confirmarResponsavelDuplicadoVistoria(pessoaNome, pessoaCpf)) {
+        input.value = "";
+        return;
+    }
+
+    viaturaResponsaveis[viaturaId].auxiliares.push({ nome: pessoaNome, cpf: pessoaCpf });
+    
+    // Mantém compatibilidade com o campo singular (usa o primeiro da lista)
+    viaturaResponsaveis[viaturaId].auxiliar = viaturaResponsaveis[viaturaId].auxiliares[0].nome;
+    viaturaResponsaveis[viaturaId].auxiliarCpf = viaturaResponsaveis[viaturaId].auxiliares[0].cpf;
+
+    input.value = "";
+    await salvarConfiguracoes();
+    renderAuxiliaresList();
+    renderEpiPessoaOptions();
+    preencherResponsaveisViatura();
+}
+
+async function removerAuxiliarExtra(index) {
+    const viaturaId = state.selectedViatura;
+    if (viaturaResponsaveis[viaturaId]?.auxiliares) {
+        viaturaResponsaveis[viaturaId].auxiliares.splice(index, 1);
+        
+        const first = viaturaResponsaveis[viaturaId].auxiliares[0];
+        viaturaResponsaveis[viaturaId].auxiliar = first ? first.nome : "";
+        viaturaResponsaveis[viaturaId].auxiliarCpf = first ? first.cpf : "";
+        
+        await salvarConfiguracoes();
+        renderAuxiliaresList();
+        renderEpiPessoaOptions();
+        preencherResponsaveisViatura();
+    }
 }
 
 function getSelectedEpiPessoaKey() {
@@ -1554,11 +1701,45 @@ function updateVistoriaModeUI() {
 
 function toggleVistoriaActions() {
     const container = document.getElementById("vistoria-actions-container");
-    const btn = document.querySelector(".btn-toggle-actions");
+    const btn = document.getElementById("btn-toggle-mode");
     if (container && btn) {
         container.classList.toggle("show");
         btn.classList.toggle("active");
     }
+}
+
+function toggleTeamActions() {
+    const container = document.getElementById("team-actions-container");
+    const btn = document.getElementById("btn-toggle-team");
+    if (container && btn) {
+        container.classList.toggle("show");
+        btn.classList.toggle("active");
+    }
+}
+
+function renderTeamList() {
+    const viaturaId = state.selectedViatura;
+    if (!viaturaId) return;
+    
+    const resp = viaturaResponsaveis[viaturaId] || {};
+    const team = [];
+
+    if (resp.tecnico && resp.tecnico !== "Veículo sem Técnico") {
+        team.push({ nome: resp.tecnico, cpf: resp.tecnicoCpf, tipo: "Técnico" });
+    }
+
+    if (Array.isArray(resp.auxiliares) && resp.auxiliares.length > 0) {
+        resp.auxiliares.forEach(aux => {
+            if (aux.nome) team.push({ nome: aux.nome, cpf: aux.cpf, tipo: "Auxiliar técnico" });
+        });
+    } else if (resp.auxiliar) {
+        team.push({ nome: resp.auxiliar, cpf: resp.auxiliarCpf, tipo: "Auxiliar técnico" });
+    }
+
+    const countLabel = document.getElementById("team-count-label");
+    if (!countLabel) return;
+
+    countLabel.innerText = `Equipe Responsável (${team.length})`;
 }
 
 function configurarModoVistoria() {
@@ -2209,9 +2390,12 @@ function bindWindowFunctions() {
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
         selecionarTecnicoVistoriaAtual,
+        salvarCpfTecnicoVistoriaAtual,
         selecionarAuxiliarVistoriaAtual,
         selecionarResponsavelPorPesquisa,
         configurarModoVistoria,
+        updateInputFontSize,
+        toggleTeamActions,
         showHome,
         showPage,
         selecionarPessoaEpi,
@@ -2289,7 +2473,9 @@ function bindWindowFunctions() {
         reiniciarTodasVistorias,
         toggleDarkMode,
         handleLongPressAction,
-        toggleVistoriaActions
+        toggleVistoriaActions,
+        adicionarAuxiliarExtra,
+        removerAuxiliarExtra
     });
 }
 
@@ -2316,6 +2502,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
     renderTecnicoDatalist();
     preencherResponsaveisViatura();
+    renderTeamList();
 
     setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
 

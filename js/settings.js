@@ -118,6 +118,7 @@ function applyFuncionariosExtras(data = funcionariosExtras) {
         ? data.map((funcionario, index) => normalizeFuncionarioExtra(funcionario, index)).filter(funcionario => funcionario.nome)
         : [];
     funcionariosExtras.splice(0, funcionariosExtras.length, ...normalized);
+    ensureDefaultExtra(defaultExtras, "SIDNEY MANOEL DO NASCIMENTO", "099.077.164-48", { funcao: "Técnico", status: "Férias" });
     ensureDefaultExtra(defaultExtras, "JOSE RANDSON SILVA", "125.442.764-36", { funcao: "Técnico", status: "Férias" });
     ensureDefaultExtra(defaultExtras, "JOSENILDO VINICIUS ALVES LOPES SILVA", "131.000.574-57", { funcao: "Auxiliar técnico", status: "Ativo" });
     ensureDefaultExtra(defaultExtras, "MIKE RYAN LIMA CRUZ", "159.056.184-88", { funcao: "Auxiliar técnico", status: "Ativo" });

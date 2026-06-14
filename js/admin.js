@@ -118,6 +118,8 @@ function getTecnicoOptions() {
     });
     [
         { nome: "JOSE RANDSON SILVA", cpf: "125.442.764-36" },
+        { nome: "LUCAS MATEUS BEZERRA CABRAL", cpf: "144.054.924-92" },
+        { nome: "ISAEL FORTUNATO DE LIMA", cpf: "182.838.664-27" },
         { nome: "JOSENILDO VINICIUS ALVES LOPES SILVA", cpf: "131.000.574-57" },
         { nome: "MIKE RYAN LIMA CRUZ", cpf: "159.056.184-88" }
     ].forEach(addOption);
@@ -388,6 +390,14 @@ export async function selecionarAuxiliarViatura(id, nome) {
     viaturaResponsaveis[viaturaId].auxiliar = auxiliarNome;
     if (auxiliar) viaturaResponsaveis[viaturaId].auxiliarCpf = auxiliarCpf;
 
+    const resp = viaturaResponsaveis[viaturaId];
+    if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
+    if (resp.auxiliares.length > 0) {
+        resp.auxiliares[0] = { nome: auxiliarNome, cpf: resp.auxiliarCpf || "" };
+    } else {
+        resp.auxiliares.push({ nome: auxiliarNome, cpf: resp.auxiliarCpf || "" });
+    }
+
     if (anterior !== auxiliarNome) {
         registrarHistoricoConfig("Auxiliar alterado", `${getViaturaLabel(viaturaId)}: auxiliar alterado de "${anterior}" para "${auxiliarNome || "Sem auxiliar"}".`);
     }
@@ -475,6 +485,17 @@ export async function editarResponsavelViatura(id, campo, valor) {
     };
     const anterior = viaturaResponsaveis[viaturaId][campo] || "Vazio";
     viaturaResponsaveis[viaturaId][campo] = valor.trim();
+
+    if (campo === "auxiliar" || campo === "auxiliarCpf") {
+        const resp = viaturaResponsaveis[viaturaId];
+        if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
+        if (resp.auxiliares.length > 0) {
+            resp.auxiliares[0] = { nome: resp.auxiliar, cpf: resp.auxiliarCpf };
+        } else if (resp.auxiliar) {
+            resp.auxiliares.push({ nome: resp.auxiliar, cpf: resp.auxiliarCpf });
+        }
+    }
+
     const novoValor = viaturaResponsaveis[viaturaId][campo] || "Vazio";
     if (anterior !== novoValor) {
         registrarHistoricoConfig(`${labels[campo]} alterado`, `${getViaturaLabel(viaturaId)}: ${labels[campo]} alterado de "${anterior}" para "${novoValor}".`);

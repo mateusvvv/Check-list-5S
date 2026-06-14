@@ -1430,6 +1430,248 @@
         }
         .custom-file-upload:hover { background-color: #0a3d7a !important; }
         body.dark-mode .custom-file-upload { background-color: #334155 !important; color: #f1f5f9 !important; border-color: #475569 !important; }
+
+        /* Melhorias na seção de Pesquisa de Técnicos/Auxiliares */
+        .checking-meta {
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        body.dark-mode .checking-meta {
+            background-color: #1e293b;
+            border-color: #334155;
+        }
+
+        .checking-main-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+        }
+
+        .date-group { flex: 0 0 180px; }
+        .technician-group {
+            flex: 1;
+            display: flex;
+            gap: 15px;
+            min-width: 250px;
+        }
+        .tech-field { flex: 2; }
+        .cpf-field { flex: 1; }
+
+        .assistant-search-row { width: 100%; margin-top: 5px; }
+        .search-action-wrapper {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .search-action-wrapper input { 
+            flex: 1; 
+            height: 44px !important;
+            border: 1.5px solid #cbd5e0 !important;
+            border-radius: 8px !important;
+            padding: 0 15px !important;
+            font-size: 0.78rem !important;
+        }
+        
+        .tech-field input, .cpf-field input {
+            font-size: 0.7rem !important; /* Reduzido para melhor visualização de nomes longos */
+            font-weight: 700 !important;
+        }
+        
+        .btn-add-auxiliar {
+            height: 44px;
+            background-color: #0f52a0;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0 20px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(15, 82, 160, 0.2);
+        }
+        .btn-add-auxiliar:hover { background-color: #0a3d7a; transform: translateY(-1px); }
+
+        .assistant-cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .assistant-card {
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: all 0.2s;
+            border-left: 4px solid #0f52a0;
+        }
+        .assistant-card:hover { transform: scale(1.02); }
+        body.dark-mode .assistant-card { background: #1e293b; border-color: #334155; }
+
+        .assistant-card-info { display: flex; flex-direction: column; gap: 2px; overflow: hidden; padding-right: 8px; flex: 1; }
+        .assistant-card-name { font-weight: 700; color: #1e293b; font-size: 0.7rem; line-height: 1.2; overflow-wrap: anywhere; } /* Reduzido para melhor visualização de nomes longos */
+        body.dark-mode .assistant-card-name { color: #f1f5f9; }
+        .assistant-card-cpf { color: #64748b; font-size: 0.72rem; font-family: monospace; }
+        body.dark-mode .assistant-card-cpf { color: #94a3b8; }
+
+        .btn-remove-assistant {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .btn-remove-assistant:hover { background: #ef4444; color: white; }
+        .remove-icon { font-size: 1.2rem; line-height: 1; font-weight: bold; }
+
+        /* Ajustes visuais e de posicionamento EXCLUSIVOS para PC */
+        @media (min-width: 601px) {
+            .team-actions-container {
+                max-width: 900px !important;
+            }
+            .checking-meta {
+                padding: 25px !important;
+                gap: 25px !important;
+                border-radius: 15px !important;
+            }
+
+            .checking-main-row {
+                display: grid !important;
+                grid-template-columns: 180px 1fr 200px !important; /* Colunas: Data | Nome | CPF */
+                gap: 20px !important;
+                align-items: end !important;
+                width: 100% !important;
+            }
+
+            /* Permite que os campos internos (Nome e CPF) se alinhem ao grid pai */
+            .technician-group {
+                display: contents !important;
+            }
+
+            .date-group { grid-column: 1 !important; }
+            .tech-field { grid-column: 2 !important; }
+            .cpf-field { grid-column: 3 !important; }
+
+            .assistant-search-row {
+                border-top: 1px solid #e2e8f0;
+                padding-top: 15px !important;
+                margin-top: 0px !important;
+            }
+            body.dark-mode .assistant-search-row { border-top-color: #334155; }
+        }
+
+        /* Estilos para o Dropdown da Equipe Responsável */
+        .team-actions-container {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 20px !important;
+            text-align: left !important;
+            width: 95% !important;
+            max-width: 600px !important;
+            margin: 12px auto 0 auto !important;
+            background-color: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+            z-index: 100 !important;
+        }
+
+        .team-member-item {
+            padding: 10px 0 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            gap: 15px !important;
+            font-size: 0.95rem !important;
+        }
+
+        .team-member-item:last-child {
+            border-bottom: none !important;
+        }
+
+        .team-member-info {
+            flex: 1 1 auto !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .team-member-name {
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            word-break: break-word !important; /* Garante quebra de linha para nomes muito longos */
+            font-size: 0.7rem !important; /* Reduzido para melhor visualização de nomes longos */
+        }
+
+        .team-member-cpf {
+            color: #64748b !important;
+            font-family: monospace !important;
+            white-space: nowrap !important;
+        }
+
+        .team-member-role {
+            font-size: 0.72rem !important;
+            font-weight: 800 !important;
+            color: #0f52a0 !important;
+            background: #eef6ff !important;
+            padding: 3px 10px !important;
+            border-radius: 20px !important;
+            text-transform: uppercase !important;
+            flex: 0 0 auto !important;
+        }
+
+        body.dark-mode .team-member-name { color: #f1f5f9 !important; }
+        body.dark-mode .team-member-cpf { color: #94a3b8 !important; }
+        body.dark-mode .team-actions-container { background-color: #1e293b !important; border-color: #334155 !important; }
+        body.dark-mode .team-member-item { border-bottom-color: #334155 !important; }
+        body.dark-mode .team-member-role { color: #38bdf8 !important; background: rgba(56, 189, 248, 0.1) !important; }
+
+        @media (max-width: 600px) {
+            .team-member-item {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 5px !important;
+            }
+            .team-member-role {
+                align-self: flex-start !important;
+                margin-left: 0 !important;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .team-actions-container { padding: 12px !important; }
+            .checking-main-row, .technician-group, .search-action-wrapper { flex-direction: column !important; align-items: stretch !important; }
+            .technician-group { min-width: auto !important; }
+            .date-group, .technician-group, .tech-field, .cpf-field { width: 100% !important; flex: none !important; }
+            .tech-field input, .cpf-field input { width: 100% !important; }
+            .btn-add-auxiliar { width: 100%; justify-content: center; height: 44px; }
+            .assistant-cards-container { grid-template-columns: 1fr; }
+            .team-member-name { font-size: 0.7rem !important; } /* Reduzido para melhor visualização de nomes longos */
+        }
     </style>
 </head>
 <body>
@@ -1484,7 +1726,7 @@
                     <!-- Botões das viaturas gerados via JS -->
                 </div>
                 <div class="vistoria-mode-bar">
-                    <button type="button" class="btn-toggle-actions" onclick="toggleVistoriaActions()">
+                    <button type="button" class="btn-toggle-actions" id="btn-toggle-mode" onclick="toggleVistoriaActions()">
                         <span id="vistoria-mode-label">Modo: Vistoria completa</span>
                         <span class="toggle-icon">▼</span>
                     </button>
@@ -1494,33 +1736,52 @@
                         <button type="button" class="btn-reset-survey btn-reset-all" onclick="reiniciarTodasVistorias()" style="border-color: #ef4444; color: #ef4444;">Reiniciar todas</button>
                     </div>
                 </div>
-                <div class="checking-meta">
-                    <div class="input-group">
-                        <label for="checking-date">Data da vistoria:</label>
-                        <input type="date" id="checking-date">
-                    </div>
-                    <div class="input-group checking-search-field">
-                        <label for="responsavel-pesquisa">Pesquisar técnico/auxiliar:</label>
-                        <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list" placeholder="Digite o nome para substituir na viatura" onchange="selecionarResponsavelPorPesquisa(this.value)">
-                        <datalist id="tecnicos-auxiliares-list"></datalist>
-                    </div>
-                    <div class="input-group checking-name-field">
-                        <label for="tecnico-nome">Técnico:</label>
-                        <input type="text" id="tecnico-nome" list="tecnicos-list" placeholder="Nome do técnico" onchange="selecionarTecnicoVistoriaAtual(this.value)">
-                        <datalist id="tecnicos-list"></datalist>
-                    </div>
-                    <div class="input-group">
-                        <label for="tecnico-cpf">CPF do técnico:</label>
-                        <input type="text" id="tecnico-cpf" placeholder="000.000.000-00">
-                    </div>
-                    <div class="input-group checking-name-field">
-                        <label for="auxiliar-nome">Auxiliar técnico:</label>
-                        <input type="text" id="auxiliar-nome" list="auxiliares-list" placeholder="Nome do auxiliar técnico" onchange="selecionarAuxiliarVistoriaAtual(this.value)">
-                        <datalist id="auxiliares-list"></datalist>
-                    </div>
-                    <div class="input-group">
-                        <label for="auxiliar-cpf">CPF do auxiliar:</label>
-                        <input type="text" id="auxiliar-cpf" placeholder="000.000.000-00">
+
+                <div class="vistoria-mode-bar">
+                    <button type="button" class="btn-toggle-actions" id="btn-toggle-team" onclick="toggleTeamActions()">
+                        <span id="team-count-label">Equipe Responsável (0)</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                    <div id="team-actions-container" class="vistoria-actions-container team-actions-container">
+                        <div class="checking-main-row">
+                            <div class="input-group date-group">
+                                <label for="checking-date">Data da vistoria:</label>
+                                <input type="date" id="checking-date">
+                            </div>
+                            <div class="input-group technician-group">
+                                <div class="tech-field">
+                                    <label for="tecnico-nome">Técnico:</label>
+                                    <input type="text" id="tecnico-nome" list="tecnicos-list" placeholder="Pesquisar técnico" onchange="selecionarTecnicoVistoriaAtual(this.value)" oninput="updateInputFontSize(this)">
+                                    <datalist id="tecnicos-list"></datalist>
+                                </div>
+                                <div class="cpf-field">
+                                    <label for="tecnico-cpf">CPF:</label>
+                                    <input type="text" id="tecnico-cpf" placeholder="000.000.000-00" onchange="salvarCpfTecnicoVistoriaAtual(this.value)">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="assistant-search-row">
+                            <div class="date-group-placeholder"></div>
+                            <div class="input-group search-field-wrapper">
+                                <label for="responsavel-pesquisa">Add Auxiliares:</label>
+                                <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list" placeholder="Nome ou CPF" oninput="updateInputFontSize(this)">
+                                <datalist id="tecnicos-auxiliares-list"></datalist>
+                            </div>
+                            <div class="input-group search-button-wrapper">
+                                <label class="desktop-only">&nbsp;</label>
+                                <button type="button" class="btn-add-auxiliar" onclick="adicionarAuxiliarExtra()">➕ Adicionar Auxiliar</button>
+                            </div>
+                        </div>
+
+                        <div id="lista-auxiliares-selecionados" class="assistant-cards-container"></div>
+                        
+                        <!-- Campos ocultos para compatibilidade com lógica antiga -->
+                        <div style="display: none;">
+                            <input type="text" id="auxiliar-nome">
+                            <input type="text" id="auxiliar-cpf">
+                            <datalist id="auxiliares-list"></datalist>
+                        </div>
                     </div>
                 </div>
                 <button id="btn-encerrar-geral" class="btn-encerrar" onclick="encerrarVistoriaCompleta()">📁 Encerrar Vistoria e Gerar PDF</button>

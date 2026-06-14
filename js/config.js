@@ -1638,6 +1638,20 @@ export const viaturaResponsaveis = {
 
 export const funcionariosExtras = [
     {
+        nome: "SIDNEY MANOEL DO NASCIMENTO",
+        cpf: "099.077.164-48",
+        funcao: "Técnico",
+        status: "Férias",
+        viaturaId: "",
+        finalizado: true,
+        epis: episSidneyManoel.map(nome => ({
+            nome,
+            quantidade: (nome === "MOSQUETÃO TRAVA QUEDAS") ? 2 : 1,
+            ca: "",
+            dataEntrega: ""
+        }))
+    },
+    {
         nome: "JOSE RANDSON SILVA",
         cpf: "125.442.764-36",
         funcao: "Técnico",
@@ -1724,6 +1738,7 @@ function seedEmployeeEpis(nome, cpf, items, defaultsByItem) {
     employeeEpisByPerson[getFuncionarioKeyFromFields(nome, cpf)] = buildFuncionarioEpisFromDefaults(items, defaultsByItem);
 }
 
+seedEmployeeEpis("SIDNEY MANOEL DO NASCIMENTO", "099.077.164-48", episSidneyManoel, {});
 seedEmployeeEpis("ANDRESON DA ROCHA SILVA", "132.919.664-30", episAndresonRocha, episAndresonRochaDefaults);
 seedEmployeeEpis("ISAEL FORTUNATO DE LIMA", "182.838.664-27", episIsaelFortunato, episIsaelFortunatoDefaults);
 seedEmployeeEpis("JOSE EDIVANILSON DA SILVA", "115.353.914-48", episJoseEdivanilson, episJoseEdivanilsonDefaults);
@@ -1779,24 +1794,37 @@ export function ensureFuncionarioEpis(viaturaId, tipo, nome, cpf) {
 
 export function getEpiPessoaOptions(viaturaId) {
     const responsaveis = viaturaResponsaveis[String(viaturaId)] || {};
-    return [
-        responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
-            ? {
-                tipo: "Técnico",
-                nome: responsaveis.tecnico,
-                cpf: responsaveis.tecnicoCpf || "",
-                key: getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf)
-            }
-            : null,
-        responsaveis.auxiliar
-            ? {
-                tipo: "Auxiliar técnico",
-                nome: responsaveis.auxiliar,
-                cpf: responsaveis.auxiliarCpf || "",
-                key: getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf)
-            }
-            : null
-    ].filter(Boolean);
+    const options = [];
+
+    if (responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico") {
+        options.push({
+            tipo: "Técnico",
+            nome: responsaveis.tecnico,
+            cpf: responsaveis.tecnicoCpf || "",
+            key: getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf)
+        });
+    }
+
+    const auxiliares = Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares : [];
+    if (auxiliares.length > 0) {
+        auxiliares.forEach((aux, idx) => {
+            options.push({
+                tipo: `Auxiliar técnico${auxiliares.length > 1 ? ` ${idx + 1}` : ""}`,
+                nome: aux.nome,
+                cpf: aux.cpf || "",
+                key: getFuncionarioKeyFromFields(aux.nome, aux.cpf)
+            });
+        });
+    } else if (responsaveis.auxiliar) {
+        options.push({
+            tipo: "Auxiliar técnico",
+            nome: responsaveis.auxiliar,
+            cpf: responsaveis.auxiliarCpf || "",
+            key: getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf)
+        });
+    }
+
+    return options;
 }
 
 export function getEpiPessoaByKey(viaturaId, key) {
@@ -1824,14 +1852,29 @@ function buildFuncionarioFromViatura(viaturaId, tipo, nome, cpf) {
 }
 
 export function getFuncionariosData() {
-    const vinculos = Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => [
-        responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
-            ? buildFuncionarioFromViatura(viaturaId, "Técnico", responsaveis.tecnico, responsaveis.tecnicoCpf)
-            : null,
-        responsaveis.auxiliar
-            ? buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", responsaveis.auxiliar, responsaveis.auxiliarCpf)
-            : null
-    ].filter(Boolean));
+    const vinculos = Object.entries(viaturaResponsaveis).flatMap(([viaturaId, responsaveis]) => {
+        const res = [];
+        if (responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico") {
+            res.push(buildFuncionarioFromViatura(viaturaId, "Técnico", responsaveis.tecnico, responsaveis.tecnicoCpf));
+        }
+        
+        const addedKeys = new Set();
+        if (responsaveis.auxiliar) {
+            res.push(buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", responsaveis.auxiliar, responsaveis.auxiliarCpf));
+            addedKeys.add(getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf));
+        }
+
+        if (Array.isArray(responsaveis.auxiliares)) {
+            responsaveis.auxiliares.forEach(aux => {
+                const key = getFuncionarioKeyFromFields(aux.nome, aux.cpf);
+                if (aux.nome && !addedKeys.has(key)) {
+                    res.push(buildFuncionarioFromViatura(viaturaId, "Auxiliar técnico", aux.nome, aux.cpf));
+                    addedKeys.add(key);
+                }
+            });
+        }
+        return res;
+    });
     const vinculoKeys = new Set(vinculos.map(funcionario => getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)));
 
     return [
