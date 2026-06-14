@@ -225,6 +225,7 @@ export async function logoutAdmin() {
 
 function renderAdminConfig() {
     renderAdminViaturas();
+    renderAdminFilterViaturaOptions();
     renderAdminViaturaOptions();
     renderAdminChecklist();
     renderAdminFuncionariosExtras();
@@ -598,6 +599,17 @@ export function renderAdminViaturaOptions() {
         <option value="${viatura.id}">${escapeHtml(viatura.nome)}${viatura.ativa === false ? " (desativada)" : ""}</option>
     `).join("");
     select.value = state.viaturas.some(viatura => viatura.id === valorAtual) ? valorAtual : state.selectedViatura;
+}
+
+export function renderAdminFilterViaturaOptions() {
+    const select = document.getElementById("filter-viatura");
+    if (!select) return;
+
+    const valorAtual = select.value;
+    select.innerHTML = `<option value="">Todas</option>` + state.viaturas.map(viatura => `
+        <option value="${viatura.id}">${escapeHtml(viatura.nome)}</option>
+    `).join("");
+    select.value = [...select.options].some(o => o.value === valorAtual) ? valorAtual : "";
 }
 
 function syncFuncionarioExtraEpis(funcionario, oldKey = "") {
@@ -1154,6 +1166,7 @@ export async function carregarHistorico() {
 
 export function aplicarFiltros() {
     const vistoriador = document.getElementById("filter-vistoriador").value;
+    const viaturaId = document.getElementById("filter-viatura")?.value || "";
     const dataInicio = document.getElementById("filter-data-inicio").value;
     const dataFim = document.getElementById("filter-data-fim").value;
     const status = document.getElementById("filter-status")?.value || "";
@@ -1163,6 +1176,7 @@ export function aplicarFiltros() {
     let filtrados = state.vistoriasCache;
 
     if (vistoriador) filtrados = filtrados.filter(v => v.vistoriador === vistoriador);
+    if (viaturaId) filtrados = filtrados.filter(v => String(v.viaturaId) === String(viaturaId));
     if (dataInicio) {
         const dInicio = new Date(dataInicio + "T00:00:00");
         filtrados = filtrados.filter(v => getDataReferenciaFiltro(v) >= dInicio);
@@ -1512,6 +1526,9 @@ export function verDetalhes(docId) {
     const pendentes = itens.filter(i => i.status !== "ok");
 
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
+    if (vistoria.categoria === "manuais_pdf" && vistoria.nomeArquivo) {
+        html += `<p><strong>Arquivo PDF:</strong> ${vistoria.nomeArquivo}</p>`;
+    }
     if (vistoria.dataVistoria) html += `<p><strong>Data da vistoria:</strong> ${String(vistoria.dataVistoria).split("-").reverse().join("/")}</p>`;
     if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
@@ -1579,10 +1596,50 @@ export function verDetalhes(docId) {
 
     body.innerHTML = html;
     modal.style.display = "block";
+    document.getElementById("modal-body").scrollTop = 0;
 }
 
 export function closeModal() {
     document.getElementById("details-modal").style.display = "none";
+}
+
+export function importarPDFs() {
+    document.getElementById("import-pdf-input")?.click();
+}
+
+export async function processarPDFsImportados(input) {
+    const files = Array.from(input.files || []);
+    if (files.length === 0) return;
+
+    if (!confirm(`Deseja adicionar ${files.length} registro(s) de PDF ao histórico?`)) {
+        input.value = "";
+        return;
+    }
+
+    const vistoriador = getVistoriadorResponsavel();
+    const viaturaId = prompt("Informe o número da viatura para estes PDFs:", state.selectedViatura) || state.selectedViatura;
+
+    try {
+        for (const file of files) {
+            await addDoc(collection(db, "vistorias"), {
+                vistoriador,
+                viaturaId: String(viaturaId),
+                categoria: "manuais_pdf",
+                tipoRegistro: "pdf_manual",
+                nomeArquivo: file.name,
+                dataEnvio: serverTimestamp(),
+                itens: [],
+                status: "ok"
+            });
+        }
+        alert("PDFs registrados no histórico com sucesso.");
+        await carregarHistorico();
+    } catch (error) {
+        console.error("Erro ao registrar PDFs:", error);
+        alert("Erro ao registrar PDFs: " + error.message);
+    } finally {
+        input.value = "";
+    }
 }
 
 export async function exportarHistoricoPDF() {

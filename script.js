@@ -42,6 +42,8 @@ import {
     logoutAdmin,
     limparHistoricoConfig,
     adicionarItemChecklist,
+    importarPDFs,
+    processarPDFsImportados,
     adicionarEpiFuncionarioExtra,
     adicionarFuncionarioExtra,
     finalizarCadastroFuncionarioExtra,
@@ -1197,7 +1199,7 @@ function updateInputFontSize(input) {
     const val = input.value || "";
     // Ajusta a fonte se o nome ultrapassar 25 caracteres para manter visibilidade
     if (val.length > 25) {
-        const factor = Math.max(0.6, 0.7 - (val.length - 25) * 0.008); // Ajustado para nova base de 0.7rem
+        const factor = Math.max(0.48, 0.65 - (val.length - 25) * 0.01); 
         input.style.fontSize = `${factor}rem`;
     } else {
         input.style.fontSize = "";
@@ -1281,6 +1283,8 @@ async function adicionarAuxiliarExtra() {
     renderAuxiliaresList();
     renderEpiPessoaOptions();
     preencherResponsaveisViatura();
+    renderViaturaDashboard();
+    updateMenuStatus();
 }
 
 async function removerAuxiliarExtra(index) {
@@ -1296,6 +1300,8 @@ async function removerAuxiliarExtra(index) {
         renderAuxiliaresList();
         renderEpiPessoaOptions();
         preencherResponsaveisViatura();
+        renderViaturaDashboard();
+        updateMenuStatus();
     }
 }
 
@@ -1645,7 +1651,13 @@ function renderViaturaDashboard() {
         const tecnico = responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
             ? responsaveis.tecnico
             : "Sem técnico";
-        const auxiliar = responsaveis.auxiliar || "Sem auxiliar";
+
+        let auxiliaresTexto = "Sem auxiliar";
+        if (Array.isArray(responsaveis.auxiliares) && responsaveis.auxiliares.length > 0) {
+            auxiliaresTexto = responsaveis.auxiliares.map(a => a.nome).join(" / ");
+        } else if (responsaveis.auxiliar) {
+            auxiliaresTexto = responsaveis.auxiliar;
+        }
 
         const card = document.createElement("div");
         card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""} ${isFullyConcluded ? "fully-concluded" : ""}`;
@@ -1657,7 +1669,7 @@ function renderViaturaDashboard() {
             <span class="viatura-name">${escapeHtml(viatura.nome)}</span>
             ${isFullyConcluded ? '<span class="viatura-concluded-label">Vistoria concluída</span>' : ''}
             ${isDisabled ? `<span class="viatura-disabled-label">Desativada</span>` : ""}
-            <span class="viatura-responsaveis">${escapeHtml(tecnico)} / ${escapeHtml(auxiliar)}</span>
+            <span class="viatura-responsaveis">${escapeHtml(tecnico)} / ${escapeHtml(auxiliaresTexto)}</span>
             <div class="status-dots">
                 <span class="dot ${status.ferramentas ? "done" : ""}" title="Ferramentas">🔧</span>
                 <span class="dot ${status.epis ? "done" : ""}" title="EPIs">🦺</span>
@@ -2089,6 +2101,10 @@ function fecharModalRevisao() {
 
 async function enviarVistoriaAoFirebase() {
     try {
+        if (!state.dadosTemporariosVistoria) {
+            throw new Error("Dados da vistoria não encontrados para envio.");
+        }
+
         const docData = { ...state.dadosTemporariosVistoria, dataEnvio: serverTimestamp() };
         await addDoc(collection(db, "vistorias"), docData);
         const categoriaSalva = state.dadosTemporariosVistoria.categoria;
@@ -2406,6 +2422,8 @@ function bindWindowFunctions() {
         loginAdmin,
         logoutAdmin,
         limparHistoricoConfig,
+        importarPDFs,
+        processarPDFsImportados,
         verDetalhes,
         closeModal,
         encerrarVistoriaCompleta,

@@ -20,6 +20,12 @@ export function setPdfUiCallbacks(callbacks) {
     uiCallbacks = { ...uiCallbacks, ...callbacks };
 }
 
+export function getInicioFimData(dateStr) { // dateStr no formato YYYY-MM-DD
+    const inicio = new Date(dateStr + "T00:00:00");
+    const fim = new Date(dateStr + "T23:59:59.999");
+    return { inicio, fim };
+}
+
 export function getInicioFimHoje() {
     const inicio = new Date();
     inicio.setHours(0, 0, 0, 0);
@@ -699,13 +705,14 @@ export async function buscarVistoriasDeHoje(retroativoDias = 1) {
 export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, options = {}) {
     const { confirmar = true, resetarStatus = true, categorias = Object.keys(categoryNames) } = options;
     const todasCategoriasSelecionadas = categorias.length === Object.keys(categoryNames).length;
-    const tipoVistoria = options.tipoVistoria
-        || (todasCategoriasSelecionadas && !isVistoriaParcial(viaturaId) ? "completa" : "parcial");
+    const tipoVistoria = options.tipoVistoria || (todasCategoriasSelecionadas ? "completa" : "parcial");
+    const periodo = options.periodo || getInicioFimHoje();
     try {
         let dadosViatura = [];
 
         try {
-            dadosViatura = selecionarVistoriasMaisRecentes(await buscarVistoriasDeHoje(), viaturaId, categorias);
+            const todasVistorias = await buscarVistoriasPorPeriodo(periodo.inicio, periodo.fim);
+            dadosViatura = selecionarVistoriasMaisRecentes(todasVistorias, viaturaId, categorias);
         } catch (error) {
             console.warn("Não foi possível ler o histórico no Firebase. Usando vistorias locais da sessão.", error);
             dadosViatura = buscarVistoriasLocaisViatura(viaturaId, categorias, sortVistoriasPorCategoria);
@@ -747,15 +754,16 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
     }
 }
 
-async function gerarRelatorioTodasViaturasHoje(categorias = Object.keys(categoryNames)) {
+async function gerarRelatorioTodasViaturasPeriodo(categorias = Object.keys(categoryNames), periodo = getInicioFimHoje()) {
     let filtrados = [];
+    const { inicio, fim } = periodo;
 
     try {
-        const dadosHoje = await buscarVistoriasDeHoje();
-        filtrados = dadosHoje.filter(v => categorias.includes(v.categoria));
+        const dados = await buscarVistoriasPorPeriodo(inicio, fim);
+        filtrados = dados.filter(v => categorias.includes(v.categoria));
     } catch (error) {
         console.warn("Não foi possível ler as vistorias do dia no Firebase. Usando vistorias locais da sessão.", error);
-        filtrados = buscarVistoriasLocaisHoje(categorias, sortVistoriasPorCategoria, getInicioFimHoje, getDataEnvioDate);
+        filtrados = buscarVistoriasLocaisHoje(categorias, sortVistoriasPorCategoria, () => periodo, getDataEnvioDate);
     }
 
     if (filtrados.length === 0) {
@@ -776,8 +784,25 @@ async function gerarRelatorioTodasViaturasHoje(categorias = Object.keys(category
 }
 
 export async function gerarRelatorioComEscolha(options = {}) {
+    const today = new Date();
+    const defaultDate = today.toLocaleDateString("pt-BR");
+    const respostaData = prompt(
+        "Informe a data das vistorias que deseja exportar (DD/MM/AAAA):",
+        defaultDate
+    );
+
+    if (!respostaData) return;
+
+    const parts = respostaData.split("/");
+    if (parts.length !== 3) {
+        alert("Formato de data inválido. Use DD/MM/AAAA (ex: 14/06/2026).");
+        return;
+    }
+    const formattedDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    const periodo = getInicioFimData(formattedDate);
+
     const resposta = prompt(
-        `Gerar PDF de qual vistoria?\n\nDigite o número da viatura, por exemplo: ${state.selectedViatura.padStart(2, "0")}\nOu digite TODAS para gerar todas as viaturas vistoriadas hoje.`,
+        `Gerar PDF de qual vistoria?\n\nDigite o número da viatura, por exemplo: ${state.selectedViatura.padStart(2, "0")}\nOu digite TODAS para gerar todas as viaturas vistoriadas no período.`,
         state.selectedViatura.padStart(2, "0")
     );
 
@@ -792,39 +817,37 @@ export async function gerarRelatorioComEscolha(options = {}) {
         return;
     }
 
-    const respostaCategoria = prompt(
-        "Gerar PDF de qual etapa?\n\nDigite TODAS ou uma/mais etapas separadas por vírgula:\nFERRAMENTAS, EPIS, VIATURA, TABLET.",
-        isVistoriaParcial(viaturaId || state.selectedViatura)
-            ? getCategoriasConcluidas(viaturaId || state.selectedViatura).map(category => categoryNames[category]).join(", ")
-            : getCategoryPromptDefault()
+    const tipoRelatorio = prompt(
+        "Deseja baixar a vistoria COMPLETA ou por ETAPAS?\n\nDigite COMPLETA para incluir tudo ou ETAPAS para selecionar partes específicas.",
+        "COMPLETA"
     );
 
-    if (!respostaCategoria) return;
+    if (!tipoRelatorio) return;
 
-    let categorias = getCategoriesFromInput(respostaCategoria);
-    if (categorias.length === 0) {
-        alert("Informe uma etapa válida: TODAS, FERRAMENTAS, EPIS, VIATURA ou TABLET.");
-        return;
-    }
-
-    if (!gerarTodas && isVistoriaParcial(viaturaId)) {
-        const concluidas = getCategoriasConcluidas(viaturaId);
-        categorias = categorias.filter(category => concluidas.includes(category));
+    let categorias = Object.keys(categoryNames);
+    if (tipoRelatorio.trim().toUpperCase() === "ETAPAS") {
+        const respostaCategoria = prompt(
+            "Informe as etapas separadas por vírgula:\nFERRAMENTAS, EPIS, VIATURA, TABLET.",
+            "FERRAMENTAS"
+        );
+        if (!respostaCategoria) return;
+        categorias = getCategoriesFromInput(respostaCategoria);
         if (categorias.length === 0) {
-            alert("No modo parcial, escolha apenas etapas que já foram finalizadas nesta viatura.");
+            alert("Informe pelo menos uma etapa válida: FERRAMENTAS, EPIS, VIATURA ou TABLET.");
             return;
         }
     }
 
     if (gerarTodas) {
-        await gerarRelatorioTodasViaturasHoje(categorias);
+        await gerarRelatorioTodasViaturasPeriodo(categorias, periodo);
         return;
     }
 
     await gerarRelatorioViatura(viaturaId, {
         confirmar: false,
         resetarStatus: options.resetarStatus && viaturaId === state.selectedViatura,
-        categorias
+        categorias,
+        periodo
     });
 }
 

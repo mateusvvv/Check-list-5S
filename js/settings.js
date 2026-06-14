@@ -65,7 +65,7 @@ function applyViaturaResponsaveis(data = {}) {
         if (!viaturaResponsaveis[String(viaturaId)]) {
             viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
         }
-        const auxiliaresArr = Array.isArray(responsaveis?.auxiliares) 
+        const auxiliaresArr = Array.isArray(responsaveis?.auxiliares) && responsaveis.auxiliares.length > 0
             ? responsaveis.auxiliares.map(a => ({...a})) 
             : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : []);
 

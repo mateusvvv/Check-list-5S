@@ -1584,37 +1584,55 @@ export const viaturaResponsaveis = {
         tecnico: "SIDNEY MANOEL DO NASCIMENTO",
         tecnicoCpf: "099.077.164-48",
         auxiliar: "ANDRESON DA ROCHA SILVA",
-        auxiliarCpf: "132.919.664-30"
+        auxiliarCpf: "132.919.664-30",
+        auxiliares: [
+            { nome: "ANDRESON DA ROCHA SILVA", cpf: "132.919.664-30" }
+        ]
     },
     "2": {
         tecnico: "LUCAS MATEUS BEZERRA CABRAL",
         tecnicoCpf: "144.054.924-92",
         auxiliar: "ISAEL FORTUNATO DE LIMA",
-        auxiliarCpf: "182.838.664-27"
+        auxiliarCpf: "182.838.664-27",
+        auxiliares: [
+            { nome: "ISAEL FORTUNATO DE LIMA", cpf: "182.838.664-27" }
+        ]
     },
     "3": {
         tecnico: "ADRIAN MATHEUS DE BARROS VIDAL",
         tecnicoCpf: "122.147.614-97",
         auxiliar: "VINICIUS JOSE DE LIMA",
-        auxiliarCpf: "135.640.954-70"
+        auxiliarCpf: "135.640.954-70",
+        auxiliares: [
+            { nome: "VINICIUS JOSE DE LIMA", cpf: "135.640.954-70" }
+        ]
     },
     "4": {
         tecnico: "RODRIGO JOSÉ RODRIGUES DE BARROS GOUVEIA",
         tecnicoCpf: "104.620.064-09",
         auxiliar: "JOSE EDIVANILSON DA SILVA",
-        auxiliarCpf: "115.353.914-48"
+        auxiliarCpf: "115.353.914-48",
+        auxiliares: [
+            { nome: "JOSE EDIVANILSON DA SILVA", cpf: "115.353.914-48" }
+        ]
     },
     "5": {
         tecnico: "MARCOS ANTONIO DE BRITO SILVA",
         tecnicoCpf: "053.209.114-08",
-        auxiliar: "",
-        auxiliarCpf: ""
+        auxiliar: "MIKE RYAN LIMA CRUZ",
+        auxiliarCpf: "159.056.184-88",
+        auxiliares: [
+            { nome: "MIKE RYAN LIMA CRUZ", cpf: "159.056.184-88" }
+        ]
     },
     "6": {
         tecnico: "DANIEL MENSALA SOUZA DE SÁ",
         tecnicoCpf: "108.106.314-90",
         auxiliar: "JOSE EMERSON DA SILVA NASCIMENTO",
-        auxiliarCpf: "102.407.824-88"
+        auxiliarCpf: "102.407.824-88",
+        auxiliares: [
+            { nome: "JOSE EMERSON DA SILVA NASCIMENTO", cpf: "102.407.824-88" }
+        ]
     },
     "7": {
         tecnico: "Veículo sem Técnico",
@@ -1689,7 +1707,7 @@ export const funcionariosExtras = [
         cpf: "159.056.184-88",
         funcao: "Auxiliar técnico",
         status: "Ativo",
-        viaturaId: "",
+        viaturaId: "5",
         finalizado: true,
         epis: episMikeRyan.map(nome => ({
             nome,
@@ -1890,7 +1908,7 @@ export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) 
     const id = String(index + 1);
     return { id, nome: `Viatura ${formatTwoDigits(id)}`, ativa: true };
 });
-export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet" };
+export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet", manuais_pdf: "Manual PDF" };
 export const defaultVistoriadores = [
     { id: "vistoriador-alisson", nome: "Alisson", email: "alisson.tavares@digitalonline.com.br", tipo: "geral", padrao: true },
     { id: "vistoriador-marcos", nome: "Marcos", email: "marcos@digitalonline.com.br", tipo: "geral", padrao: true },

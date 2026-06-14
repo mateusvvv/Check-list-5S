@@ -32,14 +32,14 @@
         }
 
         .admin-extra-employee-row .admin-responsaveis-grid label span {
-            font-size: 1.05rem !important; /* Letras das etiquetas levemente maiores */
+            font-size: 0.9rem !important;
             font-weight: 600 !important;
             color: #4a5568 !important;
         }
 
         .admin-extra-employee-row .admin-responsaveis-grid input,
         .admin-extra-employee-row .admin-responsaveis-grid select {
-            font-size: 1.05rem !important; /* Texto dentro dos campos levemente maior */
+            font-size: 0.9rem !important;
             height: 40px !important; /* Ajuste na altura para equilibrar com a fonte */
         }
 
@@ -209,6 +209,29 @@
             .btn-change-mode, .btn-reset-survey {
                 width: auto !important;
             }
+
+            .modal-content {
+                position: fixed !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                margin: 0 !important;
+                width: 80% !important;
+                max-width: 900px !important;
+            }
+
+            .resolution-box {
+                margin-top: 2px !important; /* Sobe significativamente o bloco de informações na versão computador */
+            }
+
+            .resolution-box h4 {
+                margin-top: 0 !important; /* Remove o espaço superior interno do título do bloco */
+                margin-bottom: 8px !important;
+            }
+
+            .status-ok.details-ok {
+                margin-bottom: 5px !important; /* Reduz o espaço após a mensagem de 'Tudo OK' */
+            }
         }
 
         @media (min-width: 481px) {
@@ -252,6 +275,10 @@
                 width: 22px !important;      /* Ajusta o tamanho do círculo para acompanhar a fonte */
                 height: 22px !important;
                 line-height: 22px !important;
+            }
+
+            .viatura-responsaveis {
+                font-size: 0.72rem !important; /* Garante que nomes longos caibam melhor nos cards no mobile */
             }
         }
 
@@ -702,6 +729,29 @@
             border-radius: 15px !important;
             border: none !important;
             box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+            max-height: 85vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        #modal-body, #employee-items-body, #revisao-body {
+            overflow-y: auto !important;
+            padding-right: 10px !important;
+            flex: 1 !important;
+            padding-bottom: 50px !important; /* Espaço extra para a última linha não sumir */
+        }
+
+        .resolution-box {
+            margin-top: 25px !important;
+            padding: 15px !important;
+            border-radius: 10px !important;
+            background-color: #f0fdf4 !important;
+            border: 1px solid #86efac !important;
+        }
+
+        body.dark-mode .resolution-box {
+            background-color: rgba(34, 197, 94, 0.1) !important;
+            border-color: #10b981 !important;
         }
 
         /* Ajuste de Hover no Menu (Modo Claro) */
@@ -1448,42 +1498,53 @@
 
         .checking-main-row {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 20px;
-            align-items: flex-end;
+            align-items: flex-start;
+            width: 100%;
         }
 
-        .date-group { flex: 0 0 180px; }
+        .date-group, 
         .technician-group {
-            flex: 1;
+            width: 100% !important;
             display: flex;
+            flex-direction: column;
             gap: 15px;
-            min-width: 250px;
         }
-        .tech-field { flex: 2; }
-        .cpf-field { flex: 1; }
 
-        .assistant-search-row { width: 100%; margin-top: 5px; }
-        .search-action-wrapper {
-            display: flex;
-            gap: 12px;
-            margin-top: 8px;
+        .tech-field, 
+        .cpf-field,
+        .search-field-wrapper,
+        .search-button-wrapper { 
+            width: 100% !important; 
         }
+
+        .assistant-search-row { 
+            width: 100%; 
+            margin-top: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .date-group-placeholder { display: none !important; }
+
         .search-action-wrapper input { 
-            flex: 1; 
+            width: 100% !important; 
             height: 44px !important;
             border: 1.5px solid #cbd5e0 !important;
             border-radius: 8px !important;
             padding: 0 15px !important;
             font-size: 0.78rem !important;
         }
-        
-        .tech-field input, .cpf-field input {
-            font-size: 0.7rem !important; /* Reduzido para melhor visualização de nomes longos */
-            font-weight: 700 !important;
+
+        .tech-field input, 
+        .cpf-field input {
+            font-size: 0.72rem !important;
         }
-        
+
         .btn-add-auxiliar {
+            width: 100% !important;
             height: 44px;
             background-color: #0f52a0;
             color: white;
@@ -1497,10 +1558,23 @@
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             box-shadow: 0 2px 4px rgba(15, 82, 160, 0.2);
         }
-        .btn-add-auxiliar:hover { background-color: #0a3d7a; transform: translateY(-1px); }
+
+        .assistant-cards-container {
+            display: grid;
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .assistant-card {
+            width: 100% !important;
+            box-sizing: border-box;
+        }
 
         .assistant-cards-container {
             display: grid;
@@ -1525,9 +1599,9 @@
         body.dark-mode .assistant-card { background: #1e293b; border-color: #334155; }
 
         .assistant-card-info { display: flex; flex-direction: column; gap: 2px; overflow: hidden; padding-right: 8px; flex: 1; }
-        .assistant-card-name { font-weight: 700; color: #1e293b; font-size: 0.7rem; line-height: 1.2; overflow-wrap: anywhere; } /* Reduzido para melhor visualização de nomes longos */
+        .assistant-card-name { font-weight: 700; color: #1e293b; font-size: 0.65rem; line-height: 1.2; overflow-wrap: anywhere; } /* Reduzido para melhor visualização de nomes longos */
         body.dark-mode .assistant-card-name { color: #f1f5f9; }
-        .assistant-card-cpf { color: #64748b; font-size: 0.72rem; font-family: monospace; }
+        .assistant-card-cpf { color: #64748b; font-size: 0.68rem; font-family: monospace; }
         body.dark-mode .assistant-card-cpf { color: #94a3b8; }
 
         .btn-remove-assistant {
@@ -1558,25 +1632,8 @@
                 border-radius: 15px !important;
             }
 
-            .checking-main-row {
-                display: grid !important;
-                grid-template-columns: 180px 1fr 200px !important; /* Colunas: Data | Nome | CPF */
-                gap: 20px !important;
-                align-items: end !important;
-                width: 100% !important;
-            }
-
-            /* Permite que os campos internos (Nome e CPF) se alinhem ao grid pai */
-            .technician-group {
-                display: contents !important;
-            }
-
-            .date-group { grid-column: 1 !important; }
-            .tech-field { grid-column: 2 !important; }
-            .cpf-field { grid-column: 3 !important; }
-
             .assistant-search-row {
-                border-top: 1px solid #e2e8f0;
+                border-top: 1px solid #e2e8f0 !important;
                 padding-top: 15px !important;
                 margin-top: 0px !important;
             }
@@ -1616,21 +1673,20 @@
 
         .team-member-info {
             flex: 1 1 auto !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
         }
 
         .team-member-name {
             font-weight: 700 !important;
             color: #1e293b !important;
             word-break: break-word !important; /* Garante quebra de linha para nomes muito longos */
-            font-size: 0.7rem !important; /* Reduzido para melhor visualização de nomes longos */
+            font-size: 0.62rem !important; /* Reduzido para nomes muito longos caberem no celular */
         }
 
         .team-member-cpf {
             color: #64748b !important;
             font-family: monospace !important;
             white-space: nowrap !important;
+            font-size: 0.75rem !important;
         }
 
         .team-member-role {
@@ -1670,7 +1726,7 @@
             .tech-field input, .cpf-field input { width: 100% !important; }
             .btn-add-auxiliar { width: 100%; justify-content: center; height: 44px; }
             .assistant-cards-container { grid-template-columns: 1fr; }
-            .team-member-name { font-size: 0.7rem !important; } /* Reduzido para melhor visualização de nomes longos */
+            .team-member-name { font-size: 0.62rem !important; } /* Reduzido para melhor visualização de nomes longos */
         }
     </style>
 </head>
@@ -2003,6 +2059,8 @@
                         </div>
                     <div class="admin-buttons-container">
                         <button class="btn-admin-pdf" onclick="exportarHistoricoPDF()">📄 Exportar PDF</button>
+                        <button class="btn-admin-pdf" onclick="importarPDFs()">📂 Adicionar PDF</button>
+                        <input type="file" id="import-pdf-input" accept="application/pdf" multiple style="display: none;" onchange="processarPDFsImportados(this)">
                         </div>
                     </div>
 
@@ -2102,6 +2160,12 @@
                             <label>Vistoriador</label>
                             <select id="filter-vistoriador" onchange="aplicarFiltros()">
                                 <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="input-group filter-field">
+                            <label>Viatura</label>
+                            <select id="filter-viatura" onchange="aplicarFiltros()">
+                                <option value="">Todas</option>
                             </select>
                         </div>
                         <div class="input-group filter-field">
