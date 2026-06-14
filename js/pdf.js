@@ -547,11 +547,17 @@ export async function gerarPDF(titulo, dados, options = {}) {
         addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
         if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
         if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
-        if (v.auxiliares && v.auxiliares.length > 0) {
-            v.auxiliares.forEach((aux, idx) => {
-                addColumnText(`Auxiliar técnico ${v.auxiliares.length > 1 ? idx + 1 : ""}: ${aux.nome}`, { color: [30, 30, 30], bold: true });
+
+        const auxiliares = Array.isArray(v.auxiliares) ? v.auxiliares : [];
+        if (auxiliares.length > 0) {
+            auxiliares.forEach((aux, idx) => {
+                addColumnText(`Auxiliar técnico ${auxiliares.length > 1 ? idx + 1 : ""}: ${aux.nome}`, { color: [30, 30, 30], bold: true });
                 if (aux.cpf) addColumnText(`CPF do auxiliar: ${aux.cpf}`, { color: [100, 100, 100] });
             });
+        } else if (v.auxiliarTecnico) {
+            // Fallback para vistorias antigas que não usavam o array de auxiliares
+            addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
+            if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
         }
 
         // Mensagem de destaque para identificar de quem são os EPIs (Técnico ou Auxiliar)
@@ -670,15 +676,20 @@ export async function gerarPDF(titulo, dados, options = {}) {
     doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
 }
 
-export async function buscarVistoriasDeHoje() {
-    const { inicio, fim } = getInicioFimHoje();
+export async function buscarVistoriasDeHoje(retroativoDias = 1) {
+    // Agora busca por padrão vistorias de hoje e ontem para garantir que 
+    // vistorias finalizadas perto da meia-noite não sumam
+    const { inicio } = getInicioFimHoje();
+    const dataLimite = new Date(inicio);
+    dataLimite.setDate(dataLimite.getDate() - retroativoDias);
+
     const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
     const snapshot = await getDocs(q);
     const dados = [];
     snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const dataEnvio = data.dataEnvio?.toDate?.();
-        if (dataEnvio && dataEnvio >= inicio && dataEnvio <= fim) {
+        if (dataEnvio && dataEnvio >= dataLimite) {
             dados.push({ id: docSnap.id, ...data });
         }
     });

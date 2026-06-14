@@ -1328,6 +1328,7 @@ function renderItems(pageId) {
         updateVehicleMapImage();
         renderDamageMarkers();
         renderDamageList();
+        renderFotoPreviews('viaturas');
     }
 
     if (pageId === "tablets") {
@@ -1335,6 +1336,7 @@ function renderItems(pageId) {
         syncTabletVistoriador();
         renderTabletDamageMarkers();
         renderTabletDamageList();
+        renderFotoPreviews('tablets');
     }
 }
 
@@ -1839,6 +1841,7 @@ async function finalizarVistoria(category) {
         tecnicoCpf: tecnicoCpfInput?.value.trim() || "",
         auxiliarTecnico: auxiliarNomeInput?.value.trim() || "",
         auxiliarCpf: auxiliarCpfInput?.value.trim() || "",
+        auxiliares: viaturaResponsaveis[state.selectedViatura]?.auxiliares || [],
         epiResponsavelTipo: epiPessoa?.tipo || null,
         epiResponsavelNome: epiPessoa?.nome || null,
         epiResponsavelCpf: epiPessoa?.cpf || null,
@@ -1938,6 +1941,8 @@ async function enviarVistoriaAoFirebase() {
         }
         const inputFoto = document.getElementById(categoriaSalva === 'viaturas' ? 'foto-viatura' : 'foto-tablet');
         if (inputFoto) inputFoto.value = "";
+
+        renderFotoPreviews(categoriaSalva);
 
         if (categoriaSalva === "epis") {
             if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;

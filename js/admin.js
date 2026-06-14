@@ -1487,13 +1487,24 @@ export function verDetalhes(docId) {
         : `Viatura ${vistoria.viaturaId}`;
     title.innerText = `Detalhes: ${categoryNames[vistoria.categoria]} - ${equipamentoTitulo}`;
 
-    const pendentes = vistoria.itens.filter(i => i.status !== "ok");
+    const itens = Array.isArray(vistoria.itens) ? vistoria.itens : [];
+    const pendentes = itens.filter(i => i.status !== "ok");
+
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
     if (vistoria.dataVistoria) html += `<p><strong>Data da vistoria:</strong> ${String(vistoria.dataVistoria).split("-").reverse().join("/")}</p>`;
     if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
-    if (vistoria.auxiliarTecnico) html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
-    if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
+
+    const auxiliares = Array.isArray(vistoria.auxiliares) ? vistoria.auxiliares : [];
+    if (auxiliares.length > 0) {
+        auxiliares.forEach((aux, idx) => {
+            html += `<p><strong>Auxiliar Técnico ${auxiliares.length > 1 ? idx + 1 : ""}:</strong> ${aux.nome} ${aux.cpf ? `(CPF: ${aux.cpf})` : ""}</p>`;
+        });
+    } else if (vistoria.auxiliarTecnico) {
+        html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
+        if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
+    }
+
     if (vistoria.categoria === "epis" && vistoria.epiResponsavelNome) {
         html += `<p><strong>EPIs vistoriados:</strong> ${vistoria.epiResponsavelTipo || "Funcionário"} - ${vistoria.epiResponsavelNome}</p>`;
     }

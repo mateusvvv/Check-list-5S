@@ -65,10 +65,16 @@ function applyViaturaResponsaveis(data = {}) {
         if (!viaturaResponsaveis[String(viaturaId)]) {
             viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
         }
+        const auxiliaresArr = Array.isArray(responsaveis?.auxiliares) 
+            ? responsaveis.auxiliares.map(a => ({...a})) 
+            : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : []);
+
         viaturaResponsaveis[String(viaturaId)] = {
             tecnico: String(responsaveis?.tecnico || ""),
             tecnicoCpf: String(responsaveis?.tecnicoCpf || ""),
-            auxiliares: Array.isArray(responsaveis?.auxiliares) ? responsaveis.auxiliares.map(a => ({...a})) : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : [])
+            auxiliar: String(responsaveis?.auxiliar || auxiliaresArr[0]?.nome || ""),
+            auxiliarCpf: String(responsaveis?.auxiliarCpf || auxiliaresArr[0]?.cpf || ""),
+            auxiliares: auxiliaresArr
         };
     });
 
@@ -299,6 +305,8 @@ export async function salvarConfiguracoes() {
                     { 
                         tecnico: responsaveis.tecnico || "",
                         tecnicoCpf: responsaveis.tecnicoCpf || "",
+                        auxiliar: responsaveis.auxiliar || (responsaveis.auxiliares?.[0]?.nome || ""),
+                        auxiliarCpf: responsaveis.auxiliarCpf || (responsaveis.auxiliares?.[0]?.cpf || ""),
                         auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({...a})) : []
                     }
                 ])
