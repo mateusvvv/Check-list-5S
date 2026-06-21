@@ -37,6 +37,38 @@ function inferirTipoVistoria(dados, categorias = []) {
     return categoriasSelecionadas.length === Object.keys(categoryNames).length ? "completa" : "parcial";
 }
 
+function normalizeNotebookTermType(value) {
+    const normalized = String(value || "")
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    if (normalized === "RETORNO" || normalized === "DEVOLUCAO") return "RETORNO";
+    return "SAIDA";
+}
+
+function getNotebookPdfFileName(notebookTermType) {
+    return normalizeNotebookTermType(notebookTermType) === "RETORNO"
+        ? "vistoria devolução.pdf"
+        : "vistoria retirada.pdf";
+}
+
+function getPdfSaveFileName(titulo, dados = [], options = {}) {
+    if (options.fileName) return options.fileName;
+
+    const categorias = Array.isArray(options.categorias) && options.categorias.length > 0
+        ? options.categorias
+        : [...new Set(dados.map(vistoria => vistoria?.categoria).filter(Boolean))];
+
+    if (categorias.length === 1 && categorias[0] === "notebooks") {
+        const notebook = dados.find(vistoria => vistoria?.categoria === "notebooks") || {};
+        return getNotebookPdfFileName(options.notebookTermType || notebook.notebookTermType);
+    }
+
+    return `${titulo.replace(/\s+/g, "_")}.pdf`;
+}
+
 function getEpiPessoaKey(vistoria) {
     return vistoria.epiResponsavelCpf || vistoria.epiResponsavelNome || "sem-responsavel";
 }
@@ -241,7 +273,7 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
 
     y = ensurePdfSpace(pdf, y, 36 + auxiliarRows * fieldHeight);
     const labelTecnico = isNotebookOnly
-        ? "Analista responsável pelo notebook"
+        ? "Analista responsável"
         : "Técnico responsável pela viatura";
 
     function drawSignatureField(x, lineY, width, label, imageData) {
@@ -263,7 +295,7 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(0, 0, 0);
     const tecnicoLineY = y + 18;
-    const tecnicoLabel = signatureTeam.tecnico?.nome
+    const tecnicoLabel = !isNotebookOnly && signatureTeam.tecnico?.nome
         ? `${labelTecnico} - ${signatureTeam.tecnico.nome}`
         : labelTecnico;
     drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
@@ -663,15 +695,16 @@ export async function gerarPDF(titulo, dados, options = {}) {
         if (cursor.y > columns[cursor.col].y) cursor.y += 3;
 
         const dataObj = getDataEnvioDate(v);
-        const equipamento = v.categoria === "tablets"
+        let equipamento = v.categoria === "tablets"
             ? `Tablet ${formatTwoDigits(v.tabletId || v.viaturaId)} / Viatura ${formatTwoDigits(v.viaturaId)}`
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
-        // Para notebooks, mostrar 'Retirada' ou 'Devolução' conforme o tipo do termo
+        // Para notebooks, o título do bloco não deve usar a viatura vinculada.
         let categoryLabel = v.categoria === "todas" ? "Vistoria completa" : (categoryNames[v.categoria] || v.categoria);
         if (v.categoria === 'notebooks') {
-            const termType = String(v.notebookTermType || options.notebookTermType || '').trim().toUpperCase();
-            if (termType === 'RETORNO') categoryLabel = 'Devolução';
-            else categoryLabel = 'Retirada';
+            const termType = normalizeNotebookTermType(v.notebookTermType || options.notebookTermType);
+            equipamento = "Vistoria";
+            if (termType === 'RETORNO') categoryLabel = 'devolução';
+            else categoryLabel = 'retirada';
         }
         addColumnText(`${equipamento} - ${categoryLabel}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
         addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
@@ -841,7 +874,8 @@ export async function gerarPDF(titulo, dados, options = {}) {
     
     // Limpa assinaturas após gerar para a próxima vistoria
     state.assinaturas = null;
-    doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
+    const fileName = getPdfSaveFileName(titulo, dados, options);
+    doc.save(fileName.toLowerCase().endsWith(".pdf") ? fileName : `${fileName}.pdf`);
 }
 
 async function buscarVistoriasPorPeriodo(inicio, fim) {
@@ -912,19 +946,15 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
             let notebookTermType = options.notebookTermType
                 || (dadosViatura[0]?.notebookTermType ?? "SAIDA");
 
-            if (notebookTermType) {
-                notebookTermType = notebookTermType.trim().toUpperCase();
-            }
-            if (notebookTermType !== "SAIDA" && notebookTermType !== "RETORNO") {
-                notebookTermType = "SAIDA";
-            }
+            notebookTermType = normalizeNotebookTermType(notebookTermType);
 
             const fileNamePrefix = isNotebookOnly ? "Relatorio_Vistoria_Notebook" : `Relatorio_Vistoria_Viatura_${formatTwoDigits(viaturaId)}`;
             await gerarPDF(`${fileNamePrefix}${sufixoCategoria}`, dadosViatura, {
                 reportName: buildReportTitle(viaturaId, categorias),
                 tipoVistoria,
                 categorias,
-                notebookTermType
+                notebookTermType,
+                fileName: isNotebookOnly ? getNotebookPdfFileName(notebookTermType) : null
             });
 
             if (resetarStatus) {
@@ -977,12 +1007,7 @@ async function gerarRelatorioTodasViaturasPeriodo(categorias = PDF_REPORT_CATEGO
     let notebookTermType = options.notebookTermType
         || (filtrados[0]?.notebookTermType ?? "SAIDA");
 
-    if (notebookTermType) {
-        notebookTermType = notebookTermType.trim().toUpperCase();
-    }
-    if (notebookTermType !== "SAIDA" && notebookTermType !== "RETORNO") {
-        notebookTermType = "SAIDA";
-    }
+    notebookTermType = normalizeNotebookTermType(notebookTermType);
 
     // Monta um label amistoso com os nomes das categorias (ex: 'ferramentas, epi, viatura e tablet')
     const shortNamesMap = { ferramentas: 'ferramentas', epis: 'epi', viaturas: 'viatura', tablets: 'tablet' };

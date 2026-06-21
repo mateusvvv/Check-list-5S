@@ -20,7 +20,7 @@ function stringToSafeId(value = "") {
 
 function getVistoriaGroupKey(vistoria) {
     if (!vistoria || vistoria.tipoVistoria !== "completa") return null;
-    if (vistoria.categoria === "todas") return null;
+    if (vistoria.categoria === "todas" || vistoria.categoria === "notebooks") return null;
     const viaturaId = String(vistoria.viaturaId || "").trim();
     const dataVistoria = String(vistoria.dataVistoria || "").trim();
     const dataEnvioDate = vistoria.dataEnvio?.toDate?.();
@@ -136,6 +136,22 @@ function getVistoriadorResponsavel() {
 function getViaturaLabel(viaturaId) {
     const viatura = state.viaturas.find(item => item.id === String(viaturaId));
     return viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`;
+}
+
+function getNotebookTermLabel(vistoria) {
+    const termType = String(vistoria?.notebookTermType || "")
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    return termType === "RETORNO" || termType === "DEVOLUCAO" ? "Devolução" : "Retirada";
+}
+
+function getCategoriaHistoricoLabel(vistoria) {
+    if (vistoria.grouped || vistoria.categoria === "todas") return "Todas as categorias";
+    if (vistoria.categoria === "notebooks") return `Notebook - ${getNotebookTermLabel(vistoria)}`;
+    return categoryNames[vistoria.categoria] || vistoria.categoria;
 }
 
 function getPessoaHistoricoLabel(pessoaKey = "") {
@@ -1323,7 +1339,8 @@ function vistoriaTemPendencia(vistoria) {
     const temItemPendente = itens.some(i => i.status !== "ok");
     const temAvariaVisual = Array.isArray(vistoria.avarias) && vistoria.avarias.length > 0;
     const temAvariaTablet = Array.isArray(vistoria.avariasTablet) && vistoria.avariasTablet.length > 0;
-    return temItemPendente || temAvariaVisual || temAvariaTablet;
+    const temAvariaNotebook = Array.isArray(vistoria.avariasNotebook) && vistoria.avariasNotebook.length > 0;
+    return temItemPendente || temAvariaVisual || temAvariaTablet || temAvariaNotebook;
 }
 
 function montarResolucaoPendencia(vistoria, observacao) {
@@ -1397,9 +1414,7 @@ function renderHistoricoTable(dados) {
         const viaturaLabel = getViaturaLabel(data.viaturaId);
 
         const tipoVistoriaLabel = (data.tipoVistoria || "").toString().toUpperCase() || "PARCIAL";
-        const todasCategoriasLabel = data.grouped || data.categoria === "todas"
-            ? "Todas as categorias"
-            : (categoryNames[data.categoria] || data.categoria);
+        const todasCategoriasLabel = getCategoriaHistoricoLabel(data);
         const checkboxChecked = (data.ids || [data.id]).every(id => state.selectedVistorias.has(id));
 
         tbody.innerHTML += `
@@ -1710,6 +1725,9 @@ export function verDetalhes(docId) {
 
     if (vistoria.categoria === "epis" && vistoria.epiResponsavelNome) {
         html += `<p><strong>EPIs vistoriados:</strong> ${vistoria.epiResponsavelTipo || "Funcionário"} - ${vistoria.epiResponsavelNome}</p>`;
+    }
+    if (vistoria.categoria === "notebooks") {
+        html += `<p><strong>Movimentação:</strong> ${getNotebookTermLabel(vistoria)}</p>`;
     }
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
     if (vistoria.categoria === "viaturas" && vistoria.observacoesViatura) html += `<p><strong>Observações:</strong> ${vistoria.observacoesViatura}</p>`;

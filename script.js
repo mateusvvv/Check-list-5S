@@ -84,7 +84,7 @@ import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
     setPdfUiCallbacks
-} from "./js/pdf.js?v=8";
+} from "./js/pdf.js?v=9";
 import {
     getCategoriasConcluidas,
     getActiveViaturas,
@@ -2102,7 +2102,7 @@ async function finalizarVistoria(category) {
         epiResponsavelNome: epiPessoa?.nome || null,
         epiResponsavelCpf: epiPessoa?.cpf || null,
         categoria: category,
-        tipoVistoria: state.vistoriaMode[state.selectedViatura] || "completa",
+        tipoVistoria: category === "notebooks" ? "parcial" : (state.vistoriaMode[state.selectedViatura] || "completa"),
         itens: checklistResults,
         km: category === "viaturas" ? kmInput.value : null,
         combustivel: category === "viaturas" ? (combustivelInput?.value || null) : null,
@@ -2275,12 +2275,13 @@ async function enviarVistoriaAoFirebase() {
         const viaturaSalva = state.selectedViatura;
         const epiPessoaKeySalva = categoriaSalva === "epis" ? getSelectedEpiPessoaKey() : "";
 
-        // Se estivermos no modo VISTORIA COMPLETA, adiamos o envio remoto das categorias
+        // Se estivermos no modo VISTORIA COMPLETA, adiamos o envio remoto das categorias da viatura
         // e só gravamos um único documento consolidado quando a última etapa (tablets)
-        // for finalizada. Em modo parcial, comportamento segue gravando por categoria.
+        // for finalizada. Notebook é uma vistoria independente e sempre é gravado separado.
         const isCompleteModeForViatura = !isVistoriaParcial(viaturaSalva);
+        const shouldConsolidateComplete = isCompleteModeForViatura && categoriaSalva !== "notebooks";
 
-        if (isCompleteModeForViatura) {
+        if (shouldConsolidateComplete) {
             // Garante mapa local de pendências por viatura
             state.pendingCompleteVistorias = state.pendingCompleteVistorias || {};
             state.pendingCompleteVistorias[viaturaSalva] = state.pendingCompleteVistorias[viaturaSalva] || {};
@@ -2310,7 +2311,7 @@ async function enviarVistoriaAoFirebase() {
             // Se chegou aqui, categoriaSalva === 'tablets' e estamos no modo completo:
             // montamos um documento consolidado com todas as categorias pendentes + atual
             const pend = state.pendingCompleteVistorias[viaturaSalva] || {};
-            const categoriasKeys = Object.keys(pend);
+            const categoriasKeys = Object.keys(pend).filter(cat => cat !== "notebooks");
             const mergedItems = [];
             const mergedAvarias = [];
             const mergedAvariasTablet = [];
@@ -2501,16 +2502,11 @@ async function enviarVistoriaAoFirebase() {
         }
 
         if (categoriaSalva === "notebooks") {
-            // Gerar PDF de notebooks automaticamente apenas no modo parcial.
-            // No modo completo, o PDF consolidado será gerado após a etapa de tablets
-            // para evitar salvar dois PDFs separados (notebook + consolidado).
-            if (isVistoriaParcial(viaturaSalva)) {
-                await gerarRelatorioViatura(viaturaSalva, {
-                    confirmar: true,
-                    resetarStatus: true,
-                    categorias: ["notebooks"]
-                });
-            }
+            await gerarRelatorioViatura(viaturaSalva, {
+                confirmar: true,
+                resetarStatus: true,
+                categorias: ["notebooks"]
+            });
         }
     } catch (error) {
         console.error("Erro ao salvar no Firestore: ", error);
@@ -2553,7 +2549,7 @@ function sincronizarStatusViaturasRealtime() {
             
             const viaturaId = String(data.viaturaId);
             const categoria = data.categoria;
-            if (!modoAtualizadoPorViatura.has(viaturaId) && ["completa", "parcial"].includes(data.tipoVistoria)) {
+            if (categoria !== "notebooks" && !modoAtualizadoPorViatura.has(viaturaId) && ["completa", "parcial"].includes(data.tipoVistoria)) {
                 state.vistoriaMode[viaturaId] = data.tipoVistoria;
                 modoAtualizadoPorViatura.add(viaturaId);
             }
