@@ -14,43 +14,50 @@ export const state = {
     configHistory: [],
     dadosTemporariosVistoria: null,
     selectedDamageType: "amassado",
-    selectedTabletDamageType: "amassado"
+    selectedTabletDamageType: "amassado",
+    selectedNotebookDamageType: "amassado",
+    notebookDamages: {},
+    assinaturas: null,
+    fotosEvidencia: {}
 };
 
 export function ensureViaturaState(id) {
     id = String(id);
-    if (!state.surveyStatus[id]) state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+    if (!state.surveyStatus[id]) state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false, notebooks: false };
     if (!state.epiSurveyStatus[id]) state.epiSurveyStatus[id] = {};
     if (!state.vehicleDamages[id]) state.vehicleDamages[id] = [];
     if (!state.tabletDamages[id]) state.tabletDamages[id] = [];
+    if (!state.notebookDamages[id]) state.notebookDamages[id] = [];
     if (!state.vistoriaMode[id]) state.vistoriaMode[id] = "completa";
 }
 
 defaultViaturas.forEach(viatura => ensureViaturaState(viatura.id));
 
 export function setViaturas(viaturas) {
-    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
-    const normalized = Array.isArray(viaturas)
-        ? viaturas
-            .filter(viatura => defaultIds.has(String(viatura.id)))
-            .map(viatura => {
-        const id = String(viatura.id);
-        const genericName = `Viatura ${id.padStart(2, "0")}`;
-        const defaultName = defaultViaturas.find(item => item.id === id)?.nome || genericName;
-        const savedName = viatura.nome || genericName;
+    // Garante que temos um array de dados vindos do Firebase
+    const savedData = Array.isArray(viaturas) ? viaturas : Object.values(viaturas || {});
 
-        return {
-            id,
-            nome: savedName === genericName ? defaultName : savedName,
-            ativa: viatura.ativa !== false
-        };
-    })
-        : [];
+    const finalViaturasMap = new Map();
 
-    state.viaturas = defaultViaturas.map(defaultViatura => {
-        const saved = normalized.find(viatura => viatura.id === defaultViatura.id);
-        return saved || { ...defaultViatura };
+    // 1. Adiciona todas as viaturas do Firebase, priorizando o estado 'ativa'
+    savedData.forEach(v => {
+        if (v && v.id) {
+            finalViaturasMap.set(String(v.id), {
+                id: String(v.id),
+                nome: v.nome,
+                ativa: v.ativa === false ? false : true // Explicitamente verifica se é false
+            });
+        }
     });
+        
+    // 2. Adiciona viaturas padrão que não vieram do Firebase (garantindo que todas as viaturas existam)
+    defaultViaturas.forEach(dv => {
+        if (!finalViaturasMap.has(String(dv.id))) {
+            finalViaturasMap.set(String(dv.id), { ...dv, ativa: true }); // Padrão é ativa
+        }
+    });
+
+    state.viaturas = Array.from(finalViaturasMap.values()).sort((a, b) => Number(a.id) - Number(b.id));
 
     state.viaturas.forEach(viatura => {
         if (!state.surveyStatus[viatura.id]) ensureViaturaState(viatura.id);
@@ -86,7 +93,9 @@ export function isVistoriaParcial(viaturaId = state.selectedViatura) {
 
 export function todasEtapasConcluidas(viaturaId = state.selectedViatura) {
     const status = state.surveyStatus[viaturaId];
-    return Boolean(status) && Object.keys(categoryNames).every(category => status[category]);
+    // Vistoria de Notebook e Manuais são independentes e não obrigatórias para o status geral da viatura
+    const obrigatorias = ["ferramentas", "epis", "viaturas", "tablets"];
+    return Boolean(status) && obrigatorias.every(category => status[category]);
 }
 
 export function salvarVistoriaLocal(vistoria) {
@@ -120,9 +129,11 @@ export function buscarVistoriasLocaisHoje(categorias, sortFn, getInicioFimHoje, 
         categorias.forEach((category) => {
             const vistoria = porCategoria[category];
             const vistorias = Array.isArray(vistoria) ? vistoria : (vistoria ? [vistoria] : []);
-            vistorias.forEach(item => {
-                const dataEnvio = getDataEnvioDate(item);
-                if (dataEnvio >= inicio && dataEnvio <= fim) dados.push(item);
+            vistorias.forEach(v => {
+                const data = getDataEnvioDate(v);
+                if (data >= inicio && data <= fim) {
+                    dados.push(v);
+                }
             });
         });
     });

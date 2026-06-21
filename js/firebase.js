@@ -24,6 +24,12 @@ import {
     signInWithEmailAndPassword,
     signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+    getStorage,
+    ref,
+    uploadBytes,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBu78yhEoIHxfi3CeSi64PFAxh3k5MDj4M",
@@ -39,6 +45,7 @@ export const app = initializeApp(firebaseConfig);
 export const analytics = getAnalytics(app);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 export async function criarUsuarioAuthSecundario(email, password) {
     const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -69,5 +76,8 @@ export {
     signInWithEmailAndPassword,
     signOut,
     updateDoc,
-    where
+    where,
+    ref as storageRef,
+    uploadBytes,
+    getDownloadURL
 };

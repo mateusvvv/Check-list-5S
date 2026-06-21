@@ -1,62 +1,28 @@
 import { categoryNames, damageTypeNames, formatTwoDigits, getVehicleMapConfig, vehicleViewNames } from "./config.js";
-import { collection, db, getDocs, orderBy, query } from "./firebase.js";
+import { collection, db, getDocs, orderBy, query, where } from "./firebase.js";
 import { getDamageColor, getDamageMarkerLabel, renderDamageList, renderDamageMarkers, renderTabletDamageList, renderTabletDamageMarkers } from "./damages.js";
 import {
     buscarVistoriasLocaisHoje,
     buscarVistoriasLocaisViatura,
-    getCategoriasConcluidas,
     getActiveViaturas,
     isVistoriaParcial,
     state,
     todasEtapasConcluidas
 } from "./state.js";
+import { getDataEnvioDate, getInicioFimData, getInicioFimHoje, sortVistoriasPorCategoria } from "./utils.js";
 
-let uiCallbacks = {
+const uiCallbacks = {
     renderViaturaDashboard: () => {},
     updateMenuStatus: () => {}
 };
 
-export function setPdfUiCallbacks(callbacks) {
-    uiCallbacks = { ...uiCallbacks, ...callbacks };
+const CHECKLIST_REPORT_CATEGORIES = ["ferramentas", "epis", "viaturas", "tablets"];
+const PDF_REPORT_CATEGORIES = [...CHECKLIST_REPORT_CATEGORIES, "notebooks"];
+
+export function setPdfUiCallbacks(callbacks = {}) {
+    Object.assign(uiCallbacks, callbacks);
 }
 
-export function getInicioFimData(dateStr) { // dateStr no formato YYYY-MM-DD
-    const inicio = new Date(dateStr + "T00:00:00");
-    const fim = new Date(dateStr + "T23:59:59.999");
-    return { inicio, fim };
-}
-
-export function getInicioFimHoje() {
-    const inicio = new Date();
-    inicio.setHours(0, 0, 0, 0);
-    const fim = new Date();
-    fim.setHours(23, 59, 59, 999);
-    return { inicio, fim };
-}
-
-export function getDataEnvioDate(vistoria) {
-    return vistoria?.dataEnvio?.toDate?.() || vistoria?.dataEnvioLocal || new Date();
-}
-
-export function sortVistoriasPorCategoria(dados) {
-    return dados.sort((a, b) => {
-        const viaturaDiff = Number(a.viaturaId || 0) - Number(b.viaturaId || 0);
-        if (viaturaDiff !== 0) return viaturaDiff;
-        
-        const catA = Object.keys(categoryNames).indexOf(a.categoria);
-        const catB = Object.keys(categoryNames).indexOf(b.categoria);
-        if (catA !== catB) return catA - catB;
-
-        // Destaque: Técnico sempre antes do Auxiliar na listagem de EPIs
-        if (a.categoria === "epis" && b.categoria === "epis") {
-            const isAuxA = String(a.epiResponsavelTipo || "").toLowerCase().includes("auxiliar");
-            const isAuxB = String(b.epiResponsavelTipo || "").toLowerCase().includes("auxiliar");
-            if (isAuxA !== isAuxB) return isAuxA ? 1 : -1;
-        }
-
-        return 0;
-    });
-}
 
 function getTipoVistoriaLabel(tipo) {
     return tipo === "parcial" ? "Vistoria parcial" : "Vistoria completa";
@@ -80,13 +46,60 @@ function getVistoriaReportKey(vistoria) {
     return vistoria.categoria;
 }
 
+function getVistoriaDataChaves(vistoria) {
+    const datas = new Set();
+    const dataVistoria = String(vistoria.dataVistoria || "").trim();
+    if (dataVistoria) datas.add(dataVistoria);
+
+    const dataEnvio = getDataEnvioDate(vistoria);
+    if (dataEnvio.getTime() > 0) datas.add(dataEnvio.toLocaleDateString("sv-SE"));
+
+    return datas.size > 0 ? [...datas] : [""];
+}
+
+function getVistoriaConsolidadaKeys(vistoria) {
+    const viaturaId = String(vistoria.viaturaId || "").trim();
+    return getVistoriaDataChaves(vistoria).map(data => `${viaturaId}|${data}`);
+}
+
+function normalizarDadosRelatorio(dados = []) {
+    const lista = Array.isArray(dados) ? dados.filter(Boolean) : [];
+    const chavesComConsolidado = new Set();
+
+    lista.forEach((vistoria) => {
+        if (vistoria.categoria !== "todas") return;
+        getVistoriaConsolidadaKeys(vistoria).forEach(key => chavesComConsolidado.add(key));
+    });
+
+    if (chavesComConsolidado.size === 0) return lista;
+
+    return lista.filter((vistoria) => {
+        if (vistoria.categoria === "todas") return true;
+        if (vistoria.tipoVistoria === "parcial") return true;
+        return !getVistoriaConsolidadaKeys(vistoria).some(key => chavesComConsolidado.has(key));
+    });
+}
+
 function selecionarVistoriasMaisRecentes(dados, viaturaId, categorias) {
     const categoriasSet = new Set(categorias);
+    const isCompleteReport = CHECKLIST_REPORT_CATEGORIES.every(category => categoriasSet.has(category));
+
+    if (isCompleteReport) {
+        const completas = dados
+            .filter(vistoria => vistoria.tipoRegistro !== "resolucaoPendencia")
+            .filter(vistoria => String(vistoria.viaturaId) === String(viaturaId))
+            .filter(vistoria => vistoria.categoria === "todas")
+            .sort((a, b) => getDataEnvioDate(b).getTime() - getDataEnvioDate(a).getTime());
+
+        if (completas.length > 0) return [completas[0]];
+    }
+
     const porChave = new Map();
 
     dados.forEach((vistoria) => {
         if (vistoria.tipoRegistro === "resolucaoPendencia") return;
         if (String(vistoria.viaturaId) !== String(viaturaId)) return;
+        if (vistoria.categoria === "todas") return;
         if (!categoriasSet.has(vistoria.categoria)) return;
 
         const key = getVistoriaReportKey(vistoria);
@@ -161,18 +174,47 @@ function limparTextoRelatorio(value) {
         .trim();
 }
 
-export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}) {
+const TERMO_NOTEBOOK_SAIDA = [
+    "TERMO DE RESPONSABILIDADE DE RETIRADA DE EQUIPAMENTOS (SAÍDA)",
+    "OBJETIVO: O presente Termo tem por finalidade registrar a entrega dos equipamentos de propriedade da empresa ao colaborador acima identificado, para utilização durante plantões, atendimentos e atividades realizadas em finais de semana e feriados.",
+    "RESPONSABILIDADES DO COLABORADOR: Declaro que recebi os equipamentos acima relacionados em perfeitas condições de uso, conforme checklist realizado pelo Técnico de Informática responsável.",
+    "Comprometo-me a:",
+    "• Utilizar os equipamentos exclusivamente para atividades relacionadas à empresa;",
+    "• Zelar pela conservação e segurança dos equipamentos durante todo o período de posse;",
+    "• Não emprestar, ceder ou transferir os equipamentos a terceiros;",
+    "• Comunicar imediatamente qualquer dano, perda, furto, roubo ou mau funcionamento;",
+    "• Devolver todos os equipamentos recebidos ao término do plantão ou quando solicitado pela empresa;",
+    "• Entregar os equipamentos nas mesmas condições em que foram recebidos, ressalvado o desgaste natural decorrente do uso adequado.",
+    "DECLARAÇÃO: Declaro estar ciente de que os equipamentos são patrimônio da empresa e que sua utilização deve ocorrer de forma responsável, observando as normas internas e políticas de segurança da informação."
+];
+
+const TERMO_NOTEBOOK_RETORNO = [
+    "TERMO DE DEVOLUÇÃO DE EQUIPAMENTOS (RETORNO)",
+    "DECLARAÇÃO DE DEVOLUÇÃO",
+    "O colaborador declara que realizou a devolução dos equipamentos relacionados neste termo. A equipe de T.I realizou a conferência dos itens e registrou o estado dos equipamentos no momento da devolução."
+];
+
+export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, options = {}) {
     let y = ensurePdfSpace(pdf, startY, 60);
-    const termo = [
-        "TERMO DE RESPONSABILIDADE E ASSINATURA DOS RESPONSÁVEIS",
-        "Na condição de funcionário da empresa DIGITAL, inscrita no CNPJ/MF sob o nº 07.578.965/0001-05, com sede na cidade de Belo Jardim, Estado de Pernambuco, declaro receber, neste ato, os equipamentos, ferramentas, EPIs, veículo e tablet relacionados neste relatório, em perfeito estado de conservação e funcionamento, comprometendo-me a utilizá-los exclusivamente no desempenho de minhas funções.",
-        "Comprometo-me a conservar os bens no mesmo estado em que foram recebidos e a devolvê-los à empresa quando solicitado ou no momento de meu desligamento do quadro funcional.",
-        "Estou ciente de que danos causados aos bens por mau uso, negligência ou culpa poderão autorizar a empresa a proceder aos descontos cabíveis em meus créditos salariais ou rescisórios, conforme a legislação vigente.",
-        "Comprometo-me assim especificamente a:",
-        "Não emprestar ou permitir o uso dos bens por terceiros;",
-        "Acionar imediatamente o departamento responsável ao detectar qualquer problema nos equipamentos;",
-        "Em caso de furto ou roubo, registrar boletim de ocorrência e apresentar cópia à empresa ou informar o departamento responsável o mais rápido possível."
-    ];
+    let termo = [];
+    const isNotebookOnly = options.categorias?.length === 1 && options.categorias[0] === 'notebooks';
+
+    if (isNotebookOnly && options.notebookTermType === "SAIDA") {
+        termo = TERMO_NOTEBOOK_SAIDA;
+    } else if (isNotebookOnly && options.notebookTermType === "RETORNO") {
+        termo = TERMO_NOTEBOOK_RETORNO;
+    } else {
+        termo = [
+            "TERMO DE RESPONSABILIDADE E ASSINATURA DOS RESPONSÁVEIS",
+            "Na condição de funcionário da empresa DIGITAL, inscrita no CNPJ/MF sob o nº 07.578.965/0001-05, com sede na cidade de Belo Jardim, Estado de Pernambuco, declaro receber, neste ato, os equipamentos, ferramentas, EPIs, veículo e tablet relacionados neste relatório, em perfeito estado de conservação e funcionamento, comprometendo-me a utilizá-los exclusivamente no desempenho de minhas funções.",
+            "Comprometo-me a conservar os bens no mesmo estado em que foram recebidos e a devolvê-los à empresa quando solicitado ou no momento de meu desligamento do quadro funcional.",
+            "Estou ciente de que danos causados aos bens por mau uso, negligência ou culpa poderão autorizar a empresa a proceder aos descontos cabíveis em meus créditos salariais ou rescisórios, conforme a legislação vigente.",
+            "Comprometo-me assim especificamente a:",
+            "Não emprestar ou permitir o uso dos bens por terceiros;",
+            "Acionar imediatamente o departamento responsável ao detectar qualquer problema nos equipamentos;",
+            "Em caso de furto ou roubo, registrar boletim de ocorrência e apresentar cópia à empresa ou informar o departamento responsável o mais rápido possível."
+        ];
+    }
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
@@ -182,31 +224,94 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}) {
 
     termo.slice(1).forEach((paragraph) => {
         y = ensurePdfSpace(pdf, y, 24);
-        y = addWrappedPdfText(pdf, paragraph, 10, y, 188, 4) + 4;
+        const spacing = (isNotebookOnly && paragraph.startsWith("•")) ? 1 : 4;
+        y = addWrappedPdfText(pdf, paragraph, 10, y, 188, 4) + spacing;
     });
 
-    y = ensurePdfSpace(pdf, y, 48);
-    y += 8;
-    
-    // Assinatura do Técnico
-    pdf.line(10, y, 92, y);
-    pdf.text("Técnico responsável pela viatura", 17, y + 5);
-    if (signatures.tecnico) {
-        pdf.addImage(signatures.tecnico, 'PNG', 15, y - 15, 70, 15);
+    const signatureTeam = options.signatureTeam || {};
+    const auxiliaresEquipe = Array.isArray(signatureTeam.auxiliares) ? signatureTeam.auxiliares : [];
+    const assinaturasAuxiliares = Array.isArray(signatures.auxiliares) ? signatures.auxiliares : [];
+    const auxiliarCount = isNotebookOnly ? 0 : Math.max(1, auxiliaresEquipe.length, assinaturasAuxiliares.length);
+    const fieldWidth = 82;
+    const fieldGap = 18;
+    const columns = 2;
+    const startX = 20;
+    const fieldHeight = 28;
+    const auxiliarRows = Math.ceil(auxiliarCount / columns);
+
+    y = ensurePdfSpace(pdf, y, 36 + auxiliarRows * fieldHeight);
+    const labelTecnico = isNotebookOnly
+        ? "Analista responsável pelo notebook"
+        : "Técnico responsável pela viatura";
+
+    function drawSignatureField(x, lineY, width, label, imageData) {
+        if (imageData) {
+            pdf.addImage(imageData, 'PNG', x + 2, lineY - 15, width - 4, 12);
+        }
+
+        pdf.setDrawColor(15, 82, 160);
+        pdf.setLineWidth(0.5);
+        pdf.line(x, lineY, x + width, lineY);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(0, 0, 0);
+        const labelLines = pdf.splitTextToSize(label, width).slice(0, 2);
+        pdf.text(labelLines, x + width / 2, lineY + 5, { align: "center" });
     }
-    y += 20;
 
-    // Assinaturas dos Auxiliares
-    const auxiliares = Array.isArray(signatures.auxiliares) ? signatures.auxiliares : [];
-    auxiliares.forEach((sig, i) => {
-        y = ensurePdfSpace(pdf, y, 30);
-        pdf.line(10, y, 92, y);
-        pdf.text(`Auxiliar técnico ${auxiliares.length > 1 ? i + 1 : ""}`, 17, y + 5);
-        if (sig) pdf.addImage(sig, 'PNG', 15, y - 15, 70, 15);
-        y += 20;
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(0, 0, 0);
+    const tecnicoLineY = y + 18;
+    const tecnicoLabel = signatureTeam.tecnico?.nome
+        ? `${labelTecnico} - ${signatureTeam.tecnico.nome}`
+        : labelTecnico;
+    drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
+
+    for (let i = 0; i < auxiliarCount; i++) {
+        const row = Math.floor(i / columns);
+        const col = i % columns;
+        const x = startX + col * (fieldWidth + fieldGap);
+        const lineY = tecnicoLineY + fieldHeight + row * fieldHeight;
+        const auxiliar = auxiliaresEquipe[i] || {};
+        const labelBase = `Auxiliar técnico ${auxiliarCount > 1 ? i + 1 : ""}`.trim();
+        const labelAux = auxiliar.nome ? `${labelBase} - ${auxiliar.nome}` : labelBase;
+
+        drawSignatureField(x, lineY, fieldWidth, labelAux, assinaturasAuxiliares[i]);
+    }
+
+    y = tecnicoLineY + 12 + auxiliarRows * fieldHeight;
+    return y;
+}
+
+function getSignatureTeam(dados = []) {
+    const team = { tecnico: null, auxiliares: [] };
+    const auxiliaresKeys = new Set();
+
+    dados.forEach((vistoria) => {
+        if (!team.tecnico && vistoria.tecnicoNome) {
+            team.tecnico = {
+                nome: vistoria.tecnicoNome,
+                cpf: vistoria.tecnicoCpf || ""
+            };
+        }
+
+        const auxiliares = Array.isArray(vistoria.auxiliares) && vistoria.auxiliares.length > 0
+            ? vistoria.auxiliares
+            : (vistoria.auxiliarTecnico ? [{ nome: vistoria.auxiliarTecnico, cpf: vistoria.auxiliarCpf || "" }] : []);
+
+        auxiliares.forEach((auxiliar) => {
+            const nome = String(auxiliar?.nome || "").trim();
+            const cpf = String(auxiliar?.cpf || "").trim();
+            const key = `${nome.toLowerCase()}|${cpf}`;
+            if (!nome || auxiliaresKeys.has(key)) return;
+
+            auxiliaresKeys.add(key);
+            team.auxiliares.push({ nome, cpf });
+        });
     });
 
-    return y;
+    return team;
 }
 
 function getCategoryFromInput(value) {
@@ -225,7 +330,9 @@ function getCategoryFromInput(value) {
         viaturas: "viaturas",
         carro: "viaturas",
         tablet: "tablets",
-        tablets: "tablets"
+        tablets: "tablets",
+        notebook: "notebooks",
+        notebooks: "notebooks"
     };
 
     return aliases[normalized] || null;
@@ -234,7 +341,7 @@ function getCategoryFromInput(value) {
 function getCategoriesFromInput(value) {
     const normalized = value.trim().toUpperCase();
     if (normalized === "TODAS" || normalized === "TODOS") {
-        return Object.keys(categoryNames);
+        return CHECKLIST_REPORT_CATEGORIES;
     }
 
     return value
@@ -250,6 +357,9 @@ function getCategoryPromptDefault() {
 
 function buildReportTitle(viaturaId, categorias) {
     if (categorias.length === 1) {
+        if (categorias[0] === "notebooks") {
+            return "Vistoria de Notebook";
+        }
         return `Vistoria Viatura ${formatTwoDigits(viaturaId)} - ${categoryNames[categorias[0]]}`;
     }
     return `Vistoria Viatura ${formatTwoDigits(viaturaId)}`;
@@ -338,16 +448,23 @@ async function criarMapaAvariasDataUrl(src, avarias, options = {}) {
 }
 
 export async function gerarPDF(titulo, dados, options = {}) {
+    dados = normalizarDadosRelatorio(dados);
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const reportName = options.reportName || titulo.replace(/_/g, " ");
     const tipoVistoria = options.tipoVistoria || inferirTipoVistoria(dados, options.categorias || []);
+
+    try {
+        console.info('[PDF] Gerando PDF:', reportName, '| categorias:', (options.categorias || []).join(','), '| tipoVistoria:', tipoVistoria);
+    } catch (e) {
+        console.debug('[PDF] log falhou', e);
+    }
     const tipoVistoriaLabel = getTipoVistoriaLabel(tipoVistoria);
     const columnWidth = 90;
     const contentStartY = 55;
     const columns = [{ x: 10, y: contentStartY }, { x: 108, y: contentStartY }];
     const cursor = { col: 0, y: contentStartY };
-    const ordemPaginas = [["ferramentas", "epis"], ["viaturas"], ["tablets"]];
+    const ordemPaginas = [["todas"], ["ferramentas", "epis"], ["viaturas"], ["tablets"], ["notebooks"]];
     let logoData = null;
     const generatedAt = new Date().toLocaleString("pt-BR");
 
@@ -549,7 +666,14 @@ export async function gerarPDF(titulo, dados, options = {}) {
         const equipamento = v.categoria === "tablets"
             ? `Tablet ${formatTwoDigits(v.tabletId || v.viaturaId)} / Viatura ${formatTwoDigits(v.viaturaId)}`
             : `Viatura ${formatTwoDigits(v.viaturaId)}`;
-        addColumnText(`${equipamento} - ${categoryNames[v.categoria] || v.categoria}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
+        // Para notebooks, mostrar 'Retirada' ou 'Devolução' conforme o tipo do termo
+        let categoryLabel = v.categoria === "todas" ? "Vistoria completa" : (categoryNames[v.categoria] || v.categoria);
+        if (v.categoria === 'notebooks') {
+            const termType = String(v.notebookTermType || options.notebookTermType || '').trim().toUpperCase();
+            if (termType === 'RETORNO') categoryLabel = 'Devolução';
+            else categoryLabel = 'Retirada';
+        }
+        addColumnText(`${equipamento} - ${categoryLabel}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
         addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
         if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
         if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
@@ -583,7 +707,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
         if (v.categoria === "viaturas" && v.observacoesViatura) addColumnText(`Observações: ${v.observacoesViatura}`);
         if (v.categoria === "tablets" && v.observacoesTablet) addColumnText(`Observações: ${v.observacoesTablet}`);
 
-        if (v.categoria === "viaturas") {
+        if (v.categoria === "viaturas" || v.categoria === "todas") {
             const avariasViatura = Array.isArray(v.avarias) ? v.avarias : [];
             addColumnText("Mapa visual da viatura:", { bold: true, color: [15, 82, 160] });
             if (avariasViatura.length > 0) {
@@ -604,7 +728,7 @@ export async function gerarPDF(titulo, dados, options = {}) {
             }
         }
 
-        if (v.categoria === "tablets") {
+        if (v.categoria === "tablets" || v.categoria === "todas") {
             const avariasTablet = Array.isArray(v.avariasTablet) ? v.avariasTablet : [];
             addColumnText("Mapa visual do tablet:", { bold: true, color: [15, 82, 160] });
             if (avariasTablet.length > 0) {
@@ -622,6 +746,37 @@ export async function gerarPDF(titulo, dados, options = {}) {
             } catch (error) {
                 console.warn("Não foi possível adicionar o mapa do tablet ao PDF.", error);
                 addColumnText("Não foi possível carregar o desenho do tablet.", { color: [190, 82, 24] });
+            }
+        }
+
+        if (v.categoria === "notebooks" || v.categoria === "todas") {
+            const avariasNotebook = Array.isArray(v.avariasNotebook) ? v.avariasNotebook : [];
+            if (v.categoria === "notebooks" || avariasNotebook.length > 0 || v.observacoesNotebook) {
+                addColumnText("Mapa visual do notebook:", { bold: true, color: [15, 82, 160] });
+            }
+            if (avariasNotebook.length > 0) {
+                addColumnText("Avarias marcadas:", { bold: true });
+            } else if (v.categoria === "notebooks") {
+                addColumnText("Nenhuma avaria marcada.", { color: [22, 128, 78] });
+            }
+            avariasNotebook.forEach((avaria) => {
+                const linhaAvaria = `${getDamageMarkerLabel(avaria.type)} - ${damageTypeNames[avaria.type] || avaria.type} - ${avaria.view}`;
+                addColumnText(linhaAvaria);
+            });
+            try {
+                if (v.categoria === "todas" && avariasNotebook.length === 0 && !v.observacoesNotebook) {
+                    throw new Error("Sem dados de notebook no relatório consolidado.");
+                }
+                const notebookImage = await criarMapaAvariasDataUrl("assets/notebook.png", avariasNotebook, { useTypeLabels: true });
+                addColumnImage(notebookImage);
+            } catch (error) {
+                if (v.categoria !== "todas") {
+                    console.warn("Não foi possível adicionar o mapa do notebook ao PDF.", error);
+                    addColumnText("Não foi possível carregar o desenho do notebook.", { color: [190, 82, 24] });
+                }
+            }
+            if (v.observacoesNotebook) {
+                addColumnText(`Observações: ${v.observacoesNotebook}`);
             }
         }
 
@@ -664,9 +819,13 @@ export async function gerarPDF(titulo, dados, options = {}) {
 
         const pageTitle = categoriasDaPagina.length > 1
             ? "Ferramentas e EPIs"
-            : categoriasDaPagina[0] === "viaturas"
-                ? "Viatura"
-                : "Tablets";
+            : categoriasDaPagina[0] === "todas"
+                ? "Vistoria completa"
+                : categoriasDaPagina[0] === "viaturas"
+                    ? "Viatura"
+                    : categoriasDaPagina[0] === "tablets"
+                        ? "Tablets"
+                        : "Notebooks";
         addPageLabel(pageTitle);
         for (const vistoria of dadosDaPagina) await addVistoria(vistoria);
     }
@@ -675,11 +834,24 @@ export async function gerarPDF(titulo, dados, options = {}) {
     addPdfHeader();
     resetCursor();
     addPageLabel("Assinatura dos responsáveis e termo de responsabilidade");
-    adicionarTermoResponsabilidade(doc, cursor.y, state.assinaturas || {});
+    adicionarTermoResponsabilidade(doc, cursor.y, state.assinaturas || {}, {
+        ...options,
+        signatureTeam: getSignatureTeam(dados)
+    });
     
     // Limpa assinaturas após gerar para a próxima vistoria
     state.assinaturas = null;
     doc.save(`${titulo.replace(/\s+/g, "_")}.pdf`);
+}
+
+async function buscarVistoriasPorPeriodo(inicio, fim) {
+    const q = query(
+        collection(db, "vistorias"),
+        where("dataEnvio", ">=", inicio),
+        where("dataEnvio", "<=", fim)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 export async function buscarVistoriasDeHoje(retroativoDias = 1) {
@@ -703,9 +875,10 @@ export async function buscarVistoriasDeHoje(retroativoDias = 1) {
 }
 
 export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, options = {}) {
-    const { confirmar = true, resetarStatus = true, categorias = Object.keys(categoryNames) } = options;
-    const todasCategoriasSelecionadas = categorias.length === Object.keys(categoryNames).length;
-    const tipoVistoria = options.tipoVistoria || (todasCategoriasSelecionadas ? "completa" : "parcial");
+    const defaultCategorias = CHECKLIST_REPORT_CATEGORIES;
+    const { confirmar = true, resetarStatus = true, categorias = defaultCategorias } = options;
+    const isCompleteByCategories = defaultCategorias.every(cat => categorias.includes(cat));
+    const tipoVistoria = options.tipoVistoria || (isCompleteByCategories ? "completa" : "parcial");
     const periodo = options.periodo || getInicioFimHoje();
     try {
         let dadosViatura = [];
@@ -719,17 +892,39 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
         }
 
         if (dadosViatura.length === 0) {
+            const dadosLocais = buscarVistoriasLocaisViatura(viaturaId, categorias, sortVistoriasPorCategoria);
+            if (dadosLocais.length > 0) dadosViatura = dadosLocais;
+        }
+
+        if (dadosViatura.length === 0) {
             const categoriasLabel = categorias.map(category => categoryNames[category]).join(", ");
             alert(`Nenhuma vistoria salva foi encontrada para: ${categoriasLabel}. Se ela foi salva em outro aparelho, faça login no Painel Admin para gerar pelo histórico.`);
             return;
         }
 
-        if (!confirmar || confirm(`Deseja gerar o relatório PDF da Viatura ${formatTwoDigits(viaturaId)}?`)) {
+        const isNotebookOnly = categorias.length === 1 && categorias[0] === 'notebooks';
+        const msgConfirm = `Deseja gerar o relatório PDF da Viatura ${formatTwoDigits(viaturaId)}?`;
+        const shouldGenerate = isNotebookOnly ? true : (!confirmar || confirm(msgConfirm));
+
+        if (shouldGenerate) {
             const sufixoCategoria = categorias.length === 1 ? `_${categoryNames[categorias[0]]}` : "";
-            await gerarPDF(`Relatorio_Vistoria_Viatura_${formatTwoDigits(viaturaId)}${sufixoCategoria}`, dadosViatura, {
+
+            let notebookTermType = options.notebookTermType
+                || (dadosViatura[0]?.notebookTermType ?? "SAIDA");
+
+            if (notebookTermType) {
+                notebookTermType = notebookTermType.trim().toUpperCase();
+            }
+            if (notebookTermType !== "SAIDA" && notebookTermType !== "RETORNO") {
+                notebookTermType = "SAIDA";
+            }
+
+            const fileNamePrefix = isNotebookOnly ? "Relatorio_Vistoria_Notebook" : `Relatorio_Vistoria_Viatura_${formatTwoDigits(viaturaId)}`;
+            await gerarPDF(`${fileNamePrefix}${sufixoCategoria}`, dadosViatura, {
                 reportName: buildReportTitle(viaturaId, categorias),
                 tipoVistoria,
-                categorias
+                categorias,
+                notebookTermType
             });
 
             if (resetarStatus) {
@@ -754,13 +949,17 @@ export async function gerarRelatorioViatura(viaturaId = state.selectedViatura, o
     }
 }
 
-async function gerarRelatorioTodasViaturasPeriodo(categorias = Object.keys(categoryNames), periodo = getInicioFimHoje()) {
+async function gerarRelatorioTodasViaturasPeriodo(categorias = PDF_REPORT_CATEGORIES, periodo = getInicioFimHoje(), options = {}) {
     let filtrados = [];
     const { inicio, fim } = periodo;
+    const isCompleteChecklistReport = CHECKLIST_REPORT_CATEGORIES.every(category => categorias.includes(category));
 
     try {
         const dados = await buscarVistoriasPorPeriodo(inicio, fim);
-        filtrados = dados.filter(v => categorias.includes(v.categoria));
+        filtrados = dados.filter(v => (
+            categorias.includes(v.categoria)
+            || (isCompleteChecklistReport && v.categoria === "todas")
+        ));
     } catch (error) {
         console.warn("Não foi possível ler as vistorias do dia no Firebase. Usando vistorias locais da sessão.", error);
         filtrados = buscarVistoriasLocaisHoje(categorias, sortVistoriasPorCategoria, () => periodo, getDataEnvioDate);
@@ -774,12 +973,36 @@ async function gerarRelatorioTodasViaturasPeriodo(categorias = Object.keys(categ
 
     sortVistoriasPorCategoria(filtrados);
     const sufixoCategoria = categorias.length === 1 ? `_${categoryNames[categorias[0]]}` : "";
+
+    let notebookTermType = options.notebookTermType
+        || (filtrados[0]?.notebookTermType ?? "SAIDA");
+
+    if (notebookTermType) {
+        notebookTermType = notebookTermType.trim().toUpperCase();
+    }
+    if (notebookTermType !== "SAIDA" && notebookTermType !== "RETORNO") {
+        notebookTermType = "SAIDA";
+    }
+
+    // Monta um label amistoso com os nomes das categorias (ex: 'ferramentas, epi, viatura e tablet')
+    const shortNamesMap = { ferramentas: 'ferramentas', epis: 'epi', viaturas: 'viatura', tablets: 'tablet' };
+    const buildCategoryListLabel = (cats) => {
+        const labels = cats.map(c => (shortNamesMap[c] || (categoryNames[c] || c).toLowerCase()));
+        if (labels.length === 0) return '';
+        if (labels.length === 1) return labels[0];
+        if (labels.length === 2) return `${labels[0]} e ${labels[1]}`;
+        return `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`;
+    };
+
+    const reportName = categorias.length === 1
+        ? `Vistoria 5S - ${categoryNames[categorias[0]]} do dia`
+        : `Vistoria 5S - ${buildCategoryListLabel(categorias)} do dia`;
+
     await gerarPDF(`Relatorio_5S_Todas_Viaturas_Hoje${sufixoCategoria}`, filtrados, {
-        reportName: categorias.length === 1
-            ? `Vistoria 5S - ${categoryNames[categorias[0]]} do dia`
-            : "Vistoria 5S - Todas as viaturas do dia",
-        tipoVistoria: categorias.length === Object.keys(categoryNames).length ? "completa" : "parcial",
-        categorias
+        reportName,
+        tipoVistoria: CHECKLIST_REPORT_CATEGORIES.every(category => categorias.includes(category)) ? "completa" : "parcial",
+        categorias,
+        notebookTermType
     });
 }
 
@@ -824,7 +1047,7 @@ export async function gerarRelatorioComEscolha(options = {}) {
 
     if (!tipoRelatorio) return;
 
-    let categorias = Object.keys(categoryNames);
+    let categorias = CHECKLIST_REPORT_CATEGORIES;
     if (tipoRelatorio.trim().toUpperCase() === "ETAPAS") {
         const respostaCategoria = prompt(
             "Informe as etapas separadas por vírgula:\nFERRAMENTAS, EPIS, VIATURA, TABLET.",
@@ -839,7 +1062,7 @@ export async function gerarRelatorioComEscolha(options = {}) {
     }
 
     if (gerarTodas) {
-        await gerarRelatorioTodasViaturasPeriodo(categorias, periodo);
+        await gerarRelatorioTodasViaturasPeriodo(categorias, periodo, options);
         return;
     }
 
@@ -860,7 +1083,7 @@ export async function encerrarVistoriaCompleta() {
         await gerarRelatorioViatura(state.selectedViatura, {
             confirmar: false,
             resetarStatus: true,
-            categorias: Object.keys(categoryNames)
+            categorias: CHECKLIST_REPORT_CATEGORIES
         });
         return;
     }

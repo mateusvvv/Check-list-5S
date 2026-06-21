@@ -193,6 +193,84 @@ export function limparAvariasTablet() {
     renderTabletDamageList();
 }
 
+export function setNotebookDamageType(type) {
+    state.selectedNotebookDamageType = type;
+    document.querySelectorAll(".notebook-damage-type").forEach(button => {
+        button.classList.toggle("active", button.dataset.type === type);
+    });
+}
+
+export function marcarAvariaNotebook(event) {
+    const panel = event.currentTarget;
+    const rect = panel.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+    state.notebookDamages[state.selectedViatura].push({
+        view: "Notebook",
+        type: state.selectedNotebookDamageType || "amassado",
+        x: Number(x.toFixed(2)),
+        y: Number(y.toFixed(2))
+    });
+
+    renderNotebookDamageMarkers();
+    renderNotebookDamageList();
+}
+
+export function renderNotebookDamageMarkers() {
+    document.querySelectorAll(".notebook-damage-marker").forEach(marker => marker.remove());
+
+    const map = document.getElementById("notebook-map");
+    const viewPanel = map?.querySelector('[data-view="notebook"]');
+    if (!viewPanel) return;
+
+    state.notebookDamages[state.selectedViatura].forEach((damage, index) => {
+        const marker = document.createElement("span");
+        marker.className = `damage-marker notebook-damage-marker ${damage.type}`;
+        marker.style.left = `${damage.x}%`;
+        marker.style.top = `${damage.y}%`;
+        marker.title = `${damageTypeNames[damage.type]} - ${damage.view}`;
+        marker.textContent = getDamageMarkerLabel(damage.type);
+        marker.onclick = (event) => {
+            event.stopPropagation();
+            removerAvariaNotebook(index);
+        };
+        viewPanel.appendChild(marker);
+    });
+}
+
+export function renderNotebookDamageList() {
+    const list = document.getElementById("notebook-damage-list");
+    if (!list) return;
+
+    const damages = state.notebookDamages[state.selectedViatura];
+    if (damages.length === 0) {
+        list.innerHTML = '<li class="empty">Nenhuma avaria marcada.</li>';
+        return;
+    }
+
+    list.innerHTML = damages.map((damage, index) => `
+        <li>
+            <span><strong>${getDamageMarkerLabel(damage.type)} - ${damageTypeNames[damage.type]}</strong> - ${damage.view}</span>
+            <button type="button" onclick="removerAvariaNotebook(${index})">Remover</button>
+        </li>
+    `).join("");
+}
+
+export function removerAvariaNotebook(index) {
+    state.notebookDamages[state.selectedViatura].splice(index, 1);
+    renderNotebookDamageMarkers();
+    renderNotebookDamageList();
+}
+
+export function limparAvariasNotebook() {
+    if (state.notebookDamages[state.selectedViatura].length === 0) return;
+    if (!confirm("Deseja limpar todas as marcações do Notebook?")) return;
+    state.notebookDamages[state.selectedViatura] = [];
+    renderNotebookDamageMarkers();
+    renderNotebookDamageList();
+}
+
 export function getDamageColor(type) {
     const colors = {
         amassado: "#7950f2",

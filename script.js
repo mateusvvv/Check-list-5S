@@ -1,4 +1,4 @@
-import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, getVistoriadorByEmail, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadores, vistoriadoresTablet } from "./js/config.js";
+import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, getVistoriadorByEmail, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadores, vistoriadoresTablet, vistoriadoresNotebook, vistoriadoresAcessoNotebook } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -16,16 +16,22 @@ import {
 import {
     limparAvariasTablet,
     limparAvariasViatura,
+    limparAvariasNotebook,
     marcarAvaria,
     marcarAvariaTablet,
+    marcarAvariaNotebook,
     removerAvaria,
     removerAvariaTablet,
+    removerAvariaNotebook,
     renderDamageList,
     renderDamageMarkers,
     renderTabletDamageList,
     renderTabletDamageMarkers,
+    renderNotebookDamageList,
+    renderNotebookDamageMarkers,
     setDamageType,
     setTabletDamageType,
+    setNotebookDamageType,
     updateTabletInfo,
     updateVehicleMapImage
 } from "./js/damages.js?v=2";
@@ -73,7 +79,7 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=8";
+} from "./js/admin.js?v=9";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
@@ -89,12 +95,18 @@ import {
     state,
     todasEtapasConcluidas
 } from "./js/state.js";
-import { salvarConfiguracoes } from "./js/settings.js";
+import { carregarConfiguracoes, salvarConfiguracoes } from "./js/settings.js";
+
+window.__APP_MODULE_BOOTED__ = true;
 
 let funcionarioItensEditandoKey = "";
 let lastTapTime = 0;
 let lastTapViaturaId = null;
 let menuJustOpened = false; // Trava para o menu não fechar rápido demais
+let isLongPressActive = false;
+let signatureCanvasInitialized = false;
+let signatureDrawing = false;
+let signatureTarget = { type: "tecnico", index: 0 };
 const DOUBLE_TAP_DELAY = 300; // Tempo máximo entre toques para considerar clique duplo
 
 function initDarkMode() {
@@ -170,6 +182,13 @@ function renderVistoriadorOptions() {
             .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
         "Selecione o Responsável"
     );
+    renderSelectOptions(
+        document.getElementById("notebook-vistoriador"),
+        vistoriadores
+            .filter(vistoriador => vistoriadoresNotebook.includes(vistoriador.nome))
+            .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
+        "Selecione o Responsável"
+    );
 }
 
 function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
@@ -182,6 +201,7 @@ function isAlissonVistoriador(vistoriador = getVistoriadorAtivo()) {
 
 function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
     if (!categoryNames[category]) return true;
+    if (category === "notebooks") return vistoriadoresAcessoNotebook.includes(vistoriador);
     if (isAlissonVistoriador(vistoriador)) return true;
     if (category === "tablets") return isTabletOnlyUser(vistoriador);
     return !isTabletOnlyUser(vistoriador);
@@ -190,6 +210,9 @@ function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
 function getAccessDeniedMessage(category, vistoriador) {
     if (category === "tablets") {
         return `A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`;
+    }
+    if (category === "notebooks") {
+        return `A vistoria de notebooks só pode ser acessada por: ${vistoriadoresAcessoNotebook.join(", ")}.`;
     }
 
     if (isTabletOnlyUser(vistoriador)) {
@@ -216,12 +239,17 @@ function updateVistoriadorLogado() {
     label.classList.add("active");
 }
 
-function syncTabletVistoriador() {
+function syncSpecialVistoriadores() {
     const vistoriador = getVistoriadorAtivo();
     const tabletSelect = document.getElementById("tablet-vistoriador");
-    if (!tabletSelect) return;
+    const notebookSelect = document.getElementById("notebook-vistoriador");
 
-    tabletSelect.value = isTabletOnlyUser(vistoriador) ? vistoriador : "";
+    if (tabletSelect) {
+        tabletSelect.value = isTabletOnlyUser(vistoriador) ? vistoriador : "";
+    }
+    if (notebookSelect) {
+        notebookSelect.value = vistoriadoresNotebook.includes(vistoriador) ? vistoriador : "";
+    }
     updateTabletInfo();
 }
 
@@ -251,7 +279,7 @@ function selecionarVistoriadorAtivo(silent = false) {
     const vistoriador = getVistoriadorAtivo();
     localStorage.setItem("vistoriadorAtivo", vistoriador);
     updateVistoriadorLogado();
-    syncTabletVistoriador();
+    syncSpecialVistoriadores();
     updateAccessByVistoriador();
 
     const activeTab = document.querySelector(".tab-content.active");
@@ -294,6 +322,21 @@ function selecionarResponsavelTablet() {
         selecionarVistoriadorAtivo(true);
     }
     updateTabletInfo();
+}
+
+function selecionarResponsavelNotebook() {
+    const notebookSelect = document.getElementById("notebook-vistoriador");
+    const vistoriadorSelect = document.getElementById("vistoriador-atual");
+    const responsavel = notebookSelect?.value || "";
+
+    if (!vistoriadoresNotebook.includes(responsavel)) {
+        return;
+    }
+
+    if (vistoriadorSelect && !isTabletOnlyUser() && !isAlissonVistoriador() && !getVistoriadorAutenticado()) {
+        vistoriadorSelect.value = responsavel;
+        selecionarVistoriadorAtivo(true);
+    }
 }
 
 function solicitarVistoriadorTablet() {
@@ -1398,7 +1441,8 @@ function renderItems(pageId) {
         ferramentas: "lista-ferramentas",
         epis: "lista-epis",
         viaturas: "lista-viaturas",
-        tablets: "lista-tablets"
+        tablets: "lista-tablets",
+        notebooks: "lista-notebooks"
     };
     const container = document.getElementById(containerMapping[pageId]);
     if (pageId === "epis") renderEpiPessoaOptions();
@@ -1486,10 +1530,17 @@ function renderItems(pageId) {
 
     if (pageId === "tablets") {
         updateTabletInfo();
-        syncTabletVistoriador();
+        syncSpecialVistoriadores();
         renderTabletDamageMarkers();
         renderTabletDamageList();
         renderFotoPreviews('tablets');
+    }
+
+    if (pageId === "notebooks") {
+        syncSpecialVistoriadores();
+        renderNotebookDamageMarkers();
+        renderNotebookDamageList();
+        renderFotoPreviews('notebooks');
     }
 }
 
@@ -1502,7 +1553,8 @@ function marcarTodosComoOk(pageId) {
         ferramentas: "lista-ferramentas",
         epis: "lista-epis",
         viaturas: "lista-viaturas",
-        tablets: "lista-tablets"
+        tablets: "lista-tablets",
+        notebooks: "lista-notebooks"
     };
     const container = document.getElementById(containerMapping[pageId]);
     if (!container) return;
@@ -1571,7 +1623,8 @@ function showLongPressMenu(x, y, viaturaId) {
         ferramentas: '🔧 Ferramentas',
         epis: '🦺 EPIs',
         viaturas: '🚗 Viatura',
-        tablets: '📱 Tablet'
+        tablets: '📱 Tablet',
+        notebooks: '💻 Notebook'
     };
 
     menu.querySelectorAll(".long-press-item").forEach(item => {
@@ -1697,6 +1750,7 @@ function selectViatura(id) {
 
     renderFotoPreviews('viaturas');
     renderFotoPreviews('tablets');
+    renderFotoPreviews('notebooks');
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab) renderItems(activeTab.id);
@@ -1875,11 +1929,12 @@ async function handleFotoUpload(input, categoria) {
 }
 
 function renderFotoPreviews(categoria) {
-    const containerId = categoria === 'viaturas' ? 'previews-viaturas' : 'previews-tablets';
-    const counterId = categoria === 'viaturas' ? 'count-viaturas' : 'count-tablets';
+    const containerId = { viaturas: 'previews-viaturas', tablets: 'previews-tablets', notebooks: 'previews-notebooks' }[categoria];
+    const counterId = { viaturas: 'count-viaturas', tablets: 'count-tablets', notebooks: 'count-notebooks' }[categoria];
+
     const container = document.getElementById(containerId);
     const counter = document.getElementById(counterId);
-    
+
     if (!container) return;
 
     const viaturaId = state.selectedViatura;
@@ -1916,14 +1971,19 @@ async function finalizarVistoria(category) {
     const auxiliarCpfInput = document.getElementById("auxiliar-cpf");
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
-    const vistoriador = category === "tablets" ? vistoriadorTablet : vistoriadorGeral;
-    const vistoriadorAcesso = category === "tablets" ? vistoriador : vistoriadorGeral;
+    const vistoriadorNotebook = document.getElementById("notebook-vistoriador")?.value || "";
+    const vistoriador = category === "tablets" ? vistoriadorTablet : (category === "notebooks" ? vistoriadorNotebook : vistoriadorGeral);
+    const vistoriadorAcesso = category === "notebooks" ? vistoriadorGeral : vistoriador;
 
     if (!podeAcessarCategoria(category, vistoriadorAcesso)) {
-        alert(category === "tablets"
-            ? `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`
-            : `${vistoriadorGeral} pode realizar apenas vistorias de tablets.`);
-        showPage("tablets");
+        alert(getAccessDeniedMessage(category, vistoriadorAcesso));
+        if (category === "tablets") showPage("tablets");
+        if (category === "notebooks") showPage("notebooks");
+        return;
+    }
+
+    if (category === "notebooks" && vistoriador && !vistoriadoresNotebook.includes(vistoriador)) {
+        alert(`O responsável pela vistoria de notebooks deve ser: ${vistoriadoresNotebook.join(" ou ")}.`);
         return;
     }
 
@@ -1938,9 +1998,10 @@ async function finalizarVistoria(category) {
     }
 
     if (!vistoriador) {
-        alert(category === "tablets"
-            ? `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`
-            : "Por favor, selecione quem está realizando a vistoria no topo da página.");
+        let msg = "Por favor, selecione quem está realizando a vistoria no topo da página.";
+        if (category === "tablets") msg = `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`;
+        if (category === "notebooks") msg = `Por favor, selecione um responsável de notebooks: ${vistoriadoresNotebook.join(", ")}.`;
+        alert(msg);
         return;
     }
 
@@ -2049,6 +2110,9 @@ async function finalizarVistoria(category) {
         observacoesViatura: category === "viaturas" ? (document.getElementById("viatura-observacoes")?.value.trim() || "") : "",
         avariasTablet: category === "tablets" ? [...state.tabletDamages[state.selectedViatura]] : [],
         observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : "",
+        avariasNotebook: category === "notebooks" ? [...state.notebookDamages[state.selectedViatura]] : [],
+        notebookTermType: category === "notebooks" ? (document.getElementById("notebook-term-type")?.value || "RETIRADA") : null,
+        observacoesNotebook: category === "notebooks" ? (document.getElementById("notebook-observacoes")?.value.trim() || "") : "",
         fotosEvidencia: state.fotosEvidencia?.[state.selectedViatura]?.[category] || []
     };
 
@@ -2099,18 +2163,258 @@ function fecharModalRevisao() {
     document.getElementById("revisao-modal").style.display = "none";
 }
 
+function getSignatureCanvasContext() {
+    const canvas = document.getElementById("signature-pad");
+    if (!canvas) return null;
+
+    const ctx = canvas.getContext("2d");
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#0f172a";
+    return ctx;
+}
+
+function getSignaturePoint(event) {
+    const canvas = document.getElementById("signature-pad");
+    const source = event.touches?.[0] || event.changedTouches?.[0] || event;
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: (source.clientX - rect.left) * (canvas.width / rect.width),
+        y: (source.clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+
+function initSignatureCanvas() {
+    if (signatureCanvasInitialized) return;
+
+    const canvas = document.getElementById("signature-pad");
+    const ctx = getSignatureCanvasContext();
+    if (!canvas || !ctx) return;
+
+    const start = (event) => {
+        event.preventDefault();
+        signatureDrawing = true;
+        const point = getSignaturePoint(event);
+        ctx.beginPath();
+        ctx.moveTo(point.x, point.y);
+    };
+
+    const move = (event) => {
+        if (!signatureDrawing) return;
+        event.preventDefault();
+        const point = getSignaturePoint(event);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+    };
+
+    const end = () => {
+        signatureDrawing = false;
+    };
+
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    canvas.addEventListener("touchstart", start, { passive: false });
+    canvas.addEventListener("touchmove", move, { passive: false });
+    canvas.addEventListener("touchend", end);
+    signatureCanvasInitialized = true;
+}
+
+function limparAssinaturaCanvas() {
+    const canvas = document.getElementById("signature-pad");
+    const ctx = getSignatureCanvasContext();
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function abrirModalAssinatura(type = "tecnico", index = 0) {
+    signatureTarget = { type, index: Number(index) || 0 };
+    const modal = document.getElementById("signature-modal");
+    const title = document.getElementById("signature-title");
+    if (title) {
+        title.innerText = type === "auxiliar"
+            ? `Assinatura do Auxiliar ${signatureTarget.index + 1}`
+            : "Assinatura do Técnico";
+    }
+    if (modal) modal.style.display = "block";
+    initSignatureCanvas();
+    limparAssinaturaCanvas();
+}
+
+function confirmarAssinatura() {
+    const canvas = document.getElementById("signature-pad");
+    if (!canvas) return;
+
+    state.assinaturas = state.assinaturas || { auxiliares: [] };
+    const dataUrl = canvas.toDataURL("image/png");
+
+    if (signatureTarget.type === "auxiliar") {
+        if (!Array.isArray(state.assinaturas.auxiliares)) state.assinaturas.auxiliares = [];
+        state.assinaturas.auxiliares[signatureTarget.index] = dataUrl;
+    } else {
+        state.assinaturas.tecnico = dataUrl;
+    }
+
+    fecharModalAssinatura();
+}
+
+function fecharModalAssinatura() {
+    const modal = document.getElementById("signature-modal");
+    if (modal) modal.style.display = "none";
+    signatureDrawing = false;
+}
+
 async function enviarVistoriaAoFirebase() {
     try {
         if (!state.dadosTemporariosVistoria) {
             throw new Error("Dados da vistoria não encontrados para envio.");
         }
-
         const docData = { ...state.dadosTemporariosVistoria, dataEnvio: serverTimestamp() };
-        await addDoc(collection(db, "vistorias"), docData);
+
         const categoriaSalva = state.dadosTemporariosVistoria.categoria;
         const viaturaSalva = state.selectedViatura;
         const epiPessoaKeySalva = categoriaSalva === "epis" ? getSelectedEpiPessoaKey() : "";
 
+        // Se estivermos no modo VISTORIA COMPLETA, adiamos o envio remoto das categorias
+        // e só gravamos um único documento consolidado quando a última etapa (tablets)
+        // for finalizada. Em modo parcial, comportamento segue gravando por categoria.
+        const isCompleteModeForViatura = !isVistoriaParcial(viaturaSalva);
+
+        if (isCompleteModeForViatura) {
+            // Garante mapa local de pendências por viatura
+            state.pendingCompleteVistorias = state.pendingCompleteVistorias || {};
+            state.pendingCompleteVistorias[viaturaSalva] = state.pendingCompleteVistorias[viaturaSalva] || {};
+            state.pendingCompleteVistorias[viaturaSalva][categoriaSalva] = { ...state.dadosTemporariosVistoria, dataEnvioLocal: new Date() };
+
+            // Salva localmente por categoria como antes
+            salvarVistoriaLocal({ ...state.dadosTemporariosVistoria, dataEnvioLocal: new Date() });
+
+            // Se não for a última etapa (tablets), não envia nada para o Firestore agora
+            if (categoriaSalva !== "tablets") {
+                alert("✅ Vistoria salva localmente (modo COMPLETO). Aguardando conclusão das demais etapas.");
+                // Atualizações de UI similares ao caso remoto
+                if (categoriaSalva === "epis") {
+                    if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
+                    state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
+                } else {
+                    state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
+                }
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                renderViaturaDashboard();
+                updateMenuStatus();
+                state.vistoriasCache = [];
+                state.dadosTemporariosVistoria = null;
+                return;
+            }
+
+            // Se chegou aqui, categoriaSalva === 'tablets' e estamos no modo completo:
+            // montamos um documento consolidado com todas as categorias pendentes + atual
+            const pend = state.pendingCompleteVistorias[viaturaSalva] || {};
+            const categoriasKeys = Object.keys(pend);
+            const mergedItems = [];
+            const mergedAvarias = [];
+            const mergedAvariasTablet = [];
+            const mergedAvariasNotebook = [];
+            const mergedFotos = [];
+            const mergedAuxiliares = [];
+            const mergedAuxiliaresKeys = new Set();
+            let notebookTermType = docData.notebookTermType || "RETIRADA";
+            let dataVistoria = docData.dataVistoria || new Date().toLocaleDateString("sv-SE");
+            let km = docData.km || null;
+            let combustivel = docData.combustivel || null;
+            let observacoesViatura = docData.observacoesViatura || "";
+            let observacoesTablet = docData.observacoesTablet || "";
+            let observacoesNotebook = docData.observacoesNotebook || "";
+            let tecnicoNome = docData.tecnicoNome || "";
+            let tecnicoCpf = docData.tecnicoCpf || "";
+            let vistoriador = docData.vistoriador || "";
+
+            const addMergedAuxiliares = (auxiliares = []) => {
+                if (!Array.isArray(auxiliares)) return;
+                auxiliares.forEach((auxiliar) => {
+                    const nome = String(auxiliar?.nome || "").trim();
+                    const cpf = String(auxiliar?.cpf || "").trim();
+                    const key = `${nome.toLowerCase()}|${cpf}`;
+                    if (!nome || mergedAuxiliaresKeys.has(key)) return;
+
+                    mergedAuxiliaresKeys.add(key);
+                    mergedAuxiliares.push({ nome, cpf });
+                });
+            };
+
+            categoriasKeys.forEach((cat) => {
+                const entry = pend[cat];
+                if (!entry) return;
+                if (Array.isArray(entry.itens)) mergedItems.push(...entry.itens);
+                if (Array.isArray(entry.avarias)) mergedAvarias.push(...entry.avarias);
+                if (Array.isArray(entry.avariasTablet)) mergedAvariasTablet.push(...entry.avariasTablet);
+                if (Array.isArray(entry.avariasNotebook)) mergedAvariasNotebook.push(...entry.avariasNotebook);
+                if (Array.isArray(entry.fotosEvidencia)) mergedFotos.push(...entry.fotosEvidencia);
+                addMergedAuxiliares(entry.auxiliares);
+                if (entry.notebookTermType) notebookTermType = entry.notebookTermType;
+                if (entry.dataVistoria) dataVistoria = entry.dataVistoria;
+                if (entry.km && !km) km = entry.km;
+                if (entry.combustivel && !combustivel) combustivel = entry.combustivel;
+                if (entry.observacoesViatura && !observacoesViatura) observacoesViatura = entry.observacoesViatura;
+                if (entry.observacoesTablet && !observacoesTablet) observacoesTablet = entry.observacoesTablet;
+                if (entry.observacoesNotebook && !observacoesNotebook) observacoesNotebook = entry.observacoesNotebook;
+                if (entry.tecnicoNome && !tecnicoNome) tecnicoNome = entry.tecnicoNome;
+                if (entry.tecnicoCpf && !tecnicoCpf) tecnicoCpf = entry.tecnicoCpf;
+                if (entry.vistoriador && !vistoriador) vistoriador = entry.vistoriador;
+            });
+
+            // Garante que também incluímos a entrada atual (pode já estar em pend)
+            if (!categoriasKeys.includes(categoriaSalva)) {
+                const entry = state.dadosTemporariosVistoria;
+                if (Array.isArray(entry.itens)) mergedItems.push(...entry.itens);
+                if (Array.isArray(entry.avarias)) mergedAvarias.push(...entry.avarias);
+                if (Array.isArray(entry.avariasTablet)) mergedAvariasTablet.push(...entry.avariasTablet);
+                if (Array.isArray(entry.avariasNotebook)) mergedAvariasNotebook.push(...entry.avariasNotebook);
+                if (Array.isArray(entry.fotosEvidencia)) mergedFotos.push(...entry.fotosEvidencia);
+                addMergedAuxiliares(entry.auxiliares);
+                if (entry.notebookTermType) notebookTermType = entry.notebookTermType;
+                if (entry.dataVistoria) dataVistoria = entry.dataVistoria;
+                if (entry.km && !km) km = entry.km;
+                if (entry.combustivel && !combustivel) combustivel = entry.combustivel;
+                if (entry.observacoesViatura && !observacoesViatura) observacoesViatura = entry.observacoesViatura;
+                if (entry.observacoesTablet && !observacoesTablet) observacoesTablet = entry.observacoesTablet;
+                if (entry.observacoesNotebook && !observacoesNotebook) observacoesNotebook = entry.observacoesNotebook;
+                if (entry.tecnicoNome && !tecnicoNome) tecnicoNome = entry.tecnicoNome;
+                if (entry.tecnicoCpf && !tecnicoCpf) tecnicoCpf = entry.tecnicoCpf;
+                if (entry.vistoriador && !vistoriador) vistoriador = entry.vistoriador;
+            }
+
+            const mergedDoc = {
+                tipoVistoria: 'completa',
+                viaturaId: viaturaSalva,
+                tabletId: null,
+                vistoriador: vistoriador || auth.currentUser?.email || "Não identificado",
+                categoria: 'todas',
+                itens: mergedItems,
+                dataVistoria,
+                km,
+                combustivel,
+                avarias: mergedAvarias,
+                avariasTablet: mergedAvariasTablet,
+                avariasNotebook: mergedAvariasNotebook,
+                notebookTermType,
+                observacoesViatura,
+                observacoesTablet,
+                observacoesNotebook,
+                fotosEvidencia: mergedFotos,
+                tecnicoNome,
+                tecnicoCpf,
+                auxiliares: mergedAuxiliares,
+                dataEnvio: serverTimestamp()
+            };
+
+            await addDoc(collection(db, "vistorias"), mergedDoc);
+            // limpa pendências
+            delete state.pendingCompleteVistorias[viaturaSalva];
+        } else {
+            // modo parcial: comportamento antigo — grava por categoria
+            await addDoc(collection(db, "vistorias"), docData);
+        }
         salvarVistoriaLocal({
             ...state.dadosTemporariosVistoria,
             dataEnvioLocal: new Date()
@@ -2132,13 +2436,21 @@ async function enviarVistoriaAoFirebase() {
             renderTabletDamageMarkers();
             renderTabletDamageList();
         }
+        if (categoriaSalva === "notebooks") {
+            state.notebookDamages[state.selectedViatura] = [];
+            const observacoesNotebook = document.getElementById("notebook-observacoes");
+            if (observacoesNotebook) observacoesNotebook.value = "";
+            renderNotebookDamageMarkers();
+            renderNotebookDamageList();
+        }
         
         // Limpa a foto após o envio
         if (state.fotosEvidencia?.[viaturaSalva]) {
             state.fotosEvidencia[viaturaSalva][categoriaSalva] = [];
             localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
         }
-        const inputFoto = document.getElementById(categoriaSalva === 'viaturas' ? 'foto-viatura' : 'foto-tablet');
+        const inputIdMapping = { viaturas: 'foto-viatura', tablets: 'foto-tablet', notebooks: 'foto-notebook' };
+        const inputFoto = document.getElementById(inputIdMapping[categoriaSalva]);
         if (inputFoto) inputFoto.value = "";
 
         renderFotoPreviews(categoriaSalva);
@@ -2184,8 +2496,21 @@ async function enviarVistoriaAoFirebase() {
             await gerarRelatorioViatura(viaturaSalva, {
                 confirmar: true,
                 resetarStatus: true,
-                categorias: Object.keys(categoryNames)
+                categorias: ["ferramentas", "epis", "viaturas", "tablets"]
             });
+        }
+
+        if (categoriaSalva === "notebooks") {
+            // Gerar PDF de notebooks automaticamente apenas no modo parcial.
+            // No modo completo, o PDF consolidado será gerado após a etapa de tablets
+            // para evitar salvar dois PDFs separados (notebook + consolidado).
+            if (isVistoriaParcial(viaturaSalva)) {
+                await gerarRelatorioViatura(viaturaSalva, {
+                    confirmar: true,
+                    resetarStatus: true,
+                    categorias: ["notebooks"]
+                });
+            }
         }
     } catch (error) {
         console.error("Erro ao salvar no Firestore: ", error);
@@ -2210,11 +2535,14 @@ function sincronizarStatusViaturasRealtime() {
     );
 
     onSnapshot(q, (snapshot) => {
-        // Reset local dos estados para recalcular com base no banco
+        const newSurveyStatus = {};
+        const newEpiSurveyStatus = {};
+
         state.viaturas.forEach(v => {
-            state.surveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
-            state.epiSurveyStatus[v.id] = {};
+            newSurveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false, notebooks: false };
+            newEpiSurveyStatus[v.id] = {};
         });
+
         const modoAtualizadoPorViatura = new Set();
 
         snapshot.forEach(doc => {
@@ -2230,22 +2558,25 @@ function sincronizarStatusViaturasRealtime() {
                 modoAtualizadoPorViatura.add(viaturaId);
             }
             
-            if (state.surveyStatus[viaturaId]) {
+            if (newSurveyStatus[viaturaId]) {
                 if (categoria === 'epis') {
-                    // Normalizamos os campos para evitar que espaços extras quebrem a comparação
                     const nome = String(data.epiResponsavelNome || "").trim();
                     const cpf = String(data.epiResponsavelCpf || "").trim();
                     const pessoaKey = getFuncionarioKeyFromFields(nome, cpf);
 
-                    if (!state.epiSurveyStatus[viaturaId]) state.epiSurveyStatus[viaturaId] = {};
-                    state.epiSurveyStatus[viaturaId][pessoaKey] = true;
+                    newEpiSurveyStatus[viaturaId][pessoaKey] = true;
                     
-                    state.surveyStatus[viaturaId].epis = todosEpisObrigatoriosVistoriados(viaturaId);
-                } else if (state.surveyStatus[viaturaId][categoria] !== undefined) {
-                    state.surveyStatus[viaturaId][categoria] = true;
+                    // Temporariamente atualiza o status para cálculo
+                    state.epiSurveyStatus[viaturaId] = newEpiSurveyStatus[viaturaId];
+                    newSurveyStatus[viaturaId].epis = todosEpisObrigatoriosVistoriados(viaturaId);
+                } else if (newSurveyStatus[viaturaId][categoria] !== undefined) {
+                    newSurveyStatus[viaturaId][categoria] = true;
                 }
             }
         });
+
+        state.surveyStatus = newSurveyStatus;
+        state.epiSurveyStatus = newEpiSurveyStatus;
 
         renderViaturaDashboard();
         updateMenuStatus();
@@ -2255,6 +2586,8 @@ function sincronizarStatusViaturasRealtime() {
         if (document.getElementById("epis")?.classList.contains("active")) {
             renderEpiPessoaOptions();
         }
+    }, (error) => {
+        console.warn("Não foi possível sincronizar o status das viaturas em tempo real.", error);
     });
 }
 
@@ -2278,10 +2611,12 @@ async function reiniciarVistoria() {
     // 1. Limpeza Local
     state.vehicleDamages[viaturaId] = [];
     state.tabletDamages[viaturaId] = [];
+    state.notebookDamages[viaturaId] = [];
     
     if (document.getElementById("km")) document.getElementById("km").value = "";
     if (document.getElementById("viatura-observacoes")) document.getElementById("viatura-observacoes").value = "";
     if (document.getElementById("tablet-observacoes")) document.getElementById("tablet-observacoes").value = "";
+    if (document.getElementById("notebook-observacoes")) document.getElementById("notebook-observacoes").value = "";
 
     // 2. Se for Alisson, perguntar se quer limpar o banco (status/bolinhas)
     if (isAlisson) {
@@ -2326,6 +2661,8 @@ async function reiniciarVistoria() {
     renderDamageList();
     renderTabletDamageMarkers();
     renderTabletDamageList();
+    renderNotebookDamageMarkers();
+    renderNotebookDamageList();
 
     if (!isAlisson) alert("Campos e avarias limpos localmente. Você pode começar novamente.");
 }
@@ -2344,8 +2681,9 @@ async function reiniciarTodasVistorias() {
     state.viaturas.forEach(v => {
         state.vehicleDamages[v.id] = [];
         state.tabletDamages[v.id] = [];
+        state.notebookDamages[v.id] = [];
         if (state.surveyStatus[v.id]) {
-            state.surveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false };
+            state.surveyStatus[v.id] = { ferramentas: false, epis: false, viaturas: false, tablets: false, notebooks: false };
         }
         state.epiSurveyStatus[v.id] = {};
     });
@@ -2354,6 +2692,7 @@ async function reiniciarTodasVistorias() {
     if (document.getElementById("km")) document.getElementById("km").value = "";
     if (document.getElementById("viatura-observacoes")) document.getElementById("viatura-observacoes").value = "";
     if (document.getElementById("tablet-observacoes")) document.getElementById("tablet-observacoes").value = "";
+    if (document.getElementById("notebook-observacoes")) document.getElementById("notebook-observacoes").value = "";
     if (state.fotosEvidencia) state.fotosEvidencia = {};
 
     // 2. Se for Alisson, resetar o status global (banco de dados)
@@ -2390,6 +2729,8 @@ async function reiniciarTodasVistorias() {
     renderDamageList();
     renderTabletDamageMarkers();
     renderTabletDamageList();
+    renderNotebookDamageMarkers();
+    renderNotebookDamageList();
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab && categoryNames[activeTab.id]) {
@@ -2405,6 +2746,7 @@ function bindWindowFunctions() {
         loginApp,
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
+        selecionarResponsavelNotebook,
         selecionarTecnicoVistoriaAtual,
         salvarCpfTecnicoVistoriaAtual,
         selecionarAuxiliarVistoriaAtual,
@@ -2462,6 +2804,10 @@ function bindWindowFunctions() {
         substituirItemChecklist,
         confirmarEnvioFinal,
         abrirModalRevisao,
+        abrirModalAssinatura,
+        confirmarAssinatura,
+        limparAssinaturaCanvas,
+        fecharModalAssinatura,
         renderFuncionariosPage,
         alterarStatusFuncionario,
         excluirFuncionario,
@@ -2486,6 +2832,10 @@ function bindWindowFunctions() {
         marcarAvariaTablet,
         removerAvariaTablet,
         limparAvariasTablet,
+        setNotebookDamageType,
+        marcarAvariaNotebook,
+        removerAvariaNotebook,
+        limparAvariasNotebook,
         removerFoto,
         reiniciarVistoria,
         reiniciarTodasVistorias,
@@ -2510,52 +2860,96 @@ window.addEventListener('scroll', () => {
     document.getElementById("long-press-menu")?.classList.remove("active");
 }, { passive: true });
 
-document.addEventListener("DOMContentLoaded", () => {
-    initDarkMode();
-    const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
-    renderVistoriadorOptions();
-    const vistoriadorSelect = document.getElementById("vistoriador-atual");
-    if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
-    const checkingDate = document.getElementById("checking-date");
-    if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
-    renderTecnicoDatalist();
-    preencherResponsaveisViatura();
-    renderTeamList();
-
-    setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
-
+document.addEventListener("DOMContentLoaded", async () => {
     try {
-        state.fotosEvidencia = JSON.parse(localStorage.getItem("fotosEvidencia") || "{}");
-    } catch (e) {
-        state.fotosEvidencia = {};
-    }
-
-    setAuthReadyCallback(async () => {
-        const vistoriadorAtual = getVistoriadorAtivo();
+        await carregarConfiguracoes();
+        initDarkMode();
+        const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
         renderVistoriadorOptions();
         const vistoriadorSelect = document.getElementById("vistoriador-atual");
-        if (vistoriadorAtual && vistoriadorSelect) vistoriadorSelect.value = vistoriadorAtual;
-        selecionarVistoriadorPorLogin();
+        if (vistoriadorSalvo && vistoriadorSelect) vistoriadorSelect.value = vistoriadorSalvo;
+        const checkingDate = document.getElementById("checking-date");
+        if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
         renderTecnicoDatalist();
         preencherResponsaveisViatura();
-        renderItems("ferramentas");
-        renderViaturaDashboard();
-        updateVehicleMapImage();
-        updateTabletInfo();
-        updateMenuStatus();
-        updateVistoriaModeUI();
-        selecionarVistoriadorAtivo(true);
-            // Inicia a sincronização automática das bolinhas
-            sincronizarStatusViaturasRealtime();
-        if (sessionStorage.getItem("abrirPainelAdmin") === "1") {
-            sessionStorage.removeItem("abrirPainelAdmin");
-            showPage("admin");
+        renderTeamList();
+
+        setPdfUiCallbacks({ renderViaturaDashboard, updateMenuStatus });
+
+        try {
+            state.fotosEvidencia = JSON.parse(localStorage.getItem("fotosEvidencia") || "{}");
+        } catch (e) {
+            state.fotosEvidencia = {};
         }
-    });
-    initAdminAuthListener();
+
+        setAuthReadyCallback(async () => {
+            try {
+                await carregarConfiguracoes();
+                const vistoriadorAtual = getVistoriadorAtivo();
+                renderVistoriadorOptions();
+                const vistoriadorSelect = document.getElementById("vistoriador-atual");
+                if (vistoriadorAtual && vistoriadorSelect) vistoriadorSelect.value = vistoriadorAtual;
+                selecionarVistoriadorPorLogin();
+                renderTecnicoDatalist();
+                preencherResponsaveisViatura();
+                renderItems("ferramentas");
+                renderViaturaDashboard();
+                updateVehicleMapImage();
+                updateTabletInfo();
+                updateMenuStatus();
+                updateVistoriaModeUI();
+                selecionarVistoriadorAtivo(true);
+                // Inicia a sincronização automática das bolinhas
+                sincronizarStatusViaturasRealtime();
+                if (sessionStorage.getItem("abrirPainelAdmin") === "1" && auth.currentUser) { // Verifica se há usuário logado antes de abrir o painel
+                    sessionStorage.removeItem("abrirPainelAdmin");
+                    showPage("admin");
+                }
+            } catch (e) {
+                console.error('Erro durante inicialização de auth-ready:', e);
+                alert('Erro ao inicializar os dados do usuário. Verifique o console.');
+            }
+        });
+        initAdminAuthListener();
+    } catch (error) {
+        console.error('Erro inicializando a aplicação:', error);
+        alert('Erro ao inicializar a aplicação. Veja o console para detalhes.');
+    }
 });
 
 bindWindowFunctions();
+
+let lastGlobalErrorMessage = "";
+let lastGlobalErrorTime = 0;
+
+function getGlobalErrorMessage(error) {
+    return String(error?.message || error?.reason?.message || error || "");
+}
+
+function shouldIgnoreGlobalError(message = "") {
+    return /extension|chrome-extension|google-analytics|gtag|ResizeObserver loop/i.test(message);
+}
+
+function notifyGlobalError(type, error) {
+    const message = getGlobalErrorMessage(error);
+    if (shouldIgnoreGlobalError(message)) return;
+
+    const now = Date.now();
+    if (message === lastGlobalErrorMessage && now - lastGlobalErrorTime < 10000) return;
+
+    lastGlobalErrorMessage = message;
+    lastGlobalErrorTime = now;
+    console.error(type, error);
+}
+
+// Captura global de erros sem criar uma cascata de alertas repetidos.
+window.addEventListener('error', (ev) => {
+    notifyGlobalError('[UNHANDLED ERROR]', ev.error || ev.message || ev);
+});
+
+window.addEventListener('unhandledrejection', (ev) => {
+    notifyGlobalError('[UNHANDLED PROMISE REJECTION]', ev.reason);
+});
 
 window.refreshAppAfterConfigChange = function() {
     const vistoriadorAtual = getVistoriadorAtivo();

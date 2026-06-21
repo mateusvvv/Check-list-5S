@@ -1,5 +1,5 @@
 import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
-import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc } from "./firebase.js";
+import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc, storage, storageRef, uploadBytes, getDownloadURL } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=8";
 import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
@@ -10,6 +10,83 @@ let historyUnsubscribe = null;
 const HISTORICO_PAGE_SIZE = 20;
 let historicoFiltradoAtual = [];
 let historicoVisibleCount = HISTORICO_PAGE_SIZE;
+let historicoGroups = {};
+
+function stringToSafeId(value = "") {
+    return String(value)
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 64);
+}
+
+function getVistoriaGroupKey(vistoria) {
+    if (!vistoria || vistoria.tipoVistoria !== "completa") return null;
+    if (vistoria.categoria === "todas") return null;
+    const viaturaId = String(vistoria.viaturaId || "").trim();
+    const dataVistoria = String(vistoria.dataVistoria || "").trim();
+    const dataEnvioDate = vistoria.dataEnvio?.toDate?.();
+    const dataEnvio = dataEnvioDate ? dataEnvioDate.toLocaleDateString("sv-SE") : "";
+    return `${viaturaId}|${dataVistoria || dataEnvio}`;
+}
+
+function getGroupStatus(docs) {
+    if (docs.some(doc => getStatusVistoria(doc) === "pendente")) return "pendente";
+    if (docs.some(doc => getStatusVistoria(doc) === "resolvida")) return "resolvida";
+    return "ok";
+}
+
+function agruparVistoriasHistorico(dados) {
+    historicoGroups = {};
+    const grupos = new Map();
+    const list = [];
+
+    dados.forEach((vistoria) => {
+        const key = getVistoriaGroupKey(vistoria);
+        if (!key) {
+            list.push({
+                ...vistoria,
+                ids: [vistoria.id],
+                grouped: false
+            });
+            return;
+        }
+
+        const grupo = grupos.get(key) || { ids: [], docs: [], representative: vistoria };
+        grupo.ids.push(vistoria.id);
+        grupo.docs.push(vistoria);
+
+        if (getDataEnvioDate(vistoria) > getDataEnvioDate(grupo.representative)) {
+            grupo.representative = vistoria;
+        }
+
+        grupos.set(key, grupo);
+    });
+
+    grupos.forEach((group, key) => {
+        const syntheticId = `group-${stringToSafeId(key)}`;
+        const representative = group.representative;
+        const status = getGroupStatus(group.docs);
+
+        historicoGroups[syntheticId] = group;
+        list.push({
+            ...representative,
+            id: syntheticId,
+            ids: group.ids,
+            docs: group.docs,
+            grouped: true,
+            categoria: "completa",
+            statusGroup: status
+        });
+    });
+
+    return list.sort((a, b) => getDataEnvioDate(b).getTime() - getDataEnvioDate(a).getTime());
+}
+
+function findVistoriaById(docId) {
+    if (docId.startsWith("group-") && historicoGroups[docId]) {
+        return historicoGroups[docId].docs[0];
+    }
+    return state.vistoriasCache.find(v => v.id === docId);
+}
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -34,6 +111,18 @@ function formatDateBR(date = new Date()) {
 function formatDateTimeBR(value) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "Data indisponível" : date.toLocaleString("pt-BR");
+}
+
+function getDataEnvioDate(vistoria) {
+    if (!vistoria) return new Date(0);
+    if (vistoria.dataEnvio && typeof vistoria.dataEnvio.toDate === "function") {
+        return vistoria.dataEnvio.toDate();
+    }
+    if (vistoria.dataEnvioLocal) {
+        return new Date(vistoria.dataEnvioLocal);
+    }
+    const date = new Date(vistoria.dataEnvio || vistoria.dataVistoria || 0);
+    return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
 
 function getVistoriadorResponsavel() {
@@ -509,6 +598,13 @@ export async function alternarViaturaAtiva(id) {
     const viatura = state.viaturas.find(item => item.id === String(id));
     if (!viatura) return;
     viatura.ativa = viatura.ativa === false;
+
+    // Garante que o objeto viatura tenha a propriedade 'ativa' definida explicitamente
+    const index = state.viaturas.findIndex(v => v.id === String(id));
+    if (index !== -1) {
+        state.viaturas[index].ativa = viatura.ativa;
+    }
+
     registrarHistoricoConfig(viatura.ativa ? "Viatura ativada" : "Viatura desativada", `${viatura.nome} foi ${viatura.ativa ? "ativada" : "desativada"}.`);
     if (state.selectedViatura === String(id) && viatura.ativa === false) {
         setSelectedViatura(getActiveViaturas()[0]?.id || id);
@@ -525,14 +621,11 @@ export async function removerViatura(id) {
     if (!confirm(`Deseja remover ${viatura.nome}?`)) return;
 
     registrarHistoricoConfig("Viatura removida", `${viatura.nome} foi removida.`);
-    state.viaturas = state.viaturas.filter(item => item.id !== viaturaId);
-    delete state.surveyStatus[viaturaId];
-    delete state.vehicleDamages[viaturaId];
-    delete state.tabletDamages[viaturaId];
-    delete state.vistoriaMode[viaturaId];
-    delete state.vistoriasLocais[viaturaId];
-    delete checklistDataByViatura[viaturaId];
 
+    // Marcamos como desativada em vez de deletar o objeto, para manter a persistência
+    viatura.ativa = false;
+    const index = state.viaturas.findIndex(v => v.id === viaturaId);
+    if (index !== -1) state.viaturas[index].ativa = false;
     if (state.viaturas.length === 0) {
         await adicionarViatura();
         return;
@@ -1095,6 +1188,8 @@ export async function substituirItemChecklist(viaturaId, category, index, pessoa
 
     const itemAnterior = item.nome;
     const itemNovo = novoNome.trim();
+
+    if (!Array.isArray(item.substituicoes)) item.substituicoes = [];
     item.substituicoes.push({
         itemAnterior,
         itemNovo,
@@ -1224,7 +1319,8 @@ function getStatusVistoria(vistoria) {
 function vistoriaTemPendencia(vistoria) {
     if (vistoria.pendenciaResolvida?.resolvida) return false;
 
-    const temItemPendente = vistoria.itens.some(i => i.status !== "ok");
+    const itens = Array.isArray(vistoria.itens) ? vistoria.itens : [];
+    const temItemPendente = itens.some(i => i.status !== "ok");
     const temAvariaVisual = Array.isArray(vistoria.avarias) && vistoria.avarias.length > 0;
     const temAvariaTablet = Array.isArray(vistoria.avariasTablet) && vistoria.avariasTablet.length > 0;
     return temItemPendente || temAvariaVisual || temAvariaTablet;
@@ -1264,8 +1360,11 @@ async function salvarResolucaoPendencia(vistoria, observacao) {
 }
 
 function atualizarCardsEstatisticas(dados) {
-    const total = dados.length;
-    const pendentes = dados.filter(vistoriaTemPendencia).length;
+    const dadosAgrupados = agruparVistoriasHistorico(dados);
+    const total = dadosAgrupados.length;
+    const pendentes = dadosAgrupados.filter((vistoria) => (
+        vistoria.grouped ? vistoria.statusGroup === "pendente" : vistoriaTemPendencia(vistoria)
+    )).length;
 
     document.getElementById("stat-total").innerText = total;
     document.getElementById("stat-pending").innerText = pendentes;
@@ -1284,34 +1383,39 @@ function renderHistoricoTable(dados) {
         return;
     }
 
-    const dadosVisiveis = dados.slice(0, historicoVisibleCount);
+    const dadosAgrupados = agruparVistoriasHistorico(dados);
+    const dadosVisiveis = dadosAgrupados.slice(0, historicoVisibleCount);
 
     dadosVisiveis.forEach((data) => {
         const dateObj = getDataReferenciaFiltro(data);
-        const status = getStatusVistoria(data);
+        const status = data.grouped ? data.statusGroup : getStatusVistoria(data);
         const statusHTML = status === "pendente"
             ? '<span class="status-pendente">Pendência</span>'
             : status === "resolvida"
                 ? '<span class="status-resolvida">Resolvida</span>'
             : '<span class="status-ok">Tudo OK</span>';
-        const equipamento = data.categoria === "tablets"
-            ? `Tablet ${data.tabletId || data.viaturaId}`
-            : `Viatura ${data.viaturaId}`;
+        const viaturaLabel = getViaturaLabel(data.viaturaId);
+
+        const tipoVistoriaLabel = (data.tipoVistoria || "").toString().toUpperCase() || "PARCIAL";
+        const todasCategoriasLabel = data.grouped || data.categoria === "todas"
+            ? "Todas as categorias"
+            : (categoryNames[data.categoria] || data.categoria);
+        const checkboxChecked = (data.ids || [data.id]).every(id => state.selectedVistorias.has(id));
 
         tbody.innerHTML += `
             <tr onclick="verDetalhes('${data.id}')">
                 <td onclick="event.stopPropagation();">
-                    <input type="checkbox" class="history-select" value="${data.id}" ${state.selectedVistorias.has(data.id) ? "checked" : ""} onchange="toggleSelecionarVistoria('${data.id}', this.checked)">
+                    <input type="checkbox" class="history-select" value="${data.id}" ${checkboxChecked ? "checked" : ""} onchange="toggleSelecionarVistoria('${data.id}', this.checked)">
                 </td>
                 <td>${dateObj.toLocaleString("pt-BR")}</td>
-                <td>${data.vistoriador}</td>
-                <td>${equipamento}</td>
-                <td>${categoryNames[data.categoria] || data.categoria}</td>
+                <td>${tipoVistoriaLabel}</td>
+                <td>${escapeHtml(viaturaLabel)}</td>
+                <td>${escapeHtml(todasCategoriasLabel)}</td>
                 <td>${statusHTML}</td>
             </tr>
         `;
     });
-    renderHistoricoPager(dadosVisiveis.length, dados.length);
+    renderHistoricoPager(dadosVisiveis.length, dadosAgrupados.length);
     atualizarContadorSelecionadas();
 }
 
@@ -1349,8 +1453,12 @@ function renderHistoricoPager(visibleCount, totalCount) {
 }
 
 export function toggleSelecionarVistoria(id, checked) {
-    if (checked) state.selectedVistorias.add(id);
-    else state.selectedVistorias.delete(id);
+    const group = historicoGroups[id];
+    const idsToToggle = group ? group.ids : [id];
+    idsToToggle.forEach((itemId) => {
+        if (checked) state.selectedVistorias.add(itemId);
+        else state.selectedVistorias.delete(itemId);
+    });
     atualizarContadorSelecionadas();
 }
 
@@ -1362,7 +1470,20 @@ export function toggleSelecionarTodasVistorias(checked) {
 }
 
 function atualizarContadorSelecionadas() {
-    const count = state.selectedVistorias.size;
+    const countedIds = new Set();
+    let count = 0;
+
+    Object.values(historicoGroups).forEach((group) => {
+        if (group.ids.length > 0 && group.ids.every(id => state.selectedVistorias.has(id))) {
+            count += 1;
+            group.ids.forEach(id => countedIds.add(id));
+        }
+    });
+
+    state.selectedVistorias.forEach((id) => {
+        if (!countedIds.has(id)) count += 1;
+    });
+
     const label = document.getElementById("selected-count");
     const selectAll = document.getElementById("select-all-vistorias");
     if (label) label.innerText = `${count} selecionada${count === 1 ? "" : "s"}`;
@@ -1473,23 +1594,60 @@ export async function exportarVistoriasSelecionadasPDF() {
             return;
         }
 
-        const selecionadas = ids
+        let selecionadas = ids
             .map(id => state.vistoriasCache.find(vistoria => vistoria.id === id))
             .filter(Boolean);
 
         if (selecionadas.length === 0) {
-            alert("Nenhuma vistoria selecionada foi encontrada no histórico carregado.");
+            alert("Nenhuma vistoria válida foi selecionada no histórico carregado.");
             return;
         }
 
+        const pdfManuais = selecionadas.filter(v => v.categoria === "manuais_pdf");
+        if (pdfManuais.length > 0) {
+            alert(`Atenção: ${pdfManuais.length} PDF(s) de manual foram selecionados, mas o sistema não armazena o conteúdo desses arquivos. Apenas os PDFs gerados a partir de vistorias de checklist podem ser baixados.`);
+            selecionadas = selecionadas.filter(v => v.categoria !== "manuais_pdf");
+        }
+        if (selecionadas.length === 0) return;
         const exportButton = document.querySelector(".btn-export-selected");
         if (exportButton) exportButton.disabled = true;
 
-        for (const vistoria of selecionadas) {
+        const selectedSet = new Set(selecionadas.map(v => v.id));
+        const gruposCompleto = [];
+        const handledIds = new Set();
+
+        Object.values(historicoGroups).forEach((group) => {
+            if (group.ids.every(id => selectedSet.has(id))) {
+                gruposCompleto.push(group);
+                group.ids.forEach(id => handledIds.add(id));
+            }
+        });
+
+        let exportCount = 0;
+
+        for (const group of gruposCompleto) {
+            const representative = group.representative || group.docs[0];
+            const viaturaId = representative.viaturaId;
+            const equipamento = `Viatura_${formatTwoDigits(viaturaId)}`;
+            const data = (representative.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
+            const categorias = [...new Set(group.docs.map(v => v.categoria))];
+
+            await gerarPDF(`Relatorio_${equipamento}_Completa_${data}`, group.docs, {
+                reportName: `${getViaturaLabel(viaturaId)} - Vistoria completa`,
+                tipoVistoria: "completa",
+                categorias
+            });
+            exportCount += 1;
+        }
+
+        const remaining = selecionadas.filter(v => !handledIds.has(v.id));
+        for (const vistoria of remaining) {
             const equipamento = vistoria.categoria === "tablets"
                 ? `Tablet_${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)}_Viatura_${formatTwoDigits(vistoria.viaturaId)}`
                 : `Viatura_${formatTwoDigits(vistoria.viaturaId)}`;
-            const categoria = categoryNames[vistoria.categoria] || vistoria.categoria;
+            const categoria = vistoria.categoria === "todas"
+                ? "Completa"
+                : (categoryNames[vistoria.categoria] || vistoria.categoria);
             const data = (vistoria.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
 
             await gerarPDF(`Relatorio_${equipamento}_${categoria}_${data}`, [vistoria], {
@@ -1497,9 +1655,10 @@ export async function exportarVistoriasSelecionadasPDF() {
                 tipoVistoria: vistoria.tipoVistoria || "parcial",
                 categorias: [vistoria.categoria]
             });
+            exportCount += 1;
         }
 
-        alert(`${selecionadas.length} PDF${selecionadas.length === 1 ? "" : "s"} baixado${selecionadas.length === 1 ? "" : "s"} com sucesso.`);
+        alert(`${exportCount} PDF${exportCount === 1 ? "" : "s"} baixado${exportCount === 1 ? "" : "s"} com sucesso.`);
     } catch (error) {
         console.error("Erro ao baixar PDFs selecionados:", error);
         alert(`Erro ao baixar PDFs selecionados: ${error?.message || error}`);
@@ -1510,7 +1669,7 @@ export async function exportarVistoriasSelecionadasPDF() {
 }
 
 export function verDetalhes(docId) {
-    const vistoria = state.vistoriasCache.find(v => v.id === docId);
+    const vistoria = findVistoriaById(docId);
     if (!vistoria) return;
 
     const modal = document.getElementById("details-modal");
@@ -1520,14 +1679,20 @@ export function verDetalhes(docId) {
     const equipamentoTitulo = vistoria.categoria === "tablets"
         ? `Tablet ${vistoria.tabletId || vistoria.viaturaId}`
         : `Viatura ${vistoria.viaturaId}`;
-    title.innerText = `Detalhes: ${categoryNames[vistoria.categoria]} - ${equipamentoTitulo}`;
+    const categoriaTitulo = vistoria.categoria === "todas"
+        ? "Vistoria completa"
+        : (categoryNames[vistoria.categoria] || vistoria.categoria);
+    title.innerText = `Detalhes: ${categoriaTitulo} - ${equipamentoTitulo}`;
 
     const itens = Array.isArray(vistoria.itens) ? vistoria.itens : [];
     const pendentes = itens.filter(i => i.status !== "ok");
 
     let html = `<p><strong>Vistoriador:</strong> ${vistoria.vistoriador}</p>`;
     if (vistoria.categoria === "manuais_pdf" && vistoria.nomeArquivo) {
-        html += `<p><strong>Arquivo PDF:</strong> ${vistoria.nomeArquivo}</p>`;
+        const linkHtml = vistoria.urlArquivo
+            ? `<a href="${vistoria.urlArquivo}" target="_blank" class="btn-admin-pdf" style="display:inline-block; margin-top:10px; padding: 5px 10px; text-decoration:none;">📄 Abrir Arquivo PDF</a>`
+            : `<br><small style="color: #e53e3e;">(Arquivo físico não disponível no servidor)</small>`;
+        html += `<p><strong>Manual:</strong> ${vistoria.nomeArquivo} ${linkHtml}</p>`;
     }
     if (vistoria.dataVistoria) html += `<p><strong>Data da vistoria:</strong> ${String(vistoria.dataVistoria).split("-").reverse().join("/")}</p>`;
     if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
@@ -1620,19 +1785,31 @@ export async function processarPDFsImportados(input) {
     const viaturaId = prompt("Informe o número da viatura para estes PDFs:", state.selectedViatura) || state.selectedViatura;
 
     try {
+        console.log("Iniciando upload para o Storage...");
+
         for (const file of files) {
+            // 1. Upload para o Firebase Storage
+            const path = `manuais_pdf/viatura_${viaturaId}/${file.name}`;
+            const fileReference = storageRef(storage, path);
+            const uploadSnapshot = await uploadBytes(fileReference, file);
+
+            // 2. Obter a URL pública para download
+            const downloadURL = await getDownloadURL(uploadSnapshot.ref);
+
+            // 3. Salvar registro no Firestore com a URL
             await addDoc(collection(db, "vistorias"), {
                 vistoriador,
                 viaturaId: String(viaturaId),
                 categoria: "manuais_pdf",
                 tipoRegistro: "pdf_manual",
                 nomeArquivo: file.name,
+                urlArquivo: downloadURL, // URL real do Storage
                 dataEnvio: serverTimestamp(),
                 itens: [],
                 status: "ok"
             });
         }
-        alert("PDFs registrados no histórico com sucesso.");
+        alert(`${files.length} arquivo(s) enviados e registrados com sucesso!`);
         await carregarHistorico();
     } catch (error) {
         console.error("Erro ao registrar PDFs:", error);
@@ -1665,21 +1842,31 @@ export function initAdminAuthListener() {
         const loginSec = document.getElementById("admin-login-section");
         const panelSec = document.getElementById("admin-panel-section");
 
-        if (loginScreen) loginScreen.style.display = user ? "none" : "grid";
-        if (header) header.style.display = "none";
-        if (main) main.style.display = "none";
-        if (loginSec) loginSec.style.display = user ? "none" : "block";
-        if (panelSec) panelSec.style.display = user ? "block" : "none";
         if (!user) {
+            if (loginScreen) loginScreen.style.display = "grid";
+            if (header) header.style.display = "none";
+            if (main) main.style.display = "none";
+            if (loginSec) loginSec.style.display = "block";
+            if (panelSec) panelSec.style.display = "none";
             const vistoriadorSelect = document.getElementById("vistoriador-atual");
             if (vistoriadorSelect) vistoriadorSelect.disabled = false;
+            return;
         }
-        if (user) {
+
+        if (loginScreen) loginScreen.style.display = "none";
+        if (loginSec) loginSec.style.display = "none";
+        if (panelSec) panelSec.style.display = "block";
+
+        try {
             await carregarConfiguracoes();
             await authReadyCallback();
             renderAdminConfig();
             carregarHistorico();
             if (auth.currentUser !== user) return;
+        } catch (error) {
+            console.error("Erro ao preparar interface após login:", error);
+            alert("Erro ao carregar dados iniciais. A tela será aberta com os dados locais disponíveis.");
+        } finally {
             if (header) header.style.display = "flex";
             if (main) main.style.display = "block";
         }

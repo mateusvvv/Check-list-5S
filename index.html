@@ -1763,6 +1763,7 @@
                 <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
+                <li><a href="#" id="menu-notebooks" onclick="showPage('notebooks')">💻 Notebooks</a></li>
                 <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Funcionários</a></li>
                 <li><a href="#" id="menu-dark-mode" onclick="toggleDarkMode()">🌓 Modo Escuro</a></li>
                 <li class="nav-admin-link"><a href="#" id="menu-admin" onclick="showPage('admin')">🔐 Painel Admin</a></li>
@@ -2014,6 +2015,80 @@
                 </div>
             </section>
 
+            <!-- Página: Notebooks -->
+            <section id="notebooks" class="tab-content">
+                <div class="card">
+                    <div class="checklist-section-header">
+                        <h2>💻 Vistoria de Notebooks</h2>
+                        <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('notebooks')">Marcar tudo OK</button>
+                    </div>
+                    <div class="tablet-meta">
+                        <div class="input-group">
+                            <label for="notebook-vistoriador">Responsável:</label>
+                            <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
+                                <option value="">Selecione o Responsável</option>
+                                <option value="Matheus">Matheus</option>
+                                <option value="Italo">Italo</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="notebook-term-type">Tipo de Movimentação:</label>
+                            <select id="notebook-term-type">
+                                <option value="RETIRADA">Retirada</option>
+                                <option value="DEVOLUCAO">Devolução</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Foto do Notebook: <span id="count-notebooks" class="photo-counter">(0 fotos)</span></label>
+                            <label for="foto-notebook" class="custom-file-upload">📷 Escolher arquivos</label>
+                            <input type="file" id="foto-notebook" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
+                            <div id="previews-notebooks" class="photo-previews"></div>
+                        </div>
+                    </div>
+
+                    <div class="damage-inspection">
+                        <div class="damage-header">
+                            <div>
+                                <h3>Notebook - Inspeção Visual</h3>
+                                <p>Selecione o tipo de avaria e toque na região correspondente.</p>
+                            </div>
+                            <button type="button" class="btn-clear-damages" onclick="limparAvariasNotebook()">Limpar marcações</button>
+                        </div>
+
+                        <div class="damage-type-selector">
+                            <button type="button" class="damage-type notebook-damage-type active" data-type="amassado" onclick="setNotebookDamageType('amassado')">A - Amassado</button>
+                            <button type="button" class="damage-type notebook-damage-type" data-type="arranhao" onclick="setNotebookDamageType('arranhao')">R - Riscado</button>
+                            <button type="button" class="damage-type notebook-damage-type" data-type="avariado" onclick="setNotebookDamageType('avariado')">X - Avariado</button>
+                            <button type="button" class="damage-type notebook-damage-type" data-type="faltante" onclick="setNotebookDamageType('faltante')">F - Faltante</button>
+                            <button type="button" class="damage-type notebook-damage-type" data-type="quebrado" onclick="setNotebookDamageType('quebrado')">Q - Quebrado</button>
+                        </div>
+
+                        <div class="vehicle-map" id="notebook-map">
+                            <button type="button" class="vehicle-view vehicle-photo" data-view="notebook" onclick="marcarAvariaNotebook(event)" aria-label="Marcar avaria no notebook">
+                                <img id="notebook-map-image" src="assets/notebook.png" alt="Mapa visual do notebook">
+                            </button>
+                        </div>
+
+                        <div class="damage-list-wrap">
+                            <div class="tablet-observacoes">
+                                <label for="notebook-observacoes">Observações</label>
+                                <textarea id="notebook-observacoes" placeholder="Observações específicas do notebook..."></textarea>
+                            </div>
+                            <h4>Avarias marcadas</h4>
+                            <ul id="notebook-damage-list" class="damage-list">
+                                <li class="empty">Nenhuma avaria marcada.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="lista-notebooks" class="checklist-items">
+                        <p class="placeholder">Aguardando lista de itens...</p>
+                    </div>
+                    <button class="btn-submit" onclick="finalizarVistoria('notebooks')">Finalizar Vistoria Notebook</button>
+                    <button type="button" id="btn-pdf-notebooks" class="btn-category-pdf" onclick="gerarPdfCategoria('notebooks')">📁 Gerar PDF de Notebook</button>
+                </div>
+            </section>
+
             <!-- Página 5: Funcionários -->
             <section id="funcionarios" class="tab-content">
                 <div class="card">
@@ -2059,8 +2134,6 @@
                         </div>
                     <div class="admin-buttons-container">
                         <button class="btn-admin-pdf" onclick="exportarHistoricoPDF()">📄 Exportar PDF</button>
-                        <button class="btn-admin-pdf" onclick="importarPDFs()">📂 Adicionar PDF</button>
-                        <input type="file" id="import-pdf-input" accept="application/pdf" multiple style="display: none;" onchange="processarPDFsImportados(this)">
                         </div>
                     </div>
 
@@ -2201,7 +2274,7 @@
                                 <tr>
                                     <th class="select-col"><input type="checkbox" id="select-all-vistorias" onchange="toggleSelecionarTodasVistorias(this.checked)"></th>
                                     <th>Data</th>
-                                    <th>Vistoriador</th>
+                                    <th>Tipo de Vistoria</th>
                                     <th>Equipamento</th>
                                     <th>Categoria</th>
                                     <th>Status</th>
@@ -2224,6 +2297,7 @@
         <div class="long-press-item" data-category="epis" onclick="handleLongPressAction('epis')">🦺 EPIs</div>
         <div class="long-press-item" data-category="viaturas" onclick="handleLongPressAction('viaturas')">🚗 Viatura</div>
         <div class="long-press-item" data-category="tablets" onclick="handleLongPressAction('tablets')">📱 Tablet</div>
+        <div class="long-press-item" data-category="notebooks" onclick="handleLongPressAction('notebooks')">💻 Notebook</div>
     </div>
 
     <!-- Modal de Detalhes -->
@@ -2273,6 +2347,14 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=46"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            setTimeout(function(){
+                if (window.__APP_MODULE_BOOTED__) return;
+                document.body.insertAdjacentHTML('beforeend', '<div style="position:fixed;inset:0;z-index:99998;display:grid;place-items:center;background:#f8fafc;color:#0f172a;font-family:Arial,sans-serif;padding:24px;text-align:center;"><div style="max-width:560px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.12);"><h1 style="margin:0 0 12px;font-size:22px;">Falha ao carregar a aplicacao</h1><p style="margin:0 0 10px;line-height:1.5;">O HTML abriu, mas o JavaScript principal nao iniciou. Abra o Console do navegador para ver o erro.</p><p style="margin:0;line-height:1.5;">Se voce abriu o arquivo direto como <strong>file://</strong>, rode por um servidor local, por exemplo: <code>python -m http.server 8000</code>.</p></div></div>');
+            }, 3000);
+        });
+    </script>
+    <script type="module" src="script.js?v=49"></script>
 </body>
 </html>

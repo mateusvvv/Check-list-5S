@@ -1,13 +1,18 @@
 import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
-import { db, firestoreDoc, onSnapshot, serverTimestamp, setDoc } from "./firebase.js";
+import { db, firestoreDoc, getDoc, onSnapshot, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
 const SETTINGS_COLLECTION = "configuracoes";
 const SETTINGS_DOC = "app";
+let settingsUnsubscribe = null;
+
+function getChecklistCategories() {
+    return Object.keys(checklistData);
+}
 
 export function normalizeAllChecklistData(data = checklistData) {
     const normalized = {};
-    Object.keys(categoryNames).forEach(category => {
+    getChecklistCategories().forEach(category => {
         normalized[category] = (data[category] || checklistData[category] || [])
             .map((item, index) => normalizeChecklistItem(item, index))
             .filter(item => item.nome);
@@ -25,7 +30,7 @@ function applyChecklistData(data) {
         normalized.viaturas = cloneChecklistItems(checklistData.viaturas);
     }
 
-    Object.keys(categoryNames).forEach(category => {
+    getChecklistCategories().forEach(category => {
         checklistData[category].splice(0, checklistData[category].length, ...normalized[category]);
     });
 }
@@ -186,6 +191,17 @@ function clearFuncionarioResponsavel(key) {
             responsaveis.auxiliar = "";
             responsaveis.auxiliarCpf = "";
         }
+
+        if (Array.isArray(responsaveis.auxiliares)) {
+            responsaveis.auxiliares = responsaveis.auxiliares.filter(auxiliar =>
+                getFuncionarioKeyFromFields(auxiliar.nome, auxiliar.cpf) !== key
+            );
+            const first = responsaveis.auxiliares[0];
+            if (!responsaveis.auxiliar && first) {
+                responsaveis.auxiliar = first.nome || "";
+                responsaveis.auxiliarCpf = first.cpf || "";
+            }
+        }
     });
 }
 
@@ -212,6 +228,14 @@ function syncFuncionariosExtrasViaturas() {
             clearFuncionarioResponsavel(key);
             destino[fields.campoNome] = funcionario.nome;
             destino[fields.campoCpf] = funcionario.cpf;
+
+            if (fields.campoNome === "auxiliar") {
+                if (!Array.isArray(destino.auxiliares)) destino.auxiliares = [];
+                const existe = destino.auxiliares.some(auxiliar =>
+                    getFuncionarioKeyFromFields(auxiliar.nome, auxiliar.cpf) === key
+                );
+                if (!existe) destino.auxiliares.push({ nome: funcionario.nome, cpf: funcionario.cpf });
+            }
         });
 }
 
@@ -247,51 +271,83 @@ function applyVistoriadores(data = []) {
     setVistoriadores(Array.isArray(data) && data.length ? data : defaultVistoriadores);
 }
 
+function applySavedConfig(data = {}) {
+    applyChecklistData(data.checklistData || checklistData);
+    setViaturas(data.viaturas || defaultViaturas);
+    applyViaturaResponsaveis(data.viaturaResponsaveis || viaturaResponsaveis);
+    applyChecklistDataByViatura(data.checklistDataByViatura || {});
+    if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
+    applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
+    applyVistoriadores(data.vistoriadores || defaultVistoriadores);
+    applyDefaultVehicleInventories();
+    applyConfigHistory(data.configHistory || []);
+    ensureChecklistForAllViaturas();
+    window.refreshAppAfterConfigChange?.();
+}
+
+function isRecoverableConfigError(error) {
+    const message = String(error?.message || "");
+    return error?.code === "permission-denied"
+        || error?.code === "unavailable"
+        || /Missing or insufficient permissions|offline|network/i.test(message);
+}
+
+function applyLocalConfigFallback(error) {
+    console.warn("Usando configurações locais/padrão porque o Firestore não respondeu.", error);
+    applySavedConfig({});
+}
+
 export async function carregarConfiguracoes() {
+    const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
+
     try {
-        const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
-        
-        // Usando onSnapshot para sincronização em tempo real das configurações
-        onSnapshot(ref, (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.data();
-                applyChecklistData(data.checklistData || checklistData);
-                setViaturas(data.viaturas || defaultViaturas);
-                applyViaturaResponsaveis(data.viaturaResponsaveis || viaturaResponsaveis);
-                applyChecklistDataByViatura(data.checklistDataByViatura || {});
-                if (data.employeeEpisByPerson) applyEmployeeEpisByPerson(data.employeeEpisByPerson);
-                applyFuncionariosExtras(data.funcionariosExtras || funcionariosExtras);
-                applyVistoriadores(data.vistoriadores || defaultVistoriadores);
-                applyDefaultVehicleInventories();
-                applyConfigHistory(data.configHistory || []);
-                ensureChecklistForAllViaturas();
-                
-                // Notifica a UI principal (script.js) para atualizar a tela
-                window.refreshAppAfterConfigChange?.();
-            }
-        });
+        const snapshot = await getDoc(ref);
+        if (snapshot.exists()) {
+            applySavedConfig(snapshot.data() || {});
+        } else {
+            applySavedConfig({});
+            await salvarConfiguracoes().catch((error) => {
+                if (!isRecoverableConfigError(error)) throw error;
+                console.warn("Não foi possível criar o documento de configurações no Firestore.", error);
+            });
+        }
     } catch (error) {
-        console.warn("Não foi possível carregar configurações remotas. Usando configuração local.", error);
+        if (!isRecoverableConfigError(error)) {
+            console.error("Não foi possível carregar configurações do Firestore.", error);
+            throw error;
+        }
+        applyLocalConfigFallback(error);
+        return;
+    }
+
+    if (!settingsUnsubscribe) {
+        settingsUnsubscribe = onSnapshot(ref, (snapshot) => {
+            if (snapshot.exists()) {
+                applySavedConfig(snapshot.data() || {});
+            }
+        }, (error) => {
+            console.error("Não foi possível sincronizar configurações remotas.", error);
+        });
     }
 }
 
-export async function salvarConfiguracoes() {
-    const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
+function buildConfigPayload(atualizadoEm) {
     const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
-    await setDoc(ref, {
+
+    return {
         checklistData: normalizeAllChecklistData(checklistData),
         checklistDataByViatura: Object.fromEntries(
             Object.entries(checklistDataByViatura)
                 .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
                 .map(([viaturaId, porCategoria]) => [
-                viaturaId,
-                Object.fromEntries(
-                    Object.keys(categoryNames).map(category => [
-                        category,
-                        cloneChecklistItems(porCategoria[category] || checklistData[category])
-                    ])
-                )
-            ])
+                    viaturaId,
+                    Object.fromEntries(
+                        getChecklistCategories().map(category => [
+                            category,
+                            cloneChecklistItems(porCategoria[category] || checklistData[category])
+                        ])
+                    )
+                ])
         ),
         employeeEpisByPerson: Object.fromEntries(
             Object.entries(employeeEpisByPerson).map(([key, items]) => [key, cloneEmployeeEpis(items)])
@@ -303,17 +359,35 @@ export async function salvarConfiguracoes() {
                 .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
                 .map(([viaturaId, responsaveis]) => [
                     viaturaId,
-                    { 
+                    {
                         tecnico: responsaveis.tecnico || "",
                         tecnicoCpf: responsaveis.tecnicoCpf || "",
                         auxiliar: responsaveis.auxiliar || (responsaveis.auxiliares?.[0]?.nome || ""),
                         auxiliarCpf: responsaveis.auxiliarCpf || (responsaveis.auxiliares?.[0]?.cpf || ""),
-                        auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({...a})) : []
+                        auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({ ...a })) : []
                     }
                 ])
         ),
-        viaturas: state.viaturas,
+        viaturas: state.viaturas.map(viatura => ({ ...viatura })),
         configHistory: state.configHistory.slice(0, 200),
-        atualizadoEm: serverTimestamp()
-    }, { merge: true });
+        atualizadoEm
+    };
+}
+
+export async function salvarConfiguracoes() {
+    const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
+
+    // Log de diagnóstico antes de tentar salvar
+    try {
+        console.info('[CONFIG SAVE] tentando salvar configurações — viaturas:', state.viaturas.length, 'funcionariosExtras:', funcionariosExtras.length, 'timestamp_local:', new Date().toISOString());
+    } catch (e) {
+        console.debug('Erro ao gerar log de save', e);
+    }
+
+    try {
+        await setDoc(ref, buildConfigPayload(serverTimestamp()), { merge: true });
+    } catch (error) {
+        console.error('Falha ao salvar configurações no Firestore.', error);
+        throw error;
+    }
 }

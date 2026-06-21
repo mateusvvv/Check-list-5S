@@ -98,6 +98,20 @@ export const checklistData = {
         "Carregador",
         "Funcionamento do toque",
         "Aplicativos de trabalho"
+    ],
+    notebooks: [
+        "Notebook",
+        "headset",
+        "Tela",
+        "Teclado",
+        "Touchpad",
+        "Carregador",
+        "Cabo de força",
+        "Bateria",
+        "Webcam",
+        "Entradas USB/HDMI",
+        "Desempenho",
+        "Capa/Mochila"
     ]
 };
 
@@ -1908,7 +1922,7 @@ export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) 
     const id = String(index + 1);
     return { id, nome: `Viatura ${formatTwoDigits(id)}`, ativa: true };
 });
-export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet", manuais_pdf: "Manual PDF" };
+export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet", notebooks: "Notebook", manuais_pdf: "Manual PDF" };
 export const defaultVistoriadores = [
     { id: "vistoriador-alisson", nome: "Alisson", email: "alisson.tavares@digitalonline.com.br", tipo: "geral", padrao: true },
     { id: "vistoriador-marcos", nome: "Marcos", email: "marcos@digitalonline.com.br", tipo: "geral", padrao: true },
@@ -1918,6 +1932,8 @@ export const defaultVistoriadores = [
 
 export const vistoriadores = defaultVistoriadores.map(vistoriador => ({ ...vistoriador }));
 export const vistoriadoresTablet = [];
+export const vistoriadoresNotebook = ["Matheus", "Italo"];
+export const vistoriadoresAcessoNotebook = ["Alisson", ...vistoriadoresNotebook];
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
