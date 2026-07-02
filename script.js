@@ -1972,6 +1972,7 @@ async function finalizarVistoria(category) {
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
     const vistoriadorNotebook = document.getElementById("notebook-vistoriador")?.value || "";
+    const analistaCpf = document.getElementById("notebook-analista-cpf")?.value || "";
     const vistoriador = category === "tablets" ? vistoriadorTablet : (category === "notebooks" ? vistoriadorNotebook : vistoriadorGeral);
     const vistoriadorAcesso = category === "notebooks" ? vistoriadorGeral : vistoriador;
 
@@ -2091,12 +2092,13 @@ async function finalizarVistoria(category) {
     state.dadosTemporariosVistoria = {
         viaturaId: state.selectedViatura,
         tabletId: category === "tablets" ? state.selectedViatura : null,
-        vistoriador,
-        dataVistoria: dataVistoriaInput?.value || new Date().toLocaleDateString("sv-SE"),
-        tecnicoNome: tecnicoNomeInput?.value.trim() || "",
-        tecnicoCpf: tecnicoCpfInput?.value.trim() || "",
-        auxiliarTecnico: auxiliarNomeInput?.value.trim() || "",
-        auxiliarCpf: auxiliarCpfInput?.value.trim() || "",
+        vistoriador: vistoriador,
+        analistaCpf: category === 'notebooks' ? analistaCpf : null,
+        dataVistoria: dataVistoriaInput?.value || new Date().toLocaleDateString("sv-SE"),        
+        tecnicoNome: category !== 'notebooks' ? (tecnicoNomeInput?.value.trim() || "") : "",
+        tecnicoCpf: category !== 'notebooks' ? (tecnicoCpfInput?.value.trim() || "") : "",
+        auxiliarTecnico: category !== 'notebooks' ? (auxiliarNomeInput?.value.trim() || "") : "",
+        auxiliarCpf: category !== 'notebooks' ? (auxiliarCpfInput?.value.trim() || "") : "",
         auxiliares: viaturaResponsaveis[state.selectedViatura]?.auxiliares || [],
         epiResponsavelTipo: epiPessoa?.tipo || null,
         epiResponsavelNome: epiPessoa?.nome || null,

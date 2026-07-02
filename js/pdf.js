@@ -273,7 +273,7 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
 
     y = ensurePdfSpace(pdf, y, 36 + auxiliarRows * fieldHeight);
     const labelTecnico = isNotebookOnly
-        ? "Analista responsável"
+        ? "Analista responsável" 
         : "Técnico responsável pela viatura";
 
     function drawSignatureField(x, lineY, width, label, imageData) {
@@ -295,21 +295,27 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(0, 0, 0);
     const tecnicoLineY = y + 18;
-    const tecnicoLabel = !isNotebookOnly && signatureTeam.tecnico?.nome
-        ? `${labelTecnico} - ${signatureTeam.tecnico.nome}`
-        : labelTecnico;
-    drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
+    
+    if (!isNotebookOnly || options.notebookTermType === "SAIDA" || options.notebookTermType === "RETORNO") {
+        let tecnicoLabel = !isNotebookOnly && signatureTeam.tecnico?.nome ? `${labelTecnico} - ${signatureTeam.tecnico.nome}` : labelTecnico;
+        if (isNotebookOnly && signatureTeam.analistaCpf) {
+            tecnicoLabel += `\nCPF: ${signatureTeam.analistaCpf.trim()}`;
+        }
+        drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
+    }
 
-    for (let i = 0; i < auxiliarCount; i++) {
-        const row = Math.floor(i / columns);
-        const col = i % columns;
-        const x = startX + col * (fieldWidth + fieldGap);
-        const lineY = tecnicoLineY + fieldHeight + row * fieldHeight;
-        const auxiliar = auxiliaresEquipe[i] || {};
-        const labelBase = `Auxiliar técnico ${auxiliarCount > 1 ? i + 1 : ""}`.trim();
-        const labelAux = auxiliar.nome ? `${labelBase} - ${auxiliar.nome}` : labelBase;
+    if (!isNotebookOnly) {
+        for (let i = 0; i < auxiliarCount; i++) {
+            const row = Math.floor(i / columns);
+            const col = i % columns;
+            const x = startX + col * (fieldWidth + fieldGap);
+            const lineY = tecnicoLineY + fieldHeight + row * fieldHeight;
+            const auxiliar = auxiliaresEquipe[i] || {};
+            const labelBase = `Auxiliar técnico ${auxiliarCount > 1 ? i + 1 : ""}`.trim();
+            const labelAux = auxiliar.nome ? `${labelBase} - ${auxiliar.nome}` : labelBase;
 
-        drawSignatureField(x, lineY, fieldWidth, labelAux, assinaturasAuxiliares[i]);
+            drawSignatureField(x, lineY, fieldWidth, labelAux, assinaturasAuxiliares[i]);
+        }
     }
 
     y = tecnicoLineY + 12 + auxiliarRows * fieldHeight;
@@ -319,6 +325,8 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
 function getSignatureTeam(dados = []) {
     const team = { tecnico: null, auxiliares: [] };
     const auxiliaresKeys = new Set();
+
+    const notebookVistoria = dados.find(v => v.categoria === 'notebooks');
 
     dados.forEach((vistoria) => {
         if (!team.tecnico && vistoria.tecnicoNome) {
@@ -342,6 +350,11 @@ function getSignatureTeam(dados = []) {
             team.auxiliares.push({ nome, cpf });
         });
     });
+
+    if (notebookVistoria) {
+        team.vistoriador = notebookVistoria.vistoriador;
+        team.analistaCpf = notebookVistoria.analistaCpf;
+    }
 
     return team;
 }
@@ -708,19 +721,22 @@ export async function gerarPDF(titulo, dados, options = {}) {
         }
         addColumnText(`${equipamento} - ${categoryLabel}`, { bold: true, size: 10, lineHeight: 5, color: [15, 82, 160] });
         addColumnText(`Responsável pela etapa: ${v.vistoriador || "Não identificado"}`, { color: [15, 82, 160], bold: true });
-        if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
-        if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
+        
+        if (v.categoria !== 'notebooks') {
+            if (v.tecnicoNome) addColumnText(`Técnico: ${v.tecnicoNome}`, { color: [30, 30, 30], bold: true });
+            if (v.tecnicoCpf) addColumnText(`CPF do técnico: ${v.tecnicoCpf}`, { color: [100, 100, 100] });
 
-        const auxiliares = Array.isArray(v.auxiliares) ? v.auxiliares : [];
-        if (auxiliares.length > 0) {
-            auxiliares.forEach((aux, idx) => {
-                addColumnText(`Auxiliar técnico ${auxiliares.length > 1 ? idx + 1 : ""}: ${aux.nome}`, { color: [30, 30, 30], bold: true });
-                if (aux.cpf) addColumnText(`CPF do auxiliar: ${aux.cpf}`, { color: [100, 100, 100] });
-            });
-        } else if (v.auxiliarTecnico) {
-            // Fallback para vistorias antigas que não usavam o array de auxiliares
-            addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
-            if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
+            const auxiliares = Array.isArray(v.auxiliares) ? v.auxiliares : [];
+            if (auxiliares.length > 0) {
+                auxiliares.forEach((aux, idx) => {
+                    addColumnText(`Auxiliar técnico ${auxiliares.length > 1 ? idx + 1 : ""}: ${aux.nome}`, { color: [30, 30, 30], bold: true });
+                    if (aux.cpf) addColumnText(`CPF do auxiliar: ${aux.cpf}`, { color: [100, 100, 100] });
+                });
+            } else if (v.auxiliarTecnico) {
+                // Fallback para vistorias antigas que não usavam o array de auxiliares
+                addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
+                if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
+            }
         }
 
         // Mensagem de destaque para identificar de quem são os EPIs (Técnico ou Auxiliar)
