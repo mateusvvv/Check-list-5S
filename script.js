@@ -2570,6 +2570,14 @@ function sincronizarStatusViaturasRealtime() {
             if (newSurveyStatus[viaturaId]) {
                 if (categoria === 'epis') {
                     const nome = String(data.epiResponsavelNome || "").trim();
+
+                    // Se for uma vistoria completa, todos os EPIs são marcados como feitos
+                    if (data.categoria === 'todas') {
+                        getEpiPessoaOptions(viaturaId).forEach(pessoa => {
+                            newEpiSurveyStatus[viaturaId][pessoa.key] = true;
+                        });
+                    }
+
                     const cpf = String(data.epiResponsavelCpf || "").trim();
                     const pessoaKey = getFuncionarioKeyFromFields(nome, cpf);
 
@@ -2578,6 +2586,11 @@ function sincronizarStatusViaturasRealtime() {
                     // Temporariamente atualiza o status para cálculo
                     state.epiSurveyStatus[viaturaId] = newEpiSurveyStatus[viaturaId];
                     newSurveyStatus[viaturaId].epis = todosEpisObrigatoriosVistoriados(viaturaId);
+                } else if (categoria === 'todas') {
+                    newSurveyStatus[viaturaId].ferramentas = true;
+                    newSurveyStatus[viaturaId].epis = true;
+                    newSurveyStatus[viaturaId].viaturas = true;
+                    newSurveyStatus[viaturaId].tablets = true;
                 } else if (newSurveyStatus[viaturaId][categoria] !== undefined) {
                     newSurveyStatus[viaturaId][categoria] = true;
                 }
@@ -2909,6 +2922,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 updateVistoriaModeUI();
                 selecionarVistoriadorAtivo(true);
                 // Inicia a sincronização automática das bolinhas
+                sincronizarStatusViaturasRealtime();
                 sincronizarStatusViaturasRealtime();
                 if (sessionStorage.getItem("abrirPainelAdmin") === "1" && auth.currentUser) { // Verifica se há usuário logado antes de abrir o painel
                     sessionStorage.removeItem("abrirPainelAdmin");
