@@ -1747,6 +1747,7 @@ function selectViatura(id) {
     preencherResponsaveisViatura();
     updateVehicleMapImage(id);
     updateTabletInfo(id);
+    limparCamposViatura();
 
     renderFotoPreviews('viaturas');
     renderFotoPreviews('tablets');
@@ -1754,6 +1755,14 @@ function selectViatura(id) {
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab) renderItems(activeTab.id);
+}
+
+function limparCamposViatura() {
+    const kmInput = document.getElementById("km");
+    const combustivelInput = document.getElementById("combustivel");
+
+    if (kmInput) kmInput.value = "";
+    if (combustivelInput) combustivelInput.value = "";
 }
 
 function updateVistoriaModeUI() {
@@ -2299,6 +2308,7 @@ async function enviarVistoriaAoFirebase() {
                 if (categoriaSalva === "epis") {
                     if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
                     state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
+                    renderEpiPessoaButtons();
                 } else {
                     state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
                 }
@@ -2461,6 +2471,7 @@ async function enviarVistoriaAoFirebase() {
         if (categoriaSalva === "epis") {
             if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
             state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
+            renderEpiPessoaButtons();
         } else {
             state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
         }
