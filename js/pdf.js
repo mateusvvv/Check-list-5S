@@ -905,18 +905,18 @@ async function buscarVistoriasPorPeriodo(inicio, fim) {
 }
 
 export async function buscarVistoriasDeHoje(retroativoDias = 1) {
-    // Agora busca por padrão vistorias de hoje e ontem para garantir que 
-    // vistorias finalizadas perto da meia-noite não sumam
-    const { inicio } = getInicioFimHoje();
-    const dataLimite = new Date(inicio);
-    dataLimite.setDate(dataLimite.getDate() - retroativoDias);
+    // Busca vistorias das últimas 24h + dias retroativos para garantir que
+    // vistorias finalizadas perto da meia-noite não sumam.
+    const agora = new Date();
+    const dataLimite = new Date(agora);
+    dataLimite.setDate(dataLimite.getDate() - (retroativoDias > 0 ? retroativoDias : 1));
 
     const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
     const snapshot = await getDocs(q);
     const dados = [];
     snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        const dataEnvio = data.dataEnvio?.toDate?.();
+        const dataEnvio = getDataEnvioDate(data);
         if (dataEnvio && dataEnvio >= dataLimite) {
             dados.push({ id: docSnap.id, ...data });
         }

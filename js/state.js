@@ -8,6 +8,7 @@ export const state = {
     vehicleDamages: {},
     tabletDamages: {},
     vistoriaMode: {},
+    pendingCompleteVistorias: {}, // Esta propriedade será removida
     vistoriasLocais: {},
     selectedVistorias: new Set(),
     vistoriasCache: [],

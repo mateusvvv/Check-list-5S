@@ -2285,149 +2285,10 @@ async function enviarVistoriaAoFirebase() {
         const categoriaSalva = state.dadosTemporariosVistoria.categoria;
         const viaturaSalva = state.selectedViatura;
         const epiPessoaKeySalva = categoriaSalva === "epis" ? getSelectedEpiPessoaKey() : "";
-
-        // Se estivermos no modo VISTORIA COMPLETA, adiamos o envio remoto das categorias da viatura
-        // e só gravamos um único documento consolidado quando a última etapa (tablets)
-        // for finalizada. Notebook é uma vistoria independente e sempre é gravado separado.
-        const isCompleteModeForViatura = !isVistoriaParcial(viaturaSalva);
-        const shouldConsolidateComplete = isCompleteModeForViatura && categoriaSalva !== "notebooks";
-
-        if (shouldConsolidateComplete) {
-            // Garante mapa local de pendências por viatura
-            state.pendingCompleteVistorias = state.pendingCompleteVistorias || {};
-            state.pendingCompleteVistorias[viaturaSalva] = state.pendingCompleteVistorias[viaturaSalva] || {};
-            state.pendingCompleteVistorias[viaturaSalva][categoriaSalva] = { ...state.dadosTemporariosVistoria, dataEnvioLocal: new Date() };
-
-            // Salva localmente por categoria como antes
-            salvarVistoriaLocal({ ...state.dadosTemporariosVistoria, dataEnvioLocal: new Date() });
-
-            // Se não for a última etapa (tablets), não envia nada para o Firestore agora
-            if (categoriaSalva !== "tablets") {
-                alert("✅ Vistoria salva localmente (modo COMPLETO). Aguardando conclusão das demais etapas.");
-                // Atualizações de UI similares ao caso remoto
-                if (categoriaSalva === "epis") {
-                    if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
-                    state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
-                    renderEpiPessoaButtons();
-                } else {
-                    state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
-                }
-                window.scrollTo({ top: 0, behavior: "smooth" });
-                renderViaturaDashboard();
-                updateMenuStatus();
-                state.vistoriasCache = [];
-                state.dadosTemporariosVistoria = null;
-                return;
-            }
-
-            // Se chegou aqui, categoriaSalva === 'tablets' e estamos no modo completo:
-            // montamos um documento consolidado com todas as categorias pendentes + atual
-            const pend = state.pendingCompleteVistorias[viaturaSalva] || {};
-            const categoriasKeys = Object.keys(pend).filter(cat => cat !== "notebooks");
-            const mergedItems = [];
-            const mergedAvarias = [];
-            const mergedAvariasTablet = [];
-            const mergedAvariasNotebook = [];
-            const mergedFotos = [];
-            const mergedAuxiliares = [];
-            const mergedAuxiliaresKeys = new Set();
-            let notebookTermType = docData.notebookTermType || "RETIRADA";
-            let dataVistoria = docData.dataVistoria || new Date().toLocaleDateString("sv-SE");
-            let km = docData.km || null;
-            let combustivel = docData.combustivel || null;
-            let observacoesViatura = docData.observacoesViatura || "";
-            let observacoesTablet = docData.observacoesTablet || "";
-            let observacoesNotebook = docData.observacoesNotebook || "";
-            let tecnicoNome = docData.tecnicoNome || "";
-            let tecnicoCpf = docData.tecnicoCpf || "";
-            let vistoriador = docData.vistoriador || "";
-
-            const addMergedAuxiliares = (auxiliares = []) => {
-                if (!Array.isArray(auxiliares)) return;
-                auxiliares.forEach((auxiliar) => {
-                    const nome = String(auxiliar?.nome || "").trim();
-                    const cpf = String(auxiliar?.cpf || "").trim();
-                    const key = `${nome.toLowerCase()}|${cpf}`;
-                    if (!nome || mergedAuxiliaresKeys.has(key)) return;
-
-                    mergedAuxiliaresKeys.add(key);
-                    mergedAuxiliares.push({ nome, cpf });
-                });
-            };
-
-            categoriasKeys.forEach((cat) => {
-                const entry = pend[cat];
-                if (!entry) return;
-                if (Array.isArray(entry.itens)) mergedItems.push(...entry.itens);
-                if (Array.isArray(entry.avarias)) mergedAvarias.push(...entry.avarias);
-                if (Array.isArray(entry.avariasTablet)) mergedAvariasTablet.push(...entry.avariasTablet);
-                if (Array.isArray(entry.avariasNotebook)) mergedAvariasNotebook.push(...entry.avariasNotebook);
-                if (Array.isArray(entry.fotosEvidencia)) mergedFotos.push(...entry.fotosEvidencia);
-                addMergedAuxiliares(entry.auxiliares);
-                if (entry.notebookTermType) notebookTermType = entry.notebookTermType;
-                if (entry.dataVistoria) dataVistoria = entry.dataVistoria;
-                if (entry.km && !km) km = entry.km;
-                if (entry.combustivel && !combustivel) combustivel = entry.combustivel;
-                if (entry.observacoesViatura && !observacoesViatura) observacoesViatura = entry.observacoesViatura;
-                if (entry.observacoesTablet && !observacoesTablet) observacoesTablet = entry.observacoesTablet;
-                if (entry.observacoesNotebook && !observacoesNotebook) observacoesNotebook = entry.observacoesNotebook;
-                if (entry.tecnicoNome && !tecnicoNome) tecnicoNome = entry.tecnicoNome;
-                if (entry.tecnicoCpf && !tecnicoCpf) tecnicoCpf = entry.tecnicoCpf;
-                if (entry.vistoriador && !vistoriador) vistoriador = entry.vistoriador;
-            });
-
-            // Garante que também incluímos a entrada atual (pode já estar em pend)
-            if (!categoriasKeys.includes(categoriaSalva)) {
-                const entry = state.dadosTemporariosVistoria;
-                if (Array.isArray(entry.itens)) mergedItems.push(...entry.itens);
-                if (Array.isArray(entry.avarias)) mergedAvarias.push(...entry.avarias);
-                if (Array.isArray(entry.avariasTablet)) mergedAvariasTablet.push(...entry.avariasTablet);
-                if (Array.isArray(entry.avariasNotebook)) mergedAvariasNotebook.push(...entry.avariasNotebook);
-                if (Array.isArray(entry.fotosEvidencia)) mergedFotos.push(...entry.fotosEvidencia);
-                addMergedAuxiliares(entry.auxiliares);
-                if (entry.notebookTermType) notebookTermType = entry.notebookTermType;
-                if (entry.dataVistoria) dataVistoria = entry.dataVistoria;
-                if (entry.km && !km) km = entry.km;
-                if (entry.combustivel && !combustivel) combustivel = entry.combustivel;
-                if (entry.observacoesViatura && !observacoesViatura) observacoesViatura = entry.observacoesViatura;
-                if (entry.observacoesTablet && !observacoesTablet) observacoesTablet = entry.observacoesTablet;
-                if (entry.observacoesNotebook && !observacoesNotebook) observacoesNotebook = entry.observacoesNotebook;
-                if (entry.tecnicoNome && !tecnicoNome) tecnicoNome = entry.tecnicoNome;
-                if (entry.tecnicoCpf && !tecnicoCpf) tecnicoCpf = entry.tecnicoCpf;
-                if (entry.vistoriador && !vistoriador) vistoriador = entry.vistoriador;
-            }
-
-            const mergedDoc = {
-                tipoVistoria: 'completa',
-                viaturaId: viaturaSalva,
-                tabletId: null,
-                vistoriador: vistoriador || auth.currentUser?.email || "Não identificado",
-                categoria: 'todas',
-                itens: mergedItems,
-                dataVistoria,
-                km,
-                combustivel,
-                avarias: mergedAvarias,
-                avariasTablet: mergedAvariasTablet,
-                avariasNotebook: mergedAvariasNotebook,
-                notebookTermType,
-                observacoesViatura,
-                observacoesTablet,
-                observacoesNotebook,
-                fotosEvidencia: mergedFotos,
-                tecnicoNome,
-                tecnicoCpf,
-                auxiliares: mergedAuxiliares,
-                dataEnvio: serverTimestamp()
-            };
-
-            await addDoc(collection(db, "vistorias"), mergedDoc);
-            // limpa pendências
-            delete state.pendingCompleteVistorias[viaturaSalva];
-        } else {
-            // modo parcial: comportamento antigo — grava por categoria
-            await addDoc(collection(db, "vistorias"), docData);
-        }
+        
+        // Lógica simplificada: sempre salva a vistoria da categoria no Firebase.
+        await addDoc(collection(db, "vistorias"), docData);
+        
         salvarVistoriaLocal({
             ...state.dadosTemporariosVistoria,
             dataEnvioLocal: new Date()
@@ -2532,14 +2393,17 @@ async function enviarVistoriaAoFirebase() {
  * de status no Dashboard em tempo real para todos os aparelhos.
  */
 function sincronizarStatusViaturasRealtime() {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const agora = new Date();
+    const dataLimite = new Date(agora);
+    // Busca vistorias das últimas 24 horas para evitar problemas de fuso horário ou virada de dia.
+    dataLimite.setDate(dataLimite.getDate() - 1);
     
     // Filtramos no Firebase para trazer APENAS vistorias de hoje
     // Isso evita processar lixo de dias anteriores
     const q = query(
         collection(db, "vistorias"), 
-        where("dataEnvio", ">=", hoje),
+        // A consulta agora busca documentos das últimas 24 horas.
+        where("dataEnvio", ">=", dataLimite),
         orderBy("dataEnvio", "desc")
     );
 
