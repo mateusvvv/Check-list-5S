@@ -18,6 +18,8 @@ export const state = {
     selectedTabletDamageType: "amassado",
     selectedNotebookDamageType: "amassado",
     notebookDamages: {},
+    notebooksCadastrados: [],
+    analistasCadastrados: [],
     assinaturas: null,
     fotosEvidencia: {}
 };

@@ -34,6 +34,41 @@
     margin-bottom: 14px;
 }
 
+.notebook-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+    align-items: start;
+}
+
+.notebook-meta .input-group {
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+.notebook-meta .input-group input,
+.notebook-meta .input-group select {
+    width: min(100%, 300px);
+    max-width: 300px;
+}
+
+.notebook-meta .input-group label[for="foto-notebook"],
+.notebook-meta .custom-file-upload {
+    width: min(100%, 300px);
+    max-width: 300px;
+    box-sizing: border-box;
+}
+
+.notebook-actions-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.notebook-actions-stack button {
+    width: min(100%, 280px);
+    max-width: 280px;
+}
+
 .tablet-association {
     display: flex;
     flex-direction: column;

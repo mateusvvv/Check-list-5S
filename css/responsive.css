@@ -87,6 +87,18 @@
         margin-bottom: 12px;
     }
 
+    .notebook-meta {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .notebook-meta .input-group input,
+    .notebook-meta .input-group select,
+    .notebook-meta .input-group label[for="foto-notebook"],
+    .notebook-meta .custom-file-upload {
+        width: 100%;
+        max-width: none;
+    }
+
     .tablet-association {
         min-height: 34px;
         padding: 5px 8px;

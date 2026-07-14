@@ -2022,7 +2022,7 @@
                         <h2>💻 Vistoria de Notebooks</h2>
                         <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('notebooks')">Marcar tudo OK</button>
                     </div>
-                    <div class="tablet-meta">
+                    <div class="tablet-meta notebook-meta">
                         <div class="input-group">
                             <label for="notebook-vistoriador">Responsável:</label>
                             <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
@@ -2032,15 +2032,30 @@
                             </select>
                         </div>
                         <div class="input-group">
-                            <label for="notebook-analista-cpf">CPF do Analista:</label>
-                            <input type="text" id="notebook-analista-cpf" placeholder="CPF do analista responsável
-                            ">
-                        </div>
-                        <div class="input-group">
                             <label for="notebook-term-type">Tipo de Movimentação:</label>
                             <select id="notebook-term-type">
                                 <option value="RETIRADA">Retirada</option>
                                 <option value="DEVOLUCAO">Devolução</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="notebook-analista-cpf">CPF do Analista:</label>
+                            <input type="text" id="notebook-analista-cpf" placeholder="CPF do analista responsável" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label for="analista-select">Analista cadastrado:</label>
+                            <select id="analista-select" onchange="selecionarAnalistaCadastrado()">
+                                <option value="">Selecione um analista cadastrado</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="notebook-serial">Nº de série:</label>
+                            <input type="text" id="notebook-serial" placeholder="Ex.: PF123456789" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label for="notebook-select">Notebook cadastrado:</label>
+                            <select id="notebook-select" onchange="selecionarNotebookCadastrado()">
+                                <option value="">Selecione um notebook cadastrado</option>
                             </select>
                         </div>
                         <div class="input-group">
@@ -2137,15 +2152,13 @@
                         <div>
                             <h2 class="admin-title">🚀 Gestão de Vistorias</h2>
                         </div>
-                    <div class="admin-buttons-container">
-                        <button class="btn-admin-pdf" onclick="exportarHistoricoPDF()">📄 Exportar PDF</button>
-                        </div>
                     </div>
 
                     <div class="admin-config-tabs">
                         <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
                         <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
                         <button type="button" id="admin-tab-funcionarios" onclick="showAdminConfigTab('funcionarios')">Funcionários</button>
+                        <button type="button" id="admin-tab-notebooks" onclick="showAdminConfigTab('notebooks')">Notebooks</button>
                         <button type="button" id="admin-tab-historico" onclick="abrirPaginaHistoricoVistorias()">Histórico</button>
                     </div>
 
@@ -2211,6 +2224,50 @@
                                         <button type="button" onclick="adicionarVistoriador()">Adicionar vistoriador</button>
                                     </div>
                                     <div id="admin-vistoriadores-list" class="admin-config-list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="admin-config-panel admin-config-section" id="admin-config-notebooks">
+                            <div class="admin-config-header">
+                                <h3>Notebooks</h3>
+                            </div>
+                            <div class="admin-item-form admin-notebook-form" autocomplete="off">
+                                <div class="admin-notebook-field">
+                                    <label for="admin-notebook-analista-nome">Nome do Analista</label>
+                                    <input type="text" id="admin-notebook-analista-nome" placeholder="Nome do analista responsável">
+                                </div>
+                                <div class="admin-notebook-field">
+                                    <label for="admin-notebook-analista-cpf">CPF do Analista</label>
+                                    <input type="text" id="admin-notebook-analista-cpf" placeholder="CPF do analista responsável">
+                                </div>
+                                <div class="admin-notebook-field">
+                                    <label for="admin-analista-select">Analista cadastrado</label>
+                                    <select id="admin-analista-select" onchange="selecionarAnalistaCadastrado('admin')">
+                                        <option value="">Selecione um analista cadastrado</option>
+                                    </select>
+                                </div>
+                                <div class="admin-notebook-actions">
+                                    <button type="button" onclick="salvarCpfAnalista('admin')">Salvar analista</button>
+                                    <button type="button" class="btn-muted" onclick="removerCpfAnalista('admin')">Remover analista</button>
+                                </div>
+                                <div class="admin-notebook-field">
+                                    <label for="admin-notebook-modelo">Modelo do notebook</label>
+                                    <input type="text" id="admin-notebook-modelo" placeholder="Ex.: ThinkPad T14">
+                                </div>
+                                <div class="admin-notebook-field">
+                                    <label for="admin-notebook-serial">Nº de série</label>
+                                    <input type="text" id="admin-notebook-serial" placeholder="Ex.: PF123456789">
+                                </div>
+                                <div class="admin-notebook-field">
+                                    <label for="admin-notebook-select">Notebook cadastrado</label>
+                                    <select id="admin-notebook-select" onchange="selecionarNotebookCadastrado('admin')">
+                                        <option value="">Selecione um notebook cadastrado</option>
+                                    </select>
+                                </div>
+                                <div class="admin-notebook-actions">
+                                    <button type="button" onclick="salvarNotebookCadastro(false, 'admin')">Salvar cadastro do notebook</button>
+                                    <button type="button" class="btn-muted" onclick="removerNotebookCadastradoSelecionado('admin')">Remover notebook cadastrado</button>
                                 </div>
                             </div>
                         </div>

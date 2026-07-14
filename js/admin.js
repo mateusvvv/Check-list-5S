@@ -345,7 +345,7 @@ function renderAdminConfig() {
  */
 function updateAdminTabsPermissions() {
     const isAlisson = isAlissonAdmin();
-    const tabs = ["viaturas", "itens", "funcionarios", "historico"];
+    const tabs = ["viaturas", "itens", "funcionarios", "notebooks", "historico"];
     
     tabs.forEach(tabId => {
         const btn = document.getElementById(`admin-tab-${tabId}`);
@@ -375,14 +375,14 @@ export function showAdminConfigTab(tab) {
     const targetButton = document.getElementById(`admin-tab-${tab}`);
     const isAlreadyOpen = targetButton?.classList.contains("active");
     if (isAlreadyOpen) {
-        ["viaturas", "itens", "funcionarios", "historico"].forEach(item => {
+        ["viaturas", "itens", "funcionarios", "notebooks", "historico"].forEach(item => {
             document.getElementById(`admin-tab-${item}`)?.classList.remove("active");
             document.getElementById(`admin-config-${item}`)?.classList.remove("active");
         });
         return;
     }
 
-    ["viaturas", "itens", "funcionarios", "historico"].forEach(item => {
+    ["viaturas", "itens", "funcionarios", "notebooks", "historico"].forEach(item => {
         document.getElementById(`admin-tab-${item}`)?.classList.toggle("active", tab === item);
         document.getElementById(`admin-config-${item}`)?.classList.toggle("active", tab === item);
     });
@@ -1411,7 +1411,9 @@ function renderHistoricoTable(dados) {
             : status === "resolvida"
                 ? '<span class="status-resolvida">Resolvida</span>'
             : '<span class="status-ok">Tudo OK</span>';
-        const viaturaLabel = getViaturaLabel(data.viaturaId);
+        const viaturaLabel = data.categoria === "notebooks"
+            ? "Vistoria"
+            : getViaturaLabel(data.viaturaId);
 
         const tipoVistoriaLabel = (data.tipoVistoria || "").toString().toUpperCase() || "PARCIAL";
         const todasCategoriasLabel = getCategoriaHistoricoLabel(data);
@@ -1642,13 +1644,16 @@ export async function exportarVistoriasSelecionadasPDF() {
 
         for (const group of gruposCompleto) {
             const representative = group.representative || group.docs[0];
-            const viaturaId = representative.viaturaId;
-            const equipamento = `Viatura_${formatTwoDigits(viaturaId)}`;
-            const data = (representative.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
             const categorias = [...new Set(group.docs.map(v => v.categoria))];
+            const isNotebookGroup = categorias.includes("notebooks") && categorias.length === 1;
+            const viaturaId = representative.viaturaId;
+            const equipamento = isNotebookGroup
+                ? "Vistoria"
+                : `Viatura_${formatTwoDigits(viaturaId)}`;
+            const data = (representative.dataEnvio?.toDate?.() || new Date()).toISOString().slice(0, 10);
 
             await gerarPDF(`Relatorio_${equipamento}_Completa_${data}`, group.docs, {
-                reportName: `${getViaturaLabel(viaturaId)} - Vistoria completa`,
+                reportName: isNotebookGroup ? "Vistoria - Completa" : `${getViaturaLabel(viaturaId)} - Vistoria completa`,
                 tipoVistoria: "completa",
                 categorias
             });
@@ -1657,9 +1662,12 @@ export async function exportarVistoriasSelecionadasPDF() {
 
         const remaining = selecionadas.filter(v => !handledIds.has(v.id));
         for (const vistoria of remaining) {
+            const isNotebook = vistoria.categoria === "notebooks";
             const equipamento = vistoria.categoria === "tablets"
                 ? `Tablet_${formatTwoDigits(vistoria.tabletId || vistoria.viaturaId)}_Viatura_${formatTwoDigits(vistoria.viaturaId)}`
-                : `Viatura_${formatTwoDigits(vistoria.viaturaId)}`;
+                : isNotebook
+                    ? "Vistoria"
+                    : `Viatura_${formatTwoDigits(vistoria.viaturaId)}`;
             const categoria = vistoria.categoria === "todas"
                 ? "Completa"
                 : (categoryNames[vistoria.categoria] || vistoria.categoria);
@@ -1693,7 +1701,9 @@ export function verDetalhes(docId) {
 
     const equipamentoTitulo = vistoria.categoria === "tablets"
         ? `Tablet ${vistoria.tabletId || vistoria.viaturaId}`
-        : `Viatura ${vistoria.viaturaId}`;
+        : vistoria.categoria === "notebooks"
+            ? "Vistoria"
+            : `Viatura ${vistoria.viaturaId}`;
     const categoriaTitulo = vistoria.categoria === "todas"
         ? "Vistoria completa"
         : (categoryNames[vistoria.categoria] || vistoria.categoria);

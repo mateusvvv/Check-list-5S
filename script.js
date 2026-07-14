@@ -11,6 +11,8 @@ import {
     orderBy,
     query,
     serverTimestamp,
+    setDoc,
+    updateDoc,
     where
 } from "./js/firebase.js";
 import {
@@ -336,6 +338,322 @@ function selecionarResponsavelNotebook() {
     if (vistoriadorSelect && !isTabletOnlyUser() && !isAlissonVistoriador() && !getVistoriadorAutenticado()) {
         vistoriadorSelect.value = responsavel;
         selecionarVistoriadorAtivo(true);
+    }
+}
+
+function preencherCamposNotebookCadastro(notebook, scope = "inspection") {
+    const modeloInput = scope === "admin"
+        ? document.getElementById("admin-notebook-modelo")
+        : document.getElementById("notebook-modelo");
+    const serialInput = scope === "admin"
+        ? document.getElementById("admin-notebook-serial")
+        : document.getElementById("notebook-serial");
+
+    if (modeloInput) modeloInput.value = notebook?.modelo || "";
+    if (serialInput) serialInput.value = notebook?.numeroSerie || "";
+}
+
+function renderNotebookSelectOptions(scope = "inspection") {
+    const select = scope === "admin"
+        ? document.getElementById("admin-notebook-select")
+        : document.getElementById("notebook-select");
+    if (!select) return;
+
+    const valorAnterior = select.value || "";
+    select.innerHTML = '<option value="">Selecione um notebook cadastrado</option>';
+
+    const notebooksOrdenados = [...state.notebooksCadastrados].sort((a, b) => {
+        const modeloA = String(a?.modelo || "").toLowerCase();
+        const modeloB = String(b?.modelo || "").toLowerCase();
+        return modeloA.localeCompare(modeloB);
+    });
+
+    notebooksOrdenados.forEach((notebook) => {
+        const option = document.createElement("option");
+        option.value = notebook.id || "";
+        const label = notebook.modelo
+            ? notebook.modelo
+            : (notebook.numeroSerie || "Notebook sem identificação");
+        option.textContent = label;
+        select.appendChild(option);
+    });
+
+    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior)) {
+        select.value = valorAnterior;
+    }
+}
+
+function selecionarNotebookCadastrado(scope = "inspection") {
+    const select = scope === "admin"
+        ? document.getElementById("admin-notebook-select")
+        : document.getElementById("notebook-select");
+    if (!select) return;
+
+    const notebookSelecionado = state.notebooksCadastrados.find(item => String(item.id) === String(select.value));
+    if (notebookSelecionado) {
+        preencherCamposNotebookCadastro(notebookSelecionado, scope);
+    }
+}
+
+async function removerNotebookCadastradoSelecionado(scope = "inspection") {
+    const select = scope === "admin"
+        ? document.getElementById("admin-notebook-select")
+        : document.getElementById("notebook-select");
+    const notebookId = select?.value;
+
+    if (!notebookId) {
+        alert("Selecione um notebook cadastrado antes de remover.");
+        return;
+    }
+
+    const notebookSelecionado = state.notebooksCadastrados.find(item => String(item.id) === String(notebookId));
+    const label = notebookSelecionado?.modelo || notebookSelecionado?.numeroSerie || "este notebook";
+
+    if (!confirm(`Deseja remover do banco o notebook "${label}"?`)) {
+        return;
+    }
+
+    try {
+        await deleteDoc(firestoreDoc(db, "notebooksCadastrados", notebookId));
+        await carregarNotebooksCadastrados();
+        const modeloInput = scope === "admin"
+            ? document.getElementById("admin-notebook-modelo")
+            : document.getElementById("notebook-modelo");
+        const serialInput = scope === "admin"
+            ? document.getElementById("admin-notebook-serial")
+            : document.getElementById("notebook-serial");
+        if (modeloInput) modeloInput.value = "";
+        if (serialInput) serialInput.value = "";
+        alert("✅ Notebook removido do banco com sucesso.");
+    } catch (error) {
+        console.error("Erro ao remover notebook cadastrado:", error);
+        alert("Erro ao remover o notebook do banco.");
+    }
+}
+
+function normalizarCpfAnalista(valor) {
+    return String(valor || "").replace(/\D/g, "");
+}
+
+function renderAnalistasSelectOptions(scope = "inspection") {
+    const select = scope === "admin"
+        ? document.getElementById("admin-analista-select")
+        : document.getElementById("analista-select");
+    if (!select) return;
+
+    const valorAnterior = select.value || "";
+    select.innerHTML = '<option value="">Selecione um analista cadastrado</option>';
+
+    state.analistasCadastrados.forEach((analista) => {
+        const option = document.createElement("option");
+        option.value = analista.cpf || "";
+        const nome = String(analista.nome || "").trim();
+        option.textContent = nome || (analista.cpf || "");
+        select.appendChild(option);
+    });
+
+    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior)) {
+        select.value = valorAnterior;
+    }
+}
+
+function selecionarAnalistaCadastrado(scope = "inspection") {
+    const select = scope === "admin"
+        ? document.getElementById("admin-analista-select")
+        : document.getElementById("analista-select");
+    const nomeInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-nome")
+        : document.getElementById("notebook-analista-nome");
+    const cpfInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-cpf")
+        : document.getElementById("notebook-analista-cpf");
+
+    if (!select || !cpfInput) return;
+
+    const analistaSelecionado = state.analistasCadastrados.find(item => String(item.cpf || "") === String(select.value || ""));
+    if (nomeInput) {
+        nomeInput.value = analistaSelecionado?.nome || "";
+    }
+    cpfInput.value = analistaSelecionado?.cpf || select.value || "";
+}
+
+async function carregarAnalistasCadastrados() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), orderBy("cpf", "asc")));
+        state.analistasCadastrados = snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
+        }));
+        renderAnalistasSelectOptions("inspection");
+        renderAnalistasSelectOptions("admin");
+    } catch (error) {
+        console.error("Erro ao carregar CPFs de analistas:", error);
+    }
+}
+
+async function salvarCpfAnalista(scope = "inspection") {
+    const nomeInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-nome")
+        : document.getElementById("notebook-analista-nome");
+    const cpfInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-cpf")
+        : document.getElementById("notebook-analista-cpf");
+    const nome = String(nomeInput?.value || "").trim();
+    const cpf = normalizarCpfAnalista(cpfInput?.value || "");
+
+    if (!nome || !cpf) {
+        alert("Informe o nome e o CPF do analista para salvar.");
+        return;
+    }
+
+    try {
+        const payload = {
+            nome,
+            cpf,
+            cpfBusca: cpf,
+            nomeBusca: nome.toLowerCase(),
+            atualizadoEm: new Date().toISOString()
+        };
+
+        const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), where("cpfBusca", "==", cpf)));
+        if (!snapshot.empty) {
+            await setDoc(snapshot.docs[0].ref, payload, { merge: true });
+        } else {
+            await addDoc(collection(db, "analistasCadastrados"), payload);
+        }
+
+        await carregarAnalistasCadastrados();
+        const select = scope === "admin"
+            ? document.getElementById("admin-analista-select")
+            : document.getElementById("analista-select");
+        if (select) select.value = cpf;
+        if (scope === "admin") {
+            const adminNomeInput = document.getElementById("admin-notebook-analista-nome");
+            const adminCpfInput = document.getElementById("admin-notebook-analista-cpf");
+            const adminAnalistaSelect = document.getElementById("admin-analista-select");
+            if (adminNomeInput) adminNomeInput.value = "";
+            if (adminCpfInput) adminCpfInput.value = "";
+            if (adminAnalistaSelect) adminAnalistaSelect.value = "";
+        }
+        alert("✅ Analista salvo no banco.");
+    } catch (error) {
+        console.error("Erro ao salvar analista:", error);
+        alert("Erro ao salvar o analista no banco.");
+    }
+}
+
+async function removerCpfAnalista(scope = "inspection") {
+    const nomeInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-nome")
+        : document.getElementById("notebook-analista-nome");
+    const cpfInput = scope === "admin"
+        ? document.getElementById("admin-notebook-analista-cpf")
+        : document.getElementById("notebook-analista-cpf");
+    const cpf = normalizarCpfAnalista(cpfInput?.value || "");
+
+    if (!cpf) {
+        alert("Informe o CPF do analista para remover.");
+        return;
+    }
+
+    if (!confirm(`Deseja remover o analista de CPF ${cpf} do banco?`)) {
+        return;
+    }
+
+    try {
+        const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), where("cpfBusca", "==", cpf)));
+        if (snapshot.empty) {
+            alert("Analista não encontrado no banco.");
+            return;
+        }
+
+        const promises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+        await Promise.all(promises);
+        await carregarAnalistasCadastrados();
+        const select = scope === "admin"
+            ? document.getElementById("admin-analista-select")
+            : document.getElementById("analista-select");
+        if (select) select.value = "";
+        if (nomeInput) nomeInput.value = "";
+        if (cpfInput) cpfInput.value = "";
+        alert("✅ Analista removido do banco.");
+    } catch (error) {
+        console.error("Erro ao remover analista:", error);
+        alert("Erro ao remover o analista do banco.");
+    }
+}
+
+async function carregarNotebooksCadastrados() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "notebooksCadastrados"), orderBy("modelo", "asc")));
+        state.notebooksCadastrados = snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
+        }));
+        renderNotebookSelectOptions("inspection");
+        renderNotebookSelectOptions("admin");
+    } catch (error) {
+        console.error("Erro ao carregar notebooks cadastrados:", error);
+    }
+}
+
+async function salvarNotebookCadastro(silencioso = false, scope = "inspection") {
+    const modeloInput = scope === "admin"
+        ? document.getElementById("admin-notebook-modelo")
+        : document.getElementById("notebook-modelo");
+    const serialInput = scope === "admin"
+        ? document.getElementById("admin-notebook-serial")
+        : document.getElementById("notebook-serial");
+
+    const modelo = modeloInput?.value?.trim() || "";
+    const numeroSerie = serialInput?.value?.trim() || "";
+
+    if (!modelo && !numeroSerie) {
+        if (!silencioso) alert("Informe o modelo e/ou o número de série do notebook para salvar.");
+        return null;
+    }
+
+    const numeroSerieBusca = numeroSerie.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const payload = {
+        modelo,
+        numeroSerie,
+        numeroSerieBusca,
+        atualizadoEm: new Date().toISOString()
+    };
+
+    try {
+        const snapshot = await getDocs(query(collection(db, "notebooksCadastrados"), where("numeroSerieBusca", "==", numeroSerieBusca)));
+
+        if (!snapshot.empty) {
+            const docRef = snapshot.docs[0].ref;
+            await setDoc(docRef, payload, { merge: true });
+        } else {
+            await addDoc(collection(db, "notebooksCadastrados"), payload);
+        }
+
+        await carregarNotebooksCadastrados();
+        const select = scope === "admin"
+            ? document.getElementById("admin-notebook-select")
+            : document.getElementById("notebook-select");
+        if (select) {
+            select.value = state.notebooksCadastrados.find(item => item.numeroSerie === numeroSerie)?.id || "";
+        }
+        if (scope === "admin") {
+            const adminModeloInput = document.getElementById("admin-notebook-modelo");
+            const adminSerialInput = document.getElementById("admin-notebook-serial");
+            const adminNotebookSelect = document.getElementById("admin-notebook-select");
+            if (adminModeloInput) adminModeloInput.value = "";
+            if (adminSerialInput) adminSerialInput.value = "";
+            if (adminNotebookSelect) adminNotebookSelect.value = "";
+        }
+        if (!silencioso) {
+            alert("✅ Notebook salvo para uso futuro.");
+        }
+        return payload;
+    } catch (error) {
+        console.error("Erro ao salvar notebook cadastrado:", error);
+        if (!silencioso) alert("Erro ao salvar o notebook no banco.");
+        return null;
     }
 }
 
@@ -1981,7 +2299,10 @@ async function finalizarVistoria(category) {
     const vistoriadorGeral = document.getElementById("vistoriador-atual").value;
     const vistoriadorTablet = document.getElementById("tablet-vistoriador")?.value || "";
     const vistoriadorNotebook = document.getElementById("notebook-vistoriador")?.value || "";
+    const analistaNome = document.getElementById("notebook-analista-nome")?.value.trim() || "";
     const analistaCpf = document.getElementById("notebook-analista-cpf")?.value || "";
+    const notebookModelo = document.getElementById("notebook-modelo")?.value.trim() || "";
+    const notebookNumeroSerie = document.getElementById("notebook-serial")?.value.trim() || "";
     const vistoriador = category === "tablets" ? vistoriadorTablet : (category === "notebooks" ? vistoriadorNotebook : vistoriadorGeral);
     const vistoriadorAcesso = category === "notebooks" ? vistoriadorGeral : vistoriador;
 
@@ -2080,6 +2401,10 @@ async function finalizarVistoria(category) {
         btnOriginal.innerText = "⌛ Enviando...";
     }
 
+    if (category === "notebooks") {
+        await salvarNotebookCadastro(true);
+    }
+
     if (quantidadesAumentadas.length > 0) {
         const detalhes = quantidadesAumentadas
             .slice(0, 6)
@@ -2102,6 +2427,7 @@ async function finalizarVistoria(category) {
         viaturaId: state.selectedViatura,
         tabletId: category === "tablets" ? state.selectedViatura : null,
         vistoriador: vistoriador,
+        analistaNome: category === 'notebooks' ? analistaNome : null,
         analistaCpf: category === 'notebooks' ? analistaCpf : null,
         dataVistoria: dataVistoriaInput?.value || new Date().toLocaleDateString("sv-SE"),        
         tecnicoNome: category !== 'notebooks' ? (tecnicoNomeInput?.value.trim() || "") : "",
@@ -2123,6 +2449,8 @@ async function finalizarVistoria(category) {
         observacoesTablet: category === "tablets" ? (document.getElementById("tablet-observacoes")?.value.trim() || "") : "",
         avariasNotebook: category === "notebooks" ? [...state.notebookDamages[state.selectedViatura]] : [],
         notebookTermType: category === "notebooks" ? (document.getElementById("notebook-term-type")?.value || "RETIRADA") : null,
+        notebookModelo: category === "notebooks" ? notebookModelo : "",
+        notebookNumeroSerie: category === "notebooks" ? notebookNumeroSerie : "",
         observacoesNotebook: category === "notebooks" ? (document.getElementById("notebook-observacoes")?.value.trim() || "") : "",
         fotosEvidencia: state.fotosEvidencia?.[state.selectedViatura]?.[category] || []
     };
@@ -2633,6 +2961,12 @@ function bindWindowFunctions() {
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
         selecionarResponsavelNotebook,
+        selecionarNotebookCadastrado,
+        selecionarAnalistaCadastrado,
+        removerNotebookCadastradoSelecionado,
+        salvarCpfAnalista,
+        removerCpfAnalista,
+        salvarNotebookCadastro,
         selecionarTecnicoVistoriaAtual,
         salvarCpfTecnicoVistoriaAtual,
         selecionarAuxiliarVistoriaAtual,
@@ -2767,6 +3101,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (e) {
             state.fotosEvidencia = {};
         }
+
+        await carregarNotebooksCadastrados();
+        await carregarAnalistasCadastrados();
 
         setAuthReadyCallback(async () => {
             try {

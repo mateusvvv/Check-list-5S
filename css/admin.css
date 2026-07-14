@@ -699,6 +699,35 @@
     flex: 1 1 190px;
 }
 
+.admin-notebook-form {
+    display: grid;
+    gap: 12px;
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.admin-notebook-field {
+    display: grid;
+    gap: 6px;
+}
+
+.admin-notebook-field label {
+    color: var(--primary-blue);
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.admin-notebook-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.admin-notebook-actions .btn-muted {
+    background: #6c757d;
+}
+
 .substitution-note {
     flex-basis: 100%;
     color: #6c757d;

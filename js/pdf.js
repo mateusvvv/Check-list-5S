@@ -275,10 +275,12 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
     const labelTecnico = isNotebookOnly
         ? "Analista responsável" 
         : "Técnico responsável pela viatura";
+    const labelColaborador = "Colaborador responsável pelo equipamento";
 
     function drawSignatureField(x, lineY, width, label, imageData) {
         if (imageData) {
-            pdf.addImage(imageData, 'PNG', x + 2, lineY - 15, width - 4, 12);
+            const imgWidth = Math.min(width - 4, 70);
+            pdf.addImage(imageData, 'PNG', x + (width - imgWidth) / 2, lineY - 15, imgWidth, 12);
         }
 
         pdf.setDrawColor(15, 82, 160);
@@ -296,11 +298,23 @@ export function adicionarTermoResponsabilidade(pdf, startY, signatures = {}, opt
     pdf.setTextColor(0, 0, 0);
     const tecnicoLineY = y + 18;
     
-    if (!isNotebookOnly || options.notebookTermType === "SAIDA" || options.notebookTermType === "RETORNO") {
+    if (isNotebookOnly) {
         let tecnicoLabel = !isNotebookOnly && signatureTeam.tecnico?.nome ? `${labelTecnico} - ${signatureTeam.tecnico.nome}` : labelTecnico;
-        if (isNotebookOnly && signatureTeam.analistaCpf) {
-            tecnicoLabel += `\nCPF: ${signatureTeam.analistaCpf.trim()}`;
+        if (signatureTeam.analistaNome) {
+            tecnicoLabel += `\n${signatureTeam.analistaNome.trim()}`;
         }
+        if (signatureTeam.analistaCpf) {
+            tecnicoLabel += `\nCPF: ${signatureTeam.analistaCpf}`;
+        }
+        drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
+
+        let colaboradorLabel = labelColaborador;
+        if (signatureTeam.vistoriador) {
+            colaboradorLabel += `\n${signatureTeam.vistoriador}`;
+        }
+        drawSignatureField(startX + fieldWidth + fieldGap, tecnicoLineY, fieldWidth, colaboradorLabel, signatures.auxiliares?.[0]);
+    } else {
+        let tecnicoLabel = !isNotebookOnly && signatureTeam.tecnico?.nome ? `${labelTecnico} - ${signatureTeam.tecnico.nome}` : labelTecnico;
         drawSignatureField(startX, tecnicoLineY, fieldWidth, tecnicoLabel, signatures.tecnico);
     }
 
@@ -354,6 +368,7 @@ function getSignatureTeam(dados = []) {
     if (notebookVistoria) {
         team.vistoriador = notebookVistoria.vistoriador;
         team.analistaCpf = notebookVistoria.analistaCpf;
+        team.analistaNome = notebookVistoria.analistaNome;
     }
 
     return team;
@@ -716,6 +731,8 @@ export async function gerarPDF(titulo, dados, options = {}) {
         if (v.categoria === 'notebooks') {
             const termType = normalizeNotebookTermType(v.notebookTermType || options.notebookTermType);
             equipamento = "Vistoria";
+            if (v.notebookModelo) equipamento = v.notebookModelo;
+            if (v.notebookNumeroSerie) equipamento += ` (S/N: ${v.notebookNumeroSerie})`;
             if (termType === 'RETORNO') categoryLabel = 'devolução';
             else categoryLabel = 'retirada';
         }
@@ -736,6 +753,11 @@ export async function gerarPDF(titulo, dados, options = {}) {
                 // Fallback para vistorias antigas que não usavam o array de auxiliares
                 addColumnText(`Auxiliar técnico: ${v.auxiliarTecnico}`, { color: [30, 30, 30], bold: true });
                 if (v.auxiliarCpf) addColumnText(`CPF do auxiliar: ${v.auxiliarCpf}`, { color: [100, 100, 100] });
+            }
+        } else { // Para v.categoria === 'notebooks'
+            if (v.analistaNome) {
+                addColumnText(`Analista: ${v.analistaNome}`, { color: [30, 30, 30], bold: true });
+                if (v.analistaCpf) addColumnText(`CPF do analista: ${v.analistaCpf}`, { color: [100, 100, 100] });
             }
         }
 

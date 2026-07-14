@@ -1935,6 +1935,8 @@ export const vistoriadoresTablet = [];
 export const vistoriadoresNotebook = ["Matheus", "Italo"];
 export const vistoriadoresAcessoNotebook = ["Alisson", ...vistoriadoresNotebook];
 
+export let notebooksInventory = [];
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
