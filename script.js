@@ -535,6 +535,7 @@ async function salvarCpfAnalista(scope = "inspection") {
             if (adminCpfInput) adminCpfInput.value = "";
             if (adminAnalistaSelect) adminAnalistaSelect.value = "";
         }
+        if (scope === "admin") renderAnalistasSelectOptions("inspection");
         alert("✅ Analista salvo no banco.");
     } catch (error) {
         console.error("Erro ao salvar analista:", error);
@@ -646,6 +647,7 @@ async function salvarNotebookCadastro(silencioso = false, scope = "inspection") 
             if (adminSerialInput) adminSerialInput.value = "";
             if (adminNotebookSelect) adminNotebookSelect.value = "";
         }
+        if (scope === "admin") renderNotebookSelectOptions("inspection");
         if (!silencioso) {
             alert("✅ Notebook salvo para uso futuro.");
         }
