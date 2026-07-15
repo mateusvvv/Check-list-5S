@@ -724,7 +724,7 @@ function showPage(pageId) {
     }
 
     const headerInfo = document.querySelector(".header-info");
-    if (headerInfo) headerInfo.style.display = ["admin", "funcionarios"].includes(pageId) ? "none" : "block";
+    if (headerInfo) headerInfo.style.display = ["admin", "funcionarios", "notebooks"].includes(pageId) ? "none" : "block";
     document.body.classList.toggle("page-funcionarios", pageId === "funcionarios");
 
     document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
