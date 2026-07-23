@@ -1764,7 +1764,6 @@
                 <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
                 <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
                 <li><a href="#" id="menu-notebooks" onclick="showPage('notebooks')">💻 Notebooks</a></li>
-                <li><a href="#" id="menu-funcionarios" onclick="showPage('funcionarios')">👤 Téc/Externos</a></li>
                 <li><a href="#" id="menu-dark-mode" onclick="toggleDarkMode()">🌓 Modo Escuro</a></li>
                 <li class="nav-admin-link"><a href="#" id="menu-admin" onclick="showPage('admin')">🔐 Painel Admin</a></li>
                 <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()">Sair</button></li>
@@ -2111,29 +2110,6 @@
 
             <!-- Página 5: Funcionários -->
             <section id="funcionarios" class="tab-content">
-                <div class="card">
-                    <h2 class="employee-title">Funcionários <span id="funcionarios-total" class="employee-total">0</span></h2>
-                    <div class="employee-filters">
-                        <div class="input-group">
-                            <label for="funcionario-search">Pesquisar funcionário</label>
-                            <input type="text" id="funcionario-search" placeholder="Nome, CPF ou função" oninput="renderFuncionariosPage()">
-                        </div>
-                        <div class="input-group">
-                            <label for="funcionario-status-filter">Situação</label>
-                            <select id="funcionario-status-filter" onchange="renderFuncionariosPage()">
-                                <option value="">Todos</option>
-                                <option value="Ativo">Ativo</option>
-                                <option value="Férias">Férias</option>
-                                <option value="Folga">Folga</option>
-                                <option value="Atestado">Atestado</option>
-                                <option value="Falta">Falta</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id="funcionarios-list" class="employees-list">
-                        <p class="placeholder">Pesquise um funcionário.</p>
-                    </div>
-                </div>
             </section>
 
             <!-- Página 6: Admin (Login) -->
@@ -2150,14 +2126,15 @@
                 <div class="card admin-only" id="admin-panel-section">
                     <div class="admin-header-actions">
                         <div>
-                            <h2 class="admin-title">🚀 GESTÃO DE VISTORIAS</h2>
+                            <h2 class="admin-title">GESTÃO DE VISTORIAS</h2>
                         </div>
                     </div>
 
                     <div class="admin-config-tabs">
                         <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
                         <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
-                        <button type="button" id="admin-tab-funcionarios" onclick="showAdminConfigTab('funcionarios')">Funcionários</button>
+                        <button type="button" id="admin-tab-funcionarios" onclick="showAdminConfigTab('funcionarios')">Adicionar Funcionários</button>
+                        <button type="button" id="menu-funcionarios" onclick="showAdminConfigTab('tec-externos')">Lista de EPI</button>
                         <button type="button" id="admin-tab-notebooks" onclick="showAdminConfigTab('notebooks')">Notebooks</button>
                         <button type="button" id="admin-tab-historico" onclick="abrirPaginaHistoricoVistorias()">Histórico</button>
                     </div>
@@ -2225,6 +2202,32 @@
                                     </div>
                                     <div id="admin-vistoriadores-list" class="admin-config-list"></div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="admin-config-panel admin-config-section" id="admin-config-tec-externos">
+                            <div class="admin-config-header">
+                                <h3 class="employee-title">Lista de EPI <span id="funcionarios-total" class="employee-total">0</span></h3>
+                            </div>
+                            <div class="employee-filters">
+                                <div class="input-group">
+                                    <label for="funcionario-search">Pesquisar funcionário</label>
+                                    <input type="text" id="funcionario-search" placeholder="Nome, CPF ou função" oninput="renderFuncionariosPage()">
+                                </div>
+                                <div class="input-group">
+                                    <label for="funcionario-status-filter">Situação</label>
+                                    <select id="funcionario-status-filter" onchange="renderFuncionariosPage()">
+                                        <option value="">Todos</option>
+                                        <option value="Ativo">Ativo</option>
+                                        <option value="Férias">Férias</option>
+                                        <option value="Folga">Folga</option>
+                                        <option value="Atestado">Atestado</option>
+                                        <option value="Falta">Falta</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="funcionarios-list" class="employees-list">
+                                <p class="placeholder">Pesquise um funcionário.</p>
                             </div>
                         </div>
 
@@ -2417,6 +2420,6 @@
             }, 3000);
         });
     </script>
-    <script type="module" src="script.js?v=50"></script>
+    <script type="module" src="script.js?v=53"></script>
 </body>
 </html>

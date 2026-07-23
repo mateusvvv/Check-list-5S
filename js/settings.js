@@ -1,4 +1,4 @@
-import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
+import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturaResponsaveis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
 import { db, firestoreDoc, getDoc, onSnapshot, serverTimestamp, setDoc } from "./firebase.js";
 import { setViaturas, state } from "./state.js";
 
@@ -60,12 +60,47 @@ function applyEmployeeEpisByPerson(data = {}) {
     });
 }
 
+function mergeResponsaveisWithDefaults(defaults = {}, saved = {}) {
+    const savedAuxiliares = Array.isArray(saved?.auxiliares)
+        ? saved.auxiliares.filter(auxiliar => auxiliar?.nome)
+        : [];
+    const defaultAuxiliares = Array.isArray(defaults?.auxiliares)
+        ? defaults.auxiliares.filter(auxiliar => auxiliar?.nome)
+        : [];
+    const isEmptyResponsavel = (value) => {
+        const normalized = String(value || "").trim().toLowerCase();
+        return !normalized || normalized === "veículo sem técnico" || normalized === "veiculo sem tecnico";
+    };
+    const tecnico = isEmptyResponsavel(saved?.tecnico) && !isEmptyResponsavel(defaults?.tecnico)
+        ? defaults.tecnico
+        : saved?.tecnico;
+
+    return {
+        tecnico: String(tecnico || defaults?.tecnico || ""),
+        tecnicoCpf: String(saved?.tecnicoCpf || defaults?.tecnicoCpf || ""),
+        auxiliar: String(saved?.auxiliar || savedAuxiliares[0]?.nome || defaults?.auxiliar || defaultAuxiliares[0]?.nome || ""),
+        auxiliarCpf: String(saved?.auxiliarCpf || savedAuxiliares[0]?.cpf || defaults?.auxiliarCpf || defaultAuxiliares[0]?.cpf || ""),
+        auxiliares: (savedAuxiliares.length ? savedAuxiliares : defaultAuxiliares).map(auxiliar => ({ ...auxiliar }))
+    };
+}
+
 function applyViaturaResponsaveis(data = {}) {
     const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+    const source = Object.fromEntries(defaultViaturas.map(viatura => {
+        const viaturaId = String(viatura.id);
+        const hasSavedResponsaveis = Object.prototype.hasOwnProperty.call(data, viaturaId);
+        return [
+            viaturaId,
+            hasSavedResponsaveis
+                ? (data[viaturaId] || {})
+                : mergeResponsaveisWithDefaults(defaultViaturaResponsaveis[viaturaId], {})
+        ];
+    }));
+
     Object.keys(viaturaResponsaveis).forEach(viaturaId => {
         if (!defaultIds.has(String(viaturaId))) delete viaturaResponsaveis[viaturaId];
     });
-    Object.entries(data).forEach(([viaturaId, responsaveis]) => {
+    Object.entries(source).forEach(([viaturaId, responsaveis]) => {
         if (!defaultIds.has(String(viaturaId))) return;
         if (!viaturaResponsaveis[String(viaturaId)]) {
             viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };

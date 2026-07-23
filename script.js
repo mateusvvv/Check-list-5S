@@ -598,6 +598,13 @@ async function carregarNotebooksCadastrados() {
     }
 }
 
+async function carregarCadastrosAposAutenticacao() {
+    await Promise.all([
+        carregarNotebooksCadastrados(),
+        carregarAnalistasCadastrados()
+    ]);
+}
+
 async function salvarNotebookCadastro(silencioso = false, scope = "inspection") {
     const modeloInput = scope === "admin"
         ? document.getElementById("admin-notebook-modelo")
@@ -818,10 +825,13 @@ function getTecnicoOptions() {
 
 function findTecnicoByName(nome) {
     const termo = normalizeSearch(nome).trim();
+    const cpfTermo = onlyDigits(nome);
     if (!termo) return null;
     const options = getTecnicoOptions();
     return options.find(tecnico => normalizeSearch(tecnico.nome).trim() === termo)
+        || options.find(tecnico => cpfTermo && onlyDigits(tecnico.cpf) === cpfTermo)
         || options.find(tecnico => normalizeSearch(tecnico.nome).includes(termo))
+        || options.find(tecnico => cpfTermo && onlyDigits(tecnico.cpf).includes(cpfTermo))
         || null;
 }
 
@@ -839,7 +849,10 @@ function findResponsavelEmOutraViatura(viaturaIdAtual, nome, cpf) {
 
         const pessoas = [
             { tipo: "técnico", nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf },
-            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf }
+            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf },
+            ...(Array.isArray(responsaveis.auxiliares)
+                ? responsaveis.auxiliares.map(auxiliar => ({ tipo: "auxiliar", nome: auxiliar.nome, cpf: auxiliar.cpf }))
+                : [])
         ];
 
         const encontrada = pessoas.find(pessoa => {
@@ -904,22 +917,37 @@ async function selecionarTecnicoVistoriaAtual(nome) {
     if (tecnicoNomeInput) updateInputFontSize(tecnicoNomeInput);
 
     if (viaturaResponsaveis[state.selectedViatura]) {
+        const previous = cloneResponsaveisEquipe(viaturaResponsaveis[state.selectedViatura]);
         viaturaResponsaveis[state.selectedViatura].tecnico = tecnicoNome;
         viaturaResponsaveis[state.selectedViatura].tecnicoCpf = tecnicoCpf;
-        await salvarConfiguracoes();
-        renderEpiPessoaOptions();
-        renderViaturaDashboard();
-        renderTeamList();
+        refreshEquipeResponsavelUI();
+
+        try {
+            await salvarConfiguracoes();
+            refreshEquipeResponsavelUI();
+        } catch (error) {
+            restoreResponsaveisEquipe(state.selectedViatura, previous);
+            console.error("Erro ao salvar técnico na equipe responsável.", error);
+            alert("Não foi possível salvar o técnico. Verifique sua conexão/permissão e tente novamente.");
+        }
     }
 }
 
 async function salvarCpfTecnicoVistoriaAtual(cpf) {
     const cpfVal = String(cpf || "").trim();
     if (viaturaResponsaveis[state.selectedViatura]) {
+        const previous = cloneResponsaveisEquipe(viaturaResponsaveis[state.selectedViatura]);
         viaturaResponsaveis[state.selectedViatura].tecnicoCpf = cpfVal;
-        await salvarConfiguracoes();
-        renderEpiPessoaOptions();
-        renderTeamList();
+        refreshEquipeResponsavelUI();
+
+        try {
+            await salvarConfiguracoes();
+            refreshEquipeResponsavelUI();
+        } catch (error) {
+            restoreResponsaveisEquipe(state.selectedViatura, previous);
+            console.error("Erro ao salvar CPF do técnico na equipe responsável.", error);
+            alert("Não foi possível salvar o CPF do técnico. Verifique sua conexão/permissão e tente novamente.");
+        }
     }
 }
 
@@ -958,24 +986,41 @@ async function selecionarResponsavelPorPesquisa(nome) {
     if (nomeInput) nomeInput.value = pessoaNome;
     if (pessoa && cpfInput) cpfInput.value = pessoaCpf;
     if (viaturaResponsaveis[state.selectedViatura]) {
+        const resp = ensureResponsaveisEquipe(state.selectedViatura);
+        const previous = cloneResponsaveisEquipe(resp);
+        let vinculoAnterior = null;
+        let vinculoNovoAnterior = null;
         if (isAuxiliar) {
-            const resp = viaturaResponsaveis[state.selectedViatura];
-            if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
-            
+            const anterior = resp.auxiliares[0];
+            vinculoAnterior = snapshotVinculoAuxiliarExtra(anterior?.nome, anterior?.cpf);
+            vinculoNovoAnterior = snapshotVinculoAuxiliarExtra(pessoaNome, pessoaCpf);
             if (resp.auxiliares.length > 0) {
                 resp.auxiliares[0] = { nome: pessoaNome, cpf: pessoaCpf };
             } else {
                 resp.auxiliares.push({ nome: pessoaNome, cpf: pessoaCpf });
             }
+            syncAuxiliarPrincipal(resp);
+            limparVinculoAuxiliarExtra(anterior?.nome, anterior?.cpf, state.selectedViatura);
+            atualizarVinculoAuxiliarExtra(pessoaNome, pessoaCpf, state.selectedViatura);
         }
 
-        viaturaResponsaveis[state.selectedViatura][campoNome] = pessoaNome;
-        viaturaResponsaveis[state.selectedViatura][campoCpf] = pessoaCpf;
-        await salvarConfiguracoes();
+        resp[campoNome] = pessoaNome;
+        resp[campoCpf] = pessoaCpf;
+        refreshEquipeResponsavelUI();
+
+        try {
+            await salvarConfiguracoes();
+            refreshEquipeResponsavelUI();
+        } catch (error) {
+            restoreVinculoAuxiliarExtra(vinculoAnterior);
+            restoreVinculoAuxiliarExtra(vinculoNovoAnterior);
+            restoreResponsaveisEquipe(state.selectedViatura, previous);
+            console.error("Erro ao salvar responsável pesquisado na equipe.", error);
+            alert("Não foi possível salvar a equipe responsável. Verifique sua conexão/permissão e tente novamente.");
+        }
     }
     if (pesquisaInput) pesquisaInput.value = "";
-    preencherResponsaveisViatura();
-    renderEpiPessoaOptions();
+    refreshEquipeResponsavelUI();
 }
 
 function alterarStatusFuncionario(key, status) {
@@ -1538,7 +1583,7 @@ function abrirPaginaHistoricoVistorias() {
 }
 
 function preencherResponsaveisViatura() {
-    const responsaveis = viaturaResponsaveis[state.selectedViatura];
+    const responsaveis = ensureResponsaveisEquipe(state.selectedViatura);
     const tecnicoNomeInput = document.getElementById("tecnico-nome");
     const tecnicoCpfInput = document.getElementById("tecnico-cpf");
     const auxiliarNomeInput = document.getElementById("auxiliar-nome");
@@ -1574,8 +1619,8 @@ function renderAuxiliaresList() {
     if (!container) return;
 
     const viaturaId = state.selectedViatura;
-    const responsaveis = viaturaResponsaveis[viaturaId] || {};
-    const auxiliares = Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares : [];
+    const responsaveis = ensureResponsaveisEquipe(viaturaId);
+    const auxiliares = responsaveis.auxiliares;
 
     if (auxiliares.length === 0) {
         container.innerHTML = '<p class="placeholder" style="grid-column: 1/-1;">Nenhum auxiliar adicionado.</p>';
@@ -1597,52 +1642,89 @@ function renderAuxiliaresList() {
     `; }).join("");
 }
 
-async function adicionarAuxiliarExtra() {
-    const input = document.getElementById("responsavel-pesquisa");
-    const nome = input?.value.trim();
-    if (!nome) {
-        alert("Digite um nome ou pesquise para adicionar um auxiliar.");
-        return;
+function cloneResponsaveisEquipe(responsaveis = {}) {
+    return {
+        ...responsaveis,
+        auxiliares: Array.isArray(responsaveis.auxiliares)
+            ? responsaveis.auxiliares.map(auxiliar => ({ ...auxiliar }))
+            : []
+    };
+}
+
+function ensureResponsaveisEquipe(viaturaId) {
+    const id = String(viaturaId || state.selectedViatura || "");
+    if (!id) return { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+
+    if (!viaturaResponsaveis[id]) {
+        viaturaResponsaveis[id] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
     }
 
-    const pessoa = findTecnicoByName(nome);
-    const pessoaNome = pessoa?.nome || nome;
-    const pessoaCpf = pessoa?.cpf || "";
-
-    const viaturaId = state.selectedViatura;
-    if (!viaturaResponsaveis[viaturaId]) {
-        viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+    const responsaveis = viaturaResponsaveis[id];
+    if (!Array.isArray(responsaveis.auxiliares)) {
+        responsaveis.auxiliares = responsaveis.auxiliar
+            ? [{ nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf || "" }]
+            : [];
     }
 
-    if (!Array.isArray(viaturaResponsaveis[viaturaId].auxiliares)) {
-        viaturaResponsaveis[viaturaId].auxiliares = [];
-        if (viaturaResponsaveis[viaturaId].auxiliar) {
-            viaturaResponsaveis[viaturaId].auxiliares.push({
-                nome: viaturaResponsaveis[viaturaId].auxiliar,
-                cpf: viaturaResponsaveis[viaturaId].auxiliarCpf
-            });
-        }
+    responsaveis.auxiliares = responsaveis.auxiliares
+        .filter(auxiliar => auxiliar?.nome)
+        .map(auxiliar => ({
+            nome: String(auxiliar.nome || "").trim(),
+            cpf: String(auxiliar.cpf || "").trim()
+        }));
+
+    syncAuxiliarPrincipal(responsaveis);
+    return responsaveis;
+}
+
+function syncAuxiliarPrincipal(responsaveis) {
+    const first = Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares[0] : null;
+    responsaveis.auxiliar = first?.nome || "";
+    responsaveis.auxiliarCpf = first?.cpf || "";
+}
+
+function getFuncionarioExtraByPessoa(nome, cpf) {
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    return funcionariosExtras.find(funcionario =>
+        getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf) === key
+    ) || null;
+}
+
+function isFuncionarioAuxiliar(funcionario) {
+    return normalizeSearch(funcionario?.funcao || "").includes("auxiliar");
+}
+
+function atualizarVinculoAuxiliarExtra(nome, cpf, viaturaId) {
+    const funcionario = getFuncionarioExtraByPessoa(nome, cpf);
+    if (!funcionario || !isFuncionarioAuxiliar(funcionario)) return;
+    funcionario.viaturaId = String(viaturaId || "");
+}
+
+function limparVinculoAuxiliarExtra(nome, cpf, viaturaId) {
+    const funcionario = getFuncionarioExtraByPessoa(nome, cpf);
+    if (!funcionario || !isFuncionarioAuxiliar(funcionario)) return;
+    if (String(funcionario.viaturaId || "") === String(viaturaId || "")) {
+        funcionario.viaturaId = "";
     }
+}
 
-    if (viaturaResponsaveis[viaturaId].auxiliares.some(a => a.nome === pessoaNome)) {
-        alert(`O auxiliar "${pessoaNome}" já está na lista.`);
-        input.value = "";
-        return;
-    }
+function snapshotVinculoAuxiliarExtra(nome, cpf) {
+    const funcionario = getFuncionarioExtraByPessoa(nome, cpf);
+    if (!funcionario || !isFuncionarioAuxiliar(funcionario)) return null;
+    return { funcionario, viaturaId: funcionario.viaturaId || "" };
+}
 
-    if (!confirmarResponsavelDuplicadoVistoria(pessoaNome, pessoaCpf)) {
-        input.value = "";
-        return;
-    }
+function restoreVinculoAuxiliarExtra(snapshot) {
+    if (!snapshot?.funcionario) return;
+    snapshot.funcionario.viaturaId = snapshot.viaturaId || "";
+}
 
-    viaturaResponsaveis[viaturaId].auxiliares.push({ nome: pessoaNome, cpf: pessoaCpf });
-    
-    // Mantém compatibilidade com o campo singular (usa o primeiro da lista)
-    viaturaResponsaveis[viaturaId].auxiliar = viaturaResponsaveis[viaturaId].auxiliares[0].nome;
-    viaturaResponsaveis[viaturaId].auxiliarCpf = viaturaResponsaveis[viaturaId].auxiliares[0].cpf;
+function restoreResponsaveisEquipe(viaturaId, responsaveis) {
+    viaturaResponsaveis[viaturaId] = cloneResponsaveisEquipe(responsaveis);
+    refreshEquipeResponsavelUI();
+}
 
-    input.value = "";
-    await salvarConfiguracoes();
+function refreshEquipeResponsavelUI() {
     renderAuxiliaresList();
     renderEpiPessoaOptions();
     preencherResponsaveisViatura();
@@ -1650,21 +1732,80 @@ async function adicionarAuxiliarExtra() {
     updateMenuStatus();
 }
 
+async function adicionarAuxiliarExtra() {
+    const viaturaId = state.selectedViatura;
+    const responsaveis = ensureResponsaveisEquipe(viaturaId);
+    const previous = cloneResponsaveisEquipe(responsaveis);
+    let vinculoAnterior = null;
+
+    try {
+        const input = document.getElementById("responsavel-pesquisa");
+        const nome = input?.value.trim();
+        if (!nome) {
+            alert("Digite um nome ou pesquise para adicionar um auxiliar.");
+            return;
+        }
+
+        const pessoa = findTecnicoByName(nome);
+        const pessoaNome = pessoa?.nome || nome;
+        const pessoaCpf = pessoa?.cpf || "";
+
+        const pessoaKey = getFuncionarioKeyFromFields(pessoaNome, pessoaCpf);
+        const jaExiste = responsaveis.auxiliares.some(auxiliar =>
+            getFuncionarioKeyFromFields(auxiliar.nome, auxiliar.cpf) === pessoaKey
+        );
+        if (jaExiste) {
+            alert(`O auxiliar "${pessoaNome}" já está na lista.`);
+            input.value = "";
+            return;
+        }
+
+        if (!confirmarResponsavelDuplicadoVistoria(pessoaNome, pessoaCpf)) {
+            input.value = "";
+            return;
+        }
+
+        vinculoAnterior = snapshotVinculoAuxiliarExtra(pessoaNome, pessoaCpf);
+        responsaveis.auxiliares.push({ nome: pessoaNome, cpf: pessoaCpf });
+        syncAuxiliarPrincipal(responsaveis);
+        atualizarVinculoAuxiliarExtra(pessoaNome, pessoaCpf, viaturaId);
+
+        input.value = "";
+        refreshEquipeResponsavelUI();
+
+        await salvarConfiguracoes();
+        refreshEquipeResponsavelUI();
+    } catch (error) {
+        restoreVinculoAuxiliarExtra(vinculoAnterior);
+        restoreResponsaveisEquipe(viaturaId, previous);
+        console.error("Erro ao salvar auxiliar na equipe responsável.", error);
+        alert("Não foi possível adicionar o auxiliar. Verifique sua conexão/permissão e tente novamente.");
+    }
+}
+
 async function removerAuxiliarExtra(index) {
     const viaturaId = state.selectedViatura;
-    if (viaturaResponsaveis[viaturaId]?.auxiliares) {
-        viaturaResponsaveis[viaturaId].auxiliares.splice(index, 1);
-        
-        const first = viaturaResponsaveis[viaturaId].auxiliares[0];
-        viaturaResponsaveis[viaturaId].auxiliar = first ? first.nome : "";
-        viaturaResponsaveis[viaturaId].auxiliarCpf = first ? first.cpf : "";
-        
+    const responsaveis = ensureResponsaveisEquipe(viaturaId);
+    const previous = cloneResponsaveisEquipe(responsaveis);
+    let vinculoAnterior = null;
+
+    try {
+        const itemIndex = Number(index);
+        if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= responsaveis.auxiliares.length) return;
+
+        const [removido] = responsaveis.auxiliares.splice(itemIndex, 1);
+        vinculoAnterior = snapshotVinculoAuxiliarExtra(removido?.nome, removido?.cpf);
+        syncAuxiliarPrincipal(responsaveis);
+        limparVinculoAuxiliarExtra(removido?.nome, removido?.cpf, viaturaId);
+        refreshEquipeResponsavelUI();
+
         await salvarConfiguracoes();
-        renderAuxiliaresList();
-        renderEpiPessoaOptions();
-        preencherResponsaveisViatura();
-        renderViaturaDashboard();
-        updateMenuStatus();
+        refreshEquipeResponsavelUI();
+    } catch (error) {
+        restoreVinculoAuxiliarExtra(vinculoAnterior);
+        restoreResponsaveisEquipe(viaturaId, previous);
+        console.error("Erro ao remover auxiliar da equipe responsável.", error);
+        alert("Não foi possível remover o auxiliar. Verifique sua conexão/permissão e tente novamente.");
     }
 }
 
@@ -3104,12 +3245,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             state.fotosEvidencia = {};
         }
 
-        await carregarNotebooksCadastrados();
-        await carregarAnalistasCadastrados();
-
         setAuthReadyCallback(async () => {
             try {
                 await carregarConfiguracoes();
+                await carregarCadastrosAposAutenticacao();
                 const vistoriadorAtual = getVistoriadorAtivo();
                 renderVistoriadorOptions();
                 const vistoriadorSelect = document.getElementById("vistoriador-atual");

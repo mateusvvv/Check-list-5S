@@ -345,10 +345,10 @@ function renderAdminConfig() {
  */
 function updateAdminTabsPermissions() {
     const isAlisson = isAlissonAdmin();
-    const tabs = ["viaturas", "itens", "funcionarios", "notebooks", "historico"];
+    const tabs = ["viaturas", "itens", "funcionarios", "tec-externos", "notebooks", "historico"];
     
     tabs.forEach(tabId => {
-        const btn = document.getElementById(`admin-tab-${tabId}`);
+        const btn = getAdminConfigTabButton(tabId);
         if (btn) {
             if (!isAlisson) {
                 btn.style.opacity = "0.4";
@@ -367,25 +367,32 @@ function updateAdminTabsPermissions() {
     });
 }
 
+function getAdminConfigTabButton(tab) {
+    return document.getElementById(tab === "tec-externos" ? "menu-funcionarios" : `admin-tab-${tab}`);
+}
+
 export function showAdminConfigTab(tab) {
     if (!isAlissonAdmin()) {
         alert("Somente Alisson tem permissão para acessar estas configurações.");
         return;
     }
-    const targetButton = document.getElementById(`admin-tab-${tab}`);
+    const tabs = ["viaturas", "itens", "funcionarios", "tec-externos", "notebooks", "historico"];
+    const targetButton = getAdminConfigTabButton(tab);
     const isAlreadyOpen = targetButton?.classList.contains("active");
     if (isAlreadyOpen) {
-        ["viaturas", "itens", "funcionarios", "notebooks", "historico"].forEach(item => {
-            document.getElementById(`admin-tab-${item}`)?.classList.remove("active");
+        tabs.forEach(item => {
+            getAdminConfigTabButton(item)?.classList.remove("active");
             document.getElementById(`admin-config-${item}`)?.classList.remove("active");
         });
         return;
     }
 
-    ["viaturas", "itens", "funcionarios", "notebooks", "historico"].forEach(item => {
-        document.getElementById(`admin-tab-${item}`)?.classList.toggle("active", tab === item);
+    tabs.forEach(item => {
+        getAdminConfigTabButton(item)?.classList.toggle("active", tab === item);
         document.getElementById(`admin-config-${item}`)?.classList.toggle("active", tab === item);
     });
+
+    if (tab === "tec-externos") window.renderFuncionariosPage?.();
 }
 
 function refreshAppAfterConfigChange() {
@@ -476,6 +483,19 @@ export async function selecionarAuxiliarViatura(id, nome) {
     const viaturaId = String(id);
     if (!viaturaResponsaveis[viaturaId]) {
         viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+
+    if (!String(nome || "").trim()) {
+        const anterior = viaturaResponsaveis[viaturaId].auxiliar || "Sem auxiliar";
+        viaturaResponsaveis[viaturaId].auxiliar = "";
+        viaturaResponsaveis[viaturaId].auxiliarCpf = "";
+        viaturaResponsaveis[viaturaId].auxiliares = [];
+        if (anterior !== "Sem auxiliar") {
+            registrarHistoricoConfig("Auxiliar alterado", `${getViaturaLabel(viaturaId)}: auxiliar alterado de "${anterior}" para "Sem auxiliar".`);
+        }
+        await salvarConfiguracoes();
+        refreshAppAfterConfigChange();
+        return;
     }
 
     const auxiliar = findTecnicoByName(nome);
@@ -595,7 +615,10 @@ export async function editarResponsavelViatura(id, campo, valor) {
     if (campo === "auxiliar" || campo === "auxiliarCpf") {
         const resp = viaturaResponsaveis[viaturaId];
         if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
-        if (resp.auxiliares.length > 0) {
+        if (!resp.auxiliar) {
+            resp.auxiliarCpf = "";
+            resp.auxiliares = [];
+        } else if (resp.auxiliares.length > 0) {
             resp.auxiliares[0] = { nome: resp.auxiliar, cpf: resp.auxiliarCpf };
         } else if (resp.auxiliar) {
             resp.auxiliares.push({ nome: resp.auxiliar, cpf: resp.auxiliarCpf });

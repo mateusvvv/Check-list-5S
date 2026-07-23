@@ -631,6 +631,19 @@ const episRodrigoJose = [
     "BOLSA EPI CG 445"
 ];
 
+const episRodrigoJoseDefaults = {
+    "CAPACETE DE SEGURANÇA BRANCO": { quantidade: 1, ca: "17.098", dataEntrega: "22/11/2021" },
+    "TALABART DE POSICIONAMENTO": { quantidade: 1, ca: "N.S 0032698", dataEntrega: "24/09/2025", observacao: "NOVO" },
+    "CINTURÃO DE SEG.TAM02": { quantidade: 1, ca: "34.601", dataEntrega: "22/11/2021" },
+    "MOSQUETÃO TRAVA QUEDAS": { quantidade: 2, ca: "078.468", dataEntrega: "22/11/2021" },
+    "BOTINA DE SEG. Nº 39": { quantidade: 1, ca: "32.813", dataEntrega: "19/11/2025", observacao: "NOVA" },
+    "LUVAS FLEX CUT": { quantidade: 1, ca: "33.997", dataEntrega: "28/07/2021" },
+    "CANETA DETECÇÃO DE TENSÃO KA-1789 1000V": { quantidade: 1, ca: "-", dataEntrega: "31/10/2025", observacao: "NOVA" },
+    "OCULOS DE SEG.": { quantidade: 1, ca: "35790", dataEntrega: "14/06/2021" },
+    "POCHETE CARBOGRAFITE": { quantidade: 1, ca: "-", dataEntrega: "09/07/2018" },
+    "BOLSA EPI CG 445": { quantidade: 1, ca: "-", dataEntrega: "20/02/2021" }
+};
+
 const episLucasMateus = [
     "CAPACETE DE SEGURANÇA BRANCO",
     "TALABART DE POSICIONAMENTO",
@@ -1593,7 +1606,19 @@ export const checklistItemDefaultsByViatura = {
     }
 };
 
-export const viaturaResponsaveis = {
+function cloneViaturaResponsaveis(data) {
+    return Object.fromEntries(Object.entries(data).map(([viaturaId, responsaveis]) => [
+        viaturaId,
+        {
+            ...responsaveis,
+            auxiliares: Array.isArray(responsaveis.auxiliares)
+                ? responsaveis.auxiliares.map(auxiliar => ({ ...auxiliar }))
+                : undefined
+        }
+    ]));
+}
+
+export const defaultViaturaResponsaveis = {
     "1": {
         tecnico: "SIDNEY MANOEL DO NASCIMENTO",
         tecnicoCpf: "099.077.164-48",
@@ -1667,6 +1692,8 @@ export const viaturaResponsaveis = {
         auxiliarCpf: ""
     }
 };
+
+export const viaturaResponsaveis = cloneViaturaResponsaveis(defaultViaturaResponsaveis);
 
 export const funcionariosExtras = [
     {
@@ -1765,17 +1792,51 @@ function buildFuncionarioEpisFromDefaults(items, defaultsByItem) {
 }
 
 export const employeeEpisByPerson = {};
+const employeeEpiPeople = [];
 
 function seedEmployeeEpis(nome, cpf, items, defaultsByItem) {
-    employeeEpisByPerson[getFuncionarioKeyFromFields(nome, cpf)] = buildFuncionarioEpisFromDefaults(items, defaultsByItem);
+    const key = getFuncionarioKeyFromFields(nome, cpf);
+    const epis = buildFuncionarioEpisFromDefaults(items, defaultsByItem);
+    employeeEpisByPerson[key] = epis;
+
+    const vinculo = Object.entries(defaultViaturaResponsaveis).reduce((found, [viaturaId, responsaveis]) => {
+        if (found) return found;
+        if (getFuncionarioKeyFromFields(responsaveis.tecnico, responsaveis.tecnicoCpf) === key) {
+            return { funcao: "Técnico", viaturaId };
+        }
+        if (getFuncionarioKeyFromFields(responsaveis.auxiliar, responsaveis.auxiliarCpf) === key) {
+            return { funcao: "Auxiliar técnico", viaturaId };
+        }
+        const auxiliar = Array.isArray(responsaveis.auxiliares)
+            ? responsaveis.auxiliares.find(aux => getFuncionarioKeyFromFields(aux.nome, aux.cpf) === key)
+            : null;
+        return auxiliar ? { funcao: "Auxiliar técnico", viaturaId } : null;
+    }, null);
+
+    if (!employeeEpiPeople.some(pessoa => getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf) === key)) {
+        employeeEpiPeople.push({
+            nome,
+            cpf,
+            funcao: vinculo?.funcao || "Técnico",
+            status: "Ativo",
+            viaturaId: vinculo?.viaturaId || "",
+            epis
+        });
+    }
 }
 
 seedEmployeeEpis("SIDNEY MANOEL DO NASCIMENTO", "099.077.164-48", episSidneyManoel, {});
 seedEmployeeEpis("ANDRESON DA ROCHA SILVA", "132.919.664-30", episAndresonRocha, episAndresonRochaDefaults);
+seedEmployeeEpis("LUCAS MATEUS BEZERRA CABRAL", "144.054.924-92", episLucasMateus, {});
 seedEmployeeEpis("ISAEL FORTUNATO DE LIMA", "182.838.664-27", episIsaelFortunato, episIsaelFortunatoDefaults);
+seedEmployeeEpis("ADRIAN MATHEUS DE BARROS VIDAL", "122.147.614-97", episAdrianMatheus, {});
+seedEmployeeEpis("RODRIGO JOSÉ RODRIGUES DE BARROS GOUVEIA", "104.620.064-09", episRodrigoJose, episRodrigoJoseDefaults);
 seedEmployeeEpis("JOSE EDIVANILSON DA SILVA", "115.353.914-48", episJoseEdivanilson, episJoseEdivanilsonDefaults);
+seedEmployeeEpis("MARCOS ANTONIO DE BRITO SILVA", "053.209.114-08", episMarcosAntonio, {});
+seedEmployeeEpis("DANIEL MENSALA SOUZA DE SÁ", "108.106.314-90", episDanielMensala, {});
 seedEmployeeEpis("JOSE EMERSON DA SILVA NASCIMENTO", "102.407.824-88", episJoseEmerson, episJoseEmersonDefaults);
 seedEmployeeEpis("VINICIUS JOSE DE LIMA", "135.640.954-70", episViniciusJose, episViniciusJoseDefaults);
+seedEmployeeEpis("RICKSON SANTOS GOUVEIA", "134.890.144-64", episRicksonSantos, {});
 seedEmployeeEpis("JOSENILDO VINICIUS ALVES LOPES SILVA", "131.000.574-57", episMikeRyan, episMikeRyanDefaults);
 seedEmployeeEpis("MIKE RYAN LIMA CRUZ", "159.056.184-88", episMikeRyan, episMikeRyanDefaults);
 
@@ -1908,11 +1969,23 @@ export function getFuncionariosData() {
         return res;
     });
     const vinculoKeys = new Set(vinculos.map(funcionario => getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)));
-
-    return [
+    const extraKeys = new Set(funcionariosExtras.map(funcionario => getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf)));
+    const funcionarios = [
         ...vinculos,
-        ...funcionariosExtras.filter(f => f.finalizado && !vinculoKeys.has(getFuncionarioKeyFromFields(f.nome, f.cpf)))
+        ...funcionariosExtras.filter(f => f.finalizado && !vinculoKeys.has(getFuncionarioKeyFromFields(f.nome, f.cpf))),
+        ...employeeEpiPeople.filter(pessoa => {
+            const key = getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf);
+            return !vinculoKeys.has(key) && !extraKeys.has(key);
+        })
     ];
+
+    const seen = new Set();
+    return funcionarios.filter(funcionario => {
+        const key = normalizePessoaKey(funcionario.nome) || getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 export const funcionariosData = getFuncionariosData();

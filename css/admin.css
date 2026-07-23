@@ -146,15 +146,22 @@
 
 .admin-title {
     margin: 0;
+    width: 100%;
+    text-align: center;
 }
 
 .admin-header-actions {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
+    text-align: center;
+}
+
+.admin-header-actions > div {
+    width: 100%;
 }
 
 .history-page-header {
