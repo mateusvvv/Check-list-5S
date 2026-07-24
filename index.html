@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=17">
     <style>
         /* Estilos Gerais para Gestão de Funcionários (Admin) */
         * {
@@ -2071,11 +2071,6 @@
                             </div>
                             <div class="input-group notebook-upload-group">
                                 <label>Foto do Notebook <span id="count-notebooks" class="photo-counter">(0 fotos)</span></label>
-                                <label for="foto-notebook" class="notebook-upload-box">
-                                    <span aria-hidden="true">☁</span>
-                                    <p>Clique para selecionar ou arraste os arquivos aqui</p>
-                                    <small>PNG, JPG ou JPEG - Máx. 10MB cada</small>
-                                </label>
                                 <label for="foto-notebook" class="custom-file-upload">📁 Escolher arquivos</label>
                                 <input type="file" id="foto-notebook" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
                                 <div id="previews-notebooks" class="photo-previews"></div>
@@ -2111,10 +2106,12 @@
                                 <label for="notebook-observacoes">Observações</label>
                                 <textarea id="notebook-observacoes" placeholder="Observações específicas do notebook..."></textarea>
                             </div>
-                            <h4>Avarias marcadas</h4>
-                            <ul id="notebook-damage-list" class="damage-list">
-                                <li class="empty">Nenhuma avaria marcada.</li>
-                            </ul>
+                            <div class="notebook-damage-list-column">
+                                <h4>Avarias marcadas</h4>
+                                <ul id="notebook-damage-list" class="damage-list">
+                                    <li class="empty">Nenhuma avaria marcada.</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
 

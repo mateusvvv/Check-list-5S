@@ -161,6 +161,13 @@
 
 #notebooks .damage-header h3::before {
     content: "◉";
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: var(--primary-blue);
+    color: #ffffff;
+    font-size: 1rem;
+    box-shadow: 0 8px 18px rgba(15, 82, 160, 0.18);
 }
 
 #notebooks .notebook-meta {
@@ -258,18 +265,22 @@
 
 #notebooks .notebook-visual-card {
     background: #ffffff;
+    padding: 22px;
 }
 
 #notebooks .damage-header {
     align-items: center;
+    margin-bottom: 22px;
 }
 
 #notebooks .damage-header h3 {
-    font-size: 1rem;
+    color: #073b78;
+    font-size: 1.45rem;
+    line-height: 1.1;
 }
 
 #notebooks .damage-header p {
-    font-size: 0.78rem;
+    font-size: 0.88rem;
     color: #64748b;
 }
 
@@ -277,20 +288,24 @@
     border-color: #ff4d5f;
     color: #ff263d;
     background: #ffffff;
-    padding: 9px 12px;
+    padding: 10px 16px;
+    font-size: 0.84rem;
 }
 
 #notebooks .damage-type-selector {
-    gap: 24px;
-    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(126px, 1fr));
+    gap: 26px;
+    margin-bottom: 20px;
 }
 
 #notebooks .damage-type {
-    min-width: 104px;
-    padding: 8px 12px;
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 14px;
     border-color: #d8dee8;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-    font-size: 0.78rem;
+    font-size: 0.92rem;
 }
 
 #notebooks .damage-type.active {
@@ -302,22 +317,58 @@
     border: 1px solid #d8dee8;
     border-radius: 6px;
     background: #ffffff;
-    padding: 10px;
+    padding: 18px;
+}
+
+#notebooks #notebook-map::before {
+    content: "Clique ou toque nas áreas do notebook para marcar as avarias";
+    display: block;
+    margin: 0 0 10px;
+    color: var(--primary-blue);
+    font-size: 0.9rem;
+    font-weight: 800;
 }
 
 #notebooks #notebook-map .vehicle-photo {
-    min-height: 260px;
+    min-height: clamp(420px, 42vw, 520px);
     border: none;
     padding: 0;
 }
 
 #notebooks #notebook-map img {
-    max-height: 260px;
+    width: 100%;
+    max-height: clamp(400px, 40vw, 500px);
     object-fit: contain;
 }
 
 #notebooks .damage-list-wrap {
-    margin-top: 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.95fr);
+    gap: 22px;
+    align-items: start;
+    margin-top: 16px;
+}
+
+#notebooks .damage-list-wrap .tablet-observacoes {
+    display: grid;
+    grid-template-rows: auto minmax(118px, 1fr);
+    margin-bottom: 0;
+}
+
+#notebooks .notebook-damage-list-column {
+    display: grid;
+    grid-template-rows: auto minmax(118px, 1fr);
+    gap: 6px;
+    min-width: 0;
+}
+
+#notebooks .notebook-damage-list-column h4 {
+    margin: 0;
+}
+
+#notebooks .damage-list-wrap textarea,
+#notebooks .damage-list {
+    min-height: 118px;
 }
 
 @media (max-width: 860px) {
@@ -338,6 +389,32 @@
     #notebooks .notebook-upload-box {
         grid-template-columns: auto minmax(0, auto);
         padding: 10px;
+    }
+
+    #notebooks .damage-type-selector {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    #notebooks #notebook-map {
+        padding: 10px;
+    }
+
+    #notebooks #notebook-map .vehicle-photo {
+        min-height: 300px;
+    }
+
+    #notebooks #notebook-map img {
+        max-height: 300px;
+    }
+
+    #notebooks .damage-list-wrap {
+        grid-template-columns: 1fr;
+    }
+
+    #notebooks .damage-list-wrap .tablet-observacoes,
+    #notebooks .notebook-damage-list-column {
+        grid-column: 1;
     }
 }
 
@@ -361,12 +438,21 @@
     }
 
     #notebooks .damage-type-selector {
+        grid-template-columns: 1fr;
         gap: 8px;
     }
 
     #notebooks .damage-type {
         min-width: 0;
-        flex: 1 1 130px;
+        width: 100%;
+    }
+
+    #notebooks #notebook-map .vehicle-photo {
+        min-height: 240px;
+    }
+
+    #notebooks #notebook-map img {
+        max-height: 240px;
     }
 
     #notebooks .notebook-upload-box {
