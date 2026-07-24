@@ -735,6 +735,182 @@
     background: #6c757d;
 }
 
+.btn-manage-analysts {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.admin-analysts-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.admin-analyst-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+.admin-analyst-card.inactive .admin-analyst-info,
+.analyst-manager-row.inactive .admin-analyst-info {
+    opacity: 0.48;
+}
+
+.admin-analyst-icon {
+    color: var(--primary-blue);
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.admin-analyst-info {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.admin-analyst-info strong,
+.admin-analyst-info span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-analyst-info strong {
+    color: var(--primary-blue);
+}
+
+.admin-analyst-info span {
+    color: #6b7280;
+    font-size: 0.82rem;
+}
+
+.admin-analyst-badge {
+    border-radius: 4px;
+    padding: 3px 7px;
+    color: #ffffff;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.admin-analyst-badge.active {
+    background: #198754;
+}
+
+.admin-analyst-badge.inactive {
+    background: #6c757d;
+}
+
+.analysts-modal-content {
+    margin: 6vh auto;
+    max-width: 620px;
+    max-height: 88vh;
+    overflow-y: auto;
+}
+
+.analysts-modal-list {
+    display: grid;
+    gap: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.analyst-manager-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.analyst-manager-row:last-child {
+    border-bottom: none;
+}
+
+.analyst-status-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 106px;
+    justify-content: flex-end;
+}
+
+.analyst-status-control strong {
+    color: #111827;
+    font-size: 0.88rem;
+}
+
+.analyst-toggle {
+    position: relative;
+    width: 42px;
+    height: 22px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #f8fafc;
+    cursor: pointer;
+    padding: 0;
+}
+
+.analyst-toggle span {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    transition: transform 0.18s ease;
+}
+
+.analyst-toggle.active {
+    background: #198754;
+    border-color: #198754;
+}
+
+.analyst-toggle.active span {
+    transform: translateX(20px);
+    border-color: #ffffff;
+}
+
+.analista-option-inactive {
+    color: #8a94a6;
+    opacity: 0.55;
+}
+
+@media (max-width: 980px) {
+    .admin-analysts-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .admin-analysts-cards,
+    .admin-analyst-card,
+    .analyst-manager-row {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-analyst-card {
+        align-items: start;
+    }
+
+    .admin-analyst-badge,
+    .analyst-status-control {
+        justify-self: start;
+    }
+}
+
 .substitution-note {
     flex-basis: 100%;
     color: #6c757d;

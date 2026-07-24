@@ -2016,56 +2016,74 @@
 
             <!-- Página: Notebooks -->
             <section id="notebooks" class="tab-content">
-                <div class="card">
-                    <div class="checklist-section-header">
-                        <h2>💻 Vistoria de Notebooks</h2>
+                <div class="card notebook-survey-card">
+                    <div class="checklist-section-header notebook-survey-header">
+                        <div class="notebook-survey-title">
+                            <span class="notebook-title-icon" aria-hidden="true">💻</span>
+                            <div>
+                                <h2>Vistoria de Notebooks</h2>
+                                <p>Preencha as informações e realize a inspeção visual do equipamento.</p>
+                            </div>
+                        </div>
                         <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('notebooks')">Marcar tudo OK</button>
                     </div>
-                    <div class="tablet-meta notebook-meta">
-                        <div class="input-group">
-                            <label for="notebook-vistoriador">Responsável:</label>
-                            <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
-                                <option value="">Selecione o Responsável</option>
-                                <option value="Matheus">Matheus</option>
-                                <option value="Italo">Italo</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="notebook-term-type">Tipo de Movimentação:</label>
-                            <select id="notebook-term-type">
-                                <option value="RETIRADA">Retirada</option>
-                                <option value="DEVOLUCAO">Devolução</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="notebook-analista-cpf">CPF do Analista:</label>
-                            <input type="text" id="notebook-analista-cpf" placeholder="CPF do analista responsável" readonly>
-                        </div>
-                        <div class="input-group">
-                            <label for="analista-select">Analista cadastrado:</label>
-                            <select id="analista-select" onchange="selecionarAnalistaCadastrado()">
-                                <option value="">Selecione um analista cadastrado</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="notebook-serial">Nº de série:</label>
-                            <input type="text" id="notebook-serial" placeholder="Ex.: PF123456789" readonly>
-                        </div>
-                        <div class="input-group">
-                            <label for="notebook-select">Notebook cadastrado:</label>
-                            <select id="notebook-select" onchange="selecionarNotebookCadastrado()">
-                                <option value="">Selecione um notebook cadastrado</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Foto do Notebook: <span id="count-notebooks" class="photo-counter">(0 fotos)</span></label>
-                            <label for="foto-notebook" class="custom-file-upload">📷 Escolher arquivos</label>
-                            <input type="file" id="foto-notebook" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
-                            <div id="previews-notebooks" class="photo-previews"></div>
+                    <div class="notebook-data-card">
+                        <h3><span aria-hidden="true">▣</span> Dados da Vistoria</h3>
+                        <div class="tablet-meta notebook-meta">
+                            <div class="notebook-meta-column">
+                                <div class="input-group">
+                                    <label for="notebook-vistoriador">Responsável *</label>
+                                    <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
+                                        <option value="">Selecione o Responsável</option>
+                                        <option value="Matheus">Matheus</option>
+                                        <option value="Italo">Italo</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="notebook-term-type">Tipo de Movimentação *</label>
+                                    <select id="notebook-term-type">
+                                        <option value="RETIRADA">Retirada</option>
+                                        <option value="DEVOLUCAO">Devolução</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="analista-select">Analista cadastrado</label>
+                                    <select id="analista-select" onchange="selecionarAnalistaCadastrado()">
+                                        <option value="">Selecione um analista cadastrado</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="notebook-select">Notebook cadastrado</label>
+                                    <select id="notebook-select" onchange="selecionarNotebookCadastrado()">
+                                        <option value="">Selecione um notebook cadastrado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="notebook-meta-column">
+                                <div class="input-group">
+                                    <label for="notebook-analista-cpf">CPF do Analista</label>
+                                    <input type="text" id="notebook-analista-cpf" placeholder="CPF do analista responsável" readonly>
+                                </div>
+                                <div class="input-group">
+                                    <label for="notebook-serial">Nº de série</label>
+                                    <input type="text" id="notebook-serial" placeholder="Ex.: PF123456789" readonly>
+                                </div>
+                            </div>
+                            <div class="input-group notebook-upload-group">
+                                <label>Foto do Notebook <span id="count-notebooks" class="photo-counter">(0 fotos)</span></label>
+                                <label for="foto-notebook" class="notebook-upload-box">
+                                    <span aria-hidden="true">☁</span>
+                                    <p>Clique para selecionar ou arraste os arquivos aqui</p>
+                                    <small>PNG, JPG ou JPEG - Máx. 10MB cada</small>
+                                </label>
+                                <label for="foto-notebook" class="custom-file-upload">📁 Escolher arquivos</label>
+                                <input type="file" id="foto-notebook" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
+                                <div id="previews-notebooks" class="photo-previews"></div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="damage-inspection">
+                    <div class="damage-inspection notebook-visual-card">
                         <div class="damage-header">
                             <div>
                                 <h3>Notebook - Inspeção Visual</h3>
@@ -2233,7 +2251,7 @@
 
                         <div class="admin-config-panel admin-config-section" id="admin-config-notebooks">
                             <div class="admin-config-header">
-                                <h3>Notebooks</h3>
+                                <button type="button" class="btn-manage-analysts" onclick="abrirGerenciadorAnalistas()">👥 Gerenciar Analistas</button>
                             </div>
                             <div class="admin-item-form admin-notebook-form" autocomplete="off">
                                 <div class="admin-notebook-field">
@@ -2253,6 +2271,9 @@
                                 <div class="admin-notebook-actions">
                                     <button type="button" onclick="salvarCpfAnalista('admin')">Salvar analista</button>
                                     <button type="button" class="btn-muted" onclick="removerCpfAnalista('admin')">Remover analista</button>
+                                </div>
+                                <div id="admin-analistas-cards" class="admin-analysts-cards">
+                                    <p class="placeholder">Nenhum analista cadastrado.</p>
                                 </div>
                                 <div class="admin-notebook-field">
                                     <label for="admin-notebook-modelo">Modelo do notebook</label>
@@ -2383,6 +2404,15 @@
         </div>
     </div>
 
+    <!-- Modal de Gerenciamento de Analistas -->
+    <div id="analistas-modal" class="modal">
+        <div class="modal-content analysts-modal-content">
+            <span class="close-modal" onclick="fecharGerenciadorAnalistas()">&times;</span>
+            <h3>Gerenciar Analistas</h3>
+            <div id="analistas-modal-list" class="analysts-modal-list"></div>
+        </div>
+    </div>
+
     <!-- Modal de Revisão de Pendências -->
     <div id="revisao-modal" class="modal">
         <div class="modal-content revisao-modal-content">
@@ -2420,6 +2450,6 @@
             }, 3000);
         });
     </script>
-    <script type="module" src="script.js?v=53"></script>
+    <script type="module" src="script.js?v=54"></script>
 </body>
 </html>

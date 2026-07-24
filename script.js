@@ -435,6 +435,10 @@ function normalizarCpfAnalista(valor) {
     return String(valor || "").replace(/\D/g, "");
 }
 
+function isAnalistaAtivo(analista) {
+    return analista?.ativo !== false;
+}
+
 function renderAnalistasSelectOptions(scope = "inspection") {
     const select = scope === "admin"
         ? document.getElementById("admin-analista-select")
@@ -448,13 +452,86 @@ function renderAnalistasSelectOptions(scope = "inspection") {
         const option = document.createElement("option");
         option.value = analista.cpf || "";
         const nome = String(analista.nome || "").trim();
-        option.textContent = nome || (analista.cpf || "");
+        const ativo = isAnalistaAtivo(analista);
+        option.textContent = `${nome || (analista.cpf || "")}${ativo ? "" : " (Inativo)"}`;
+        if (!ativo) {
+            option.className = "analista-option-inactive";
+            if (scope === "inspection") option.disabled = true;
+        }
         select.appendChild(option);
     });
 
-    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior)) {
+    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior && !option.disabled)) {
         select.value = valorAnterior;
+    } else if (scope === "inspection") {
+        select.value = "";
+        const nomeInput = document.getElementById("notebook-analista-nome");
+        const cpfInput = document.getElementById("notebook-analista-cpf");
+        if (nomeInput) nomeInput.value = "";
+        if (cpfInput) cpfInput.value = "";
     }
+}
+
+function renderAnalistasGerenciamento() {
+    const cardsList = document.getElementById("admin-analistas-cards");
+    const modalList = document.getElementById("analistas-modal-list");
+
+    if (!state.analistasCadastrados.length) {
+        if (cardsList) cardsList.innerHTML = '<p class="placeholder">Nenhum analista cadastrado.</p>';
+        if (modalList) modalList.innerHTML = '<p class="placeholder">Nenhum analista cadastrado.</p>';
+        return;
+    }
+
+    if (cardsList) {
+        cardsList.innerHTML = state.analistasCadastrados.map((analista) => {
+            const ativo = isAnalistaAtivo(analista);
+            const nome = String(analista.nome || "Analista sem nome").trim();
+            const cpf = String(analista.cpf || "").trim();
+            return `
+                <div class="admin-analyst-card${ativo ? "" : " inactive"}">
+                    <span class="admin-analyst-icon" aria-hidden="true">👤</span>
+                    <div class="admin-analyst-info">
+                        <strong>${escapeHtml(nome)}</strong>
+                        <span>${escapeHtml(cpf || "CPF não informado")}</span>
+                    </div>
+                    <span class="admin-analyst-badge ${ativo ? "active" : "inactive"}">${ativo ? "Ativo" : "Inativo"}</span>
+                </div>
+            `;
+        }).join("");
+    }
+
+    if (!modalList) return;
+
+    modalList.innerHTML = state.analistasCadastrados.map((analista) => {
+        const ativo = isAnalistaAtivo(analista);
+        const nome = String(analista.nome || "Analista sem nome").trim();
+        const cpf = String(analista.cpf || "").trim();
+        return `
+            <div class="analyst-manager-row${ativo ? "" : " inactive"}">
+                <div class="admin-analyst-info">
+                    <strong>${escapeHtml(nome)}</strong>
+                    <span>${escapeHtml(cpf || "CPF não informado")}</span>
+                </div>
+                <div class="analyst-status-control">
+                    <button type="button" class="analyst-toggle ${ativo ? "active" : ""}" onclick="alternarStatusAnalista('${escapeJsString(analista.id)}')" aria-pressed="${ativo ? "true" : "false"}">
+                        <span></span>
+                    </button>
+                    <strong>${ativo ? "Ativo" : "Inativo"}</strong>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function abrirGerenciadorAnalistas() {
+    renderAnalistasGerenciamento();
+    const modal = document.getElementById("analistas-modal");
+    if (modal) modal.style.display = "block";
+}
+
+function fecharGerenciadorAnalistas() {
+    const modal = document.getElementById("analistas-modal");
+    if (modal) modal.style.display = "none";
 }
 
 function selecionarAnalistaCadastrado(scope = "inspection") {
@@ -482,10 +559,12 @@ async function carregarAnalistasCadastrados() {
         const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), orderBy("cpf", "asc")));
         state.analistasCadastrados = snapshot.docs.map(docSnap => ({
             id: docSnap.id,
-            ...docSnap.data()
+            ...docSnap.data(),
+            ativo: docSnap.data().ativo !== false
         }));
         renderAnalistasSelectOptions("inspection");
         renderAnalistasSelectOptions("admin");
+        renderAnalistasGerenciamento();
     } catch (error) {
         console.error("Erro ao carregar CPFs de analistas:", error);
     }
@@ -512,11 +591,13 @@ async function salvarCpfAnalista(scope = "inspection") {
             cpf,
             cpfBusca: cpf,
             nomeBusca: nome.toLowerCase(),
+            ativo: true,
             atualizadoEm: new Date().toISOString()
         };
 
         const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), where("cpfBusca", "==", cpf)));
         if (!snapshot.empty) {
+            payload.ativo = snapshot.docs[0].data().ativo !== false;
             await setDoc(snapshot.docs[0].ref, payload, { merge: true });
         } else {
             await addDoc(collection(db, "analistasCadastrados"), payload);
@@ -581,6 +662,26 @@ async function removerCpfAnalista(scope = "inspection") {
     } catch (error) {
         console.error("Erro ao remover analista:", error);
         alert("Erro ao remover o analista do banco.");
+    }
+}
+
+async function alternarStatusAnalista(analistaId) {
+    const analista = state.analistasCadastrados.find(item => item.id === analistaId);
+    if (!analista) {
+        alert("Analista não encontrado.");
+        return;
+    }
+
+    const novoStatus = !isAnalistaAtivo(analista);
+    try {
+        await updateDoc(firestoreDoc(db, "analistasCadastrados", analistaId), {
+            ativo: novoStatus,
+            atualizadoEm: new Date().toISOString()
+        });
+        await carregarAnalistasCadastrados();
+    } catch (error) {
+        console.error("Erro ao alterar status do analista:", error);
+        alert("Erro ao alterar o status do analista.");
     }
 }
 
@@ -3106,6 +3207,9 @@ function bindWindowFunctions() {
         selecionarResponsavelNotebook,
         selecionarNotebookCadastrado,
         selecionarAnalistaCadastrado,
+        alternarStatusAnalista,
+        abrirGerenciadorAnalistas,
+        fecharGerenciadorAnalistas,
         removerNotebookCadastradoSelecionado,
         salvarCpfAnalista,
         removerCpfAnalista,
