@@ -1,4 +1,4 @@
-import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, resolveChecklistItemData, viaturaResponsaveis, vistoriadores, vistoriadoresTablet, vistoriadoresNotebook, vistoriadoresAcessoNotebook } from "./js/config.js";
+import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, getVistoriadorPermissoes, normalizeEmployeeEpiItem, resolveChecklistItemData, viaturaResponsaveis, vistoriadorPermissionCategories, vistoriadorPodeVistoriar, vistoriadores, vistoriadoresTablet, vistoriadoresNotebook, vistoriadoresAcessoNotebook } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -84,6 +84,7 @@ import {
     showAdminPeopleTab,
     substituirItemChecklist,
     adicionarVistoriador,
+    alterarPermissoesVistoriador,
     resolverPendenciasSelecionadas,
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
@@ -173,7 +174,7 @@ function renderVistoriadorOptions() {
     renderSelectOptions(
         document.getElementById("tablet-vistoriador"),
         vistoriadores
-            .filter(vistoriador => vistoriador.tipo === "tablets" || vistoriador.nome === "Alisson")
+            .filter(vistoriador => vistoriadorPodeVistoriar(vistoriador.nome, "tablets"))
             .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
         "Selecione o Responsável"
     );
@@ -187,7 +188,8 @@ function renderVistoriadorOptions() {
 }
 
 function isTabletOnlyUser(vistoriador = getVistoriadorAtivo()) {
-    return vistoriadoresTablet.includes(vistoriador);
+    const permissoes = getVistoriadorPermissoes(vistoriador);
+    return permissoes.length === 1 && permissoes[0] === "tablets";
 }
 
 function isAlissonVistoriador(vistoriador = getVistoriadorAtivo()) {
@@ -196,15 +198,13 @@ function isAlissonVistoriador(vistoriador = getVistoriadorAtivo()) {
 
 function podeAcessarCategoria(category, vistoriador = getVistoriadorAtivo()) {
     if (!categoryNames[category]) return true;
-    if (category === "notebooks") return vistoriadoresAcessoNotebook.includes(vistoriador);
-    if (isAlissonVistoriador(vistoriador)) return true;
-    if (category === "tablets") return isTabletOnlyUser(vistoriador);
-    return !isTabletOnlyUser(vistoriador);
+    if (!vistoriadorPermissionCategories.includes(category)) return true;
+    return vistoriadorPodeVistoriar(vistoriador, category);
 }
 
 function getAccessDeniedMessage(category, vistoriador) {
     if (category === "tablets") {
-        return `A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`;
+        return `A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`;
     }
     if (category === "notebooks") {
         return `A vistoria de notebooks só pode ser acessada por: ${vistoriadoresAcessoNotebook.join(", ")}.`;
@@ -299,7 +299,7 @@ function selecionarResponsavelTablet() {
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     const responsavel = tabletSelect?.value || "";
 
-    if (!vistoriadoresTablet.includes(responsavel) && !isAlissonVistoriador(responsavel)) {
+    if (!vistoriadoresTablet.includes(responsavel)) {
         updateTabletInfo();
         return;
     }
@@ -324,6 +324,27 @@ function selecionarResponsavelNotebook() {
         vistoriadorSelect.value = responsavel;
         selecionarVistoriadorAtivo(true);
     }
+}
+
+function toggleNotebookInspectionInfo() {
+    const button = document.querySelector(".notebook-info-title");
+    const panel = document.getElementById("notebook-inspection-info");
+    if (!button || !panel) return;
+
+    setNotebookInspectionInfoOpen(panel.hidden);
+}
+
+function setNotebookInspectionInfoOpen(open = true) {
+    const button = document.querySelector(".notebook-info-title");
+    const panel = document.getElementById("notebook-inspection-info");
+    const card = panel?.closest(".notebook-info-card");
+    if (!button || !panel) return;
+
+    panel.hidden = !open;
+    if (card) card.hidden = !open;
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    const stateText = button.querySelector("small");
+    if (stateText) stateText.textContent = open ? "Ocultar" : "Mostrar";
 }
 
 function preencherCamposNotebookCadastro(notebook, scope = "inspection") {
@@ -472,9 +493,31 @@ function selecionarNotebookCadastrado(scope = "inspection", notebookIdSelecionad
     const notebookSelecionado = state.notebooksCadastrados.find(item => String(item.id) === String(notebookId));
     if (notebookSelecionado) {
         preencherCamposNotebookCadastro(notebookSelecionado, scope);
+        if (scope === "inspection") {
+            preencherDadosDevolucaoNotebookEmUso(notebookSelecionado);
+        }
     }
     if (select) select.value = notebookId;
     if (scope === "inspection") renderNotebookInspectionList();
+}
+
+function preencherDadosDevolucaoNotebookEmUso(notebook = {}) {
+    const status = getNotebookUsageStatus(notebook);
+    if (!status?.emUso) return;
+
+    const termTypeSelect = document.getElementById("notebook-term-type");
+    const analistaNomeInput = document.getElementById("notebook-analista-nome");
+    const analistaCpfInput = document.getElementById("notebook-analista-cpf");
+    const modeloInput = document.getElementById("notebook-modelo");
+    const serialInput = document.getElementById("notebook-serial");
+
+    if (termTypeSelect) termTypeSelect.value = "DEVOLUCAO";
+    if (analistaNomeInput) analistaNomeInput.value = status.analistaNome || "";
+    if (analistaCpfInput) analistaCpfInput.value = status.analistaCpf || "";
+    if (modeloInput) modeloInput.value = status.notebookModelo || notebook.modelo || "";
+    if (serialInput) serialInput.value = status.notebookNumeroSerie || notebook.numeroSerie || "";
+
+    renderAnalistasInspectionList();
 }
 
 async function removerNotebookCadastradoSelecionado(scope = "inspection") {
@@ -835,6 +878,9 @@ async function carregarNotebookUsageStatus() {
             statusPorNotebook[identity] = {
                 emUso,
                 analistaNome: emUso ? String(data.analistaNome || "").trim() : "",
+                analistaCpf: emUso ? String(data.analistaCpf || "").trim() : "",
+                notebookModelo: emUso ? String(data.notebookModelo || "").trim() : "",
+                notebookNumeroSerie: emUso ? String(data.notebookNumeroSerie || "").trim() : "",
                 diasUso: emUso ? diasUso : 0
             };
         });
@@ -917,27 +963,24 @@ async function salvarNotebookCadastro(silencioso = false, scope = "inspection") 
 
 function solicitarVistoriadorTablet() {
     const vistoriadorAutenticado = getVistoriadorAutenticado();
-    if (isAlissonVistoriador(vistoriadorAutenticado)) return true;
-    if (vistoriadorAutenticado && !isTabletOnlyUser(vistoriadorAutenticado)) {
-        alert(`A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`);
+    if (vistoriadorAutenticado && !vistoriadorPodeVistoriar(vistoriadorAutenticado, "tablets")) {
+        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
-    const atual = (isTabletOnlyUser() || isAlissonVistoriador()) ? getVistoriadorAtivo() : "";
+    const atual = vistoriadorPodeVistoriar(getVistoriadorAtivo(), "tablets") ? getVistoriadorAtivo() : "";
     const resposta = prompt(
-        `Para acessar a vistoria de tablets, informe o vistoriador logado: ALISSON, ${vistoriadoresTablet.join(" ou ").toUpperCase()}.`,
+        `Para acessar a vistoria de tablets, informe um vistoriador autorizado: ${vistoriadoresTablet.join(" ou ").toUpperCase()}.`,
         atual
     );
 
     if (!resposta) return false;
 
     const normalizado = resposta.trim().toLowerCase();
-    const vistoriador = normalizado === "alisson"
-        ? "Alisson"
-        : vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
+    const vistoriador = vistoriadoresTablet.find(nome => nome.toLowerCase() === normalizado);
 
     if (!vistoriador) {
-        alert(`A vistoria de tablets só pode ser acessada por: Alisson, ${vistoriadoresTablet.join(", ")}.`);
+        alert(`A vistoria de tablets só pode ser acessada por: ${vistoriadoresTablet.join(", ")}.`);
         return false;
     }
 
@@ -1014,6 +1057,7 @@ function showPage(pageId, options = {}) {
         activePage.classList.add("active");
         updateActiveMenuLink(options.activeMenuId || pageId);
         renderItems(pageId);
+        if (pageId === "notebooks") setNotebookInspectionInfoOpen(true);
     }
 
     if (pageId === "funcionarios") renderFuncionariosPage();
@@ -1388,32 +1432,17 @@ function alterarStatusFuncionario(key, status) {
 }
 
 function renderFuncionarioCard(funcionario) {
-    const status = getFuncionarioStatus(funcionario);
-    const key = getFuncionarioKey(funcionario);
     const editKey = getFuncionarioEditKey(funcionario);
     const isEditingItems = funcionarioItensEditandoKey === editKey;
     const displayViaturaId = getFuncionarioDisplayViaturaId(funcionario);
-    const statusClass = getFuncionarioStatusClass(status);
     const deleteControl = getVistoriadorAtivo() === "Alisson"
         ? `<button type="button" class="employee-delete-btn" onclick="excluirFuncionario('${escapeJsString(editKey)}')">Excluir</button>`
         : "";
     const editControl = getVistoriadorAtivo() === "Alisson"
         ? `<button type="button" class="employee-edit-items-btn ${isEditingItems ? "editing" : ""}" onclick="abrirEditorItensFuncionario('${escapeJsString(editKey)}')">${isEditingItems ? "Concluir edição" : "Editar itens"}</button>`
         : "";
-    const statusControl = getVistoriadorAtivo() === "Alisson"
-        ? `
-            <label class="employee-status-control">
-                <span>Situação</span>
-                <select class="employee-status-select ${statusClass}" onchange="alterarStatusFuncionario('${escapeJsString(key)}', this.value)">
-                    ${["Ativo", "Férias", "Folga", "Atestado", "Falta"].map(option => `
-                        <option value="${option}" ${status === option ? "selected" : ""}>${option}</option>
-                    `).join("")}
-                </select>
-            </label>
-        `
-        : `<span class="employee-status ${statusClass}">${escapeHtml(status)}</span>`;
-    const actionsHtml = deleteControl || editControl || statusControl
-        ? `<div class="employee-card-actions">${deleteControl}${editControl}${statusControl}</div>`
+    const actionsHtml = deleteControl || editControl
+        ? `<div class="employee-card-actions">${deleteControl}${editControl}</div>`
         : "";
     const episHtml = isEditingItems
         ? renderEditorItensFuncionarioInline(editKey)
@@ -1734,11 +1763,11 @@ function renderEditorItensFuncionario(key) {
         <div class="employee-items-editor-list">
             ${items.length ? items.map((epi, index) => `
                 <div class="employee-items-editor-row">
-                    <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
-                    <input type="text" value="${escapeHtml(epi.nome || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
-                    <input type="text" value="${escapeHtml(epi.ca || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
-                    <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
-                    <input type="text" value="${escapeHtml(epi.observacao || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
+                    <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" placeholder="Qtd" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
+                    <input type="text" value="${escapeHtml(epi.nome || "")}" placeholder="Descrição do item" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
+                    <input type="text" value="${escapeHtml(epi.ca || "")}" placeholder="C.A." onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
+                    <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" placeholder="Data de entrega" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
+                    <input type="text" value="${escapeHtml(epi.observacao || "")}" placeholder="OBS" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
                     <button type="button" class="employee-item-remove-btn" onclick="removerItemFuncionarioEditado('${escapeJsString(key)}', ${index})">Remover</button>
                 </div>
             `).join("") : `<p class="employee-empty-epis">Nenhum item cadastrado para esta pessoa.</p>`}
@@ -1810,11 +1839,11 @@ function renderEditorItensFuncionarioInline(key) {
             <div class="employee-items-editor-list">
                 ${items.length ? items.map((epi, index) => `
                     <div class="employee-items-editor-row employee-inline-editor-row">
-                        <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
-                        <input type="text" value="${escapeHtml(epi.nome || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
-                        <input type="text" value="${escapeHtml(epi.ca || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
-                        <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
-                        <input type="text" value="${escapeHtml(epi.observacao || "")}" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
+                        <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" placeholder="Qtd" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'quantidade', this.value)" aria-label="Quantidade">
+                        <input type="text" value="${escapeHtml(epi.nome || "")}" placeholder="Descrição do item" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'nome', this.value)" aria-label="Descrição do item">
+                        <input type="text" value="${escapeHtml(epi.ca || "")}" placeholder="C.A." onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'ca', this.value)" aria-label="C.A.">
+                        <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" placeholder="Data de entrega" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'dataEntrega', this.value)" aria-label="Data de entrega">
+                        <input type="text" value="${escapeHtml(epi.observacao || "")}" placeholder="OBS" onchange="editarItemFuncionarioEditado('${escapeJsString(key)}', ${index}, 'observacao', this.value)" aria-label="Observação">
                         <button type="button" class="employee-item-remove-btn" onclick="removerItemFuncionarioEditado('${escapeJsString(key)}', ${index})">Remover</button>
                     </div>
                 `).join("") : `<p class="employee-empty-epis">Nenhum item cadastrado para esta pessoa.</p>`}
@@ -1888,7 +1917,6 @@ function renderFuncionariosPage() {
     const list = document.getElementById("funcionarios-list");
     const totalLabel = document.getElementById("funcionarios-total");
     const search = document.getElementById("funcionario-search")?.value || "";
-    const status = document.getElementById("funcionario-status-filter")?.value || "";
     if (!list) return;
 
     const funcionariosData = getFuncionariosData();
@@ -1898,8 +1926,7 @@ function renderFuncionariosPage() {
             || normalizeSearch(funcionario.nome).includes(termo)
             || normalizeSearch(funcionario.cpf).includes(termo)
             || normalizeSearch(funcionario.funcao).includes(termo);
-        const matchesStatus = !status || getFuncionarioStatus(funcionario) === status;
-        return matchesSearch && matchesStatus;
+        return matchesSearch;
     }).sort((a, b) => {
         const viaturaA = Number(a.viaturaId || Number.MAX_SAFE_INTEGER);
         const viaturaB = Number(b.viaturaId || Number.MAX_SAFE_INTEGER);
@@ -2948,10 +2975,10 @@ function renderFotoPreviews(categoria) {
         const extraPhotos = fotos
             .map((foto, index) => ({ foto, index }))
             .filter(item => item.index >= slots.length && Boolean(item.foto));
+        const lastExtraPhotoIndex = extraPhotos.at(-1)?.index ?? -1;
         const extraPhotosHtml = extraPhotos.map(({ foto, index }, extraIndex) => `
             <div class="notebook-extra-photo-item">
                 <img src="${foto}" alt="Foto extra ${extraIndex + 1}">
-                <button type="button" class="btn-remove-photo" onclick="removerFoto('notebooks', ${index})">Excluir</button>
             </div>
         `).join("");
         container.innerHTML = `
@@ -2966,6 +2993,7 @@ function renderFotoPreviews(categoria) {
                 <div class="notebook-photo-slot-actions">
                     <label for="foto-notebook-extra" class="notebook-photo-action">Adicionar</label>
                     <input type="file" id="foto-notebook-extra" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
+                    <button type="button" class="btn-remove-photo" onclick="removerFoto('notebooks', ${lastExtraPhotoIndex})" ${lastExtraPhotoIndex >= 0 ? "" : "disabled"}>Excluir</button>
                 </div>
             </div>
         `;
@@ -3035,7 +3063,7 @@ async function finalizarVistoria(category) {
 
     if (!vistoriador) {
         let msg = "Por favor, selecione quem está realizando a vistoria no topo da página.";
-        if (category === "tablets") msg = `Por favor, selecione um responsável de tablets: Alisson, ${vistoriadoresTablet.join(", ")}.`;
+        if (category === "tablets") msg = `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`;
         if (category === "notebooks") msg = `Por favor, selecione um responsável de notebooks: ${vistoriadoresAcessoNotebook.join(", ")}.`;
         alert(msg);
         return;
@@ -3685,6 +3713,7 @@ function bindWindowFunctions() {
         configurarModoVistoria,
         updateInputFontSize,
         toggleTeamActions,
+        toggleNotebookInspectionInfo,
         showHome,
         showPage,
         selecionarPessoaEpi,
@@ -3735,6 +3764,7 @@ function bindWindowFunctions() {
         atualizarTotalItemChecklistAdmin,
         atualizarTotalNovoItemChecklist,
         adicionarVistoriador,
+        alterarPermissoesVistoriador,
         editarItemChecklist,
         alternarItemChecklist,
         removerItemChecklist,
@@ -3910,6 +3940,8 @@ window.refreshAppAfterConfigChange = function() {
     }
     renderTecnicoDatalist();
     preencherResponsaveisViatura();
+    syncSpecialVistoriadores();
+    updateAccessByVistoriador();
     renderViaturaDashboard();
     updateMenuStatus();
     const activeTab = document.querySelector(".tab-content.active");

@@ -81,7 +81,9 @@
 }
 
 #notebooks .notebook-survey-header {
+    display: flex;
     align-items: center;
+    gap: 10px;
     margin-bottom: 22px;
 }
 
@@ -90,6 +92,7 @@
     align-items: center;
     gap: 14px;
     min-width: 0;
+    margin-right: auto;
 }
 
 #notebooks .notebook-title-icon {
@@ -138,23 +141,44 @@
 #notebooks .notebook-info-title {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    margin: 0 0 16px;
-    color: var(--primary-blue);
-    font-size: 1rem;
-    font-weight: 800;
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    min-height: 34px;
+    margin: 0;
+    border: 1px solid #76a8ff;
+    border-radius: 6px;
+    padding: 9px 13px;
+    background: #eaf2ff;
+    color: #0b5ed7;
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(11, 94, 215, 0.12);
 }
 
-#notebooks .notebook-info-title span {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 5px;
-    background: #e8f1ff;
-    color: var(--primary-blue);
-    font-size: 0.86rem;
+#notebooks .notebook-info-title:hover {
+    background: #dbeafe;
+    border-color: #0b5ed7;
+    color: #0849a8;
+}
+
+#notebooks .notebook-info-title small {
+    color: inherit;
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+#notebooks .notebook-info-title::after {
+    content: "▾";
+    color: inherit;
+    font-size: 0.74rem;
+    transition: transform 0.16s ease;
+}
+
+#notebooks .notebook-info-title[aria-expanded="true"]::after {
+    transform: rotate(180deg);
 }
 
 #notebooks .notebook-data-card,
@@ -218,6 +242,10 @@
     gap: 16px;
     align-items: stretch;
     margin-bottom: 0;
+}
+
+#notebooks .notebook-inspection-layout[hidden] {
+    display: none !important;
 }
 
 #notebooks .notebook-meta {
@@ -709,10 +737,6 @@
     height: 62px;
     border-radius: 5px;
     object-fit: cover;
-}
-
-#notebooks .notebook-extra-photo-item .btn-remove-photo {
-    width: 100% !important;
 }
 
 #notebooks .notebook-photo-slot-actions {

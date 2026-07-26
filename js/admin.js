@@ -1,4 +1,4 @@
-import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, resolveChecklistItemData, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, normalizeVistoriadorPermissoes, resolveChecklistItemData, viaturaResponsaveis, vehicleViewNames, vistoriadorPermissionCategories, vistoriadores, syncVistoriadoresTablet } from "./config.js";
 import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc, storage, storageRef, uploadBytes, getDownloadURL } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js?v=3";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=10";
@@ -1193,11 +1193,11 @@ export function renderAdminFuncionariosExtras() {
                     <div class="admin-extra-epi-list admin-employee-epi-list">
                         ${epis.length ? epis.map((epi, epiIndex) => `
                             <div class="admin-extra-epi-row admin-employee-epi-row">
-                                <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'quantidade', this.value)" aria-label="Quantidade do EPI">
-                                <input type="text" value="${escapeHtml(epi.nome || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'nome', this.value)" aria-label="Nome do EPI">
-                                <input type="text" value="${escapeHtml(epi.ca || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'ca', this.value)" aria-label="CA do EPI">
-                                <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'dataEntrega', this.value)" aria-label="Data de entrega do EPI">
-                                <input type="text" value="${escapeHtml(epi.observacao || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'observacao', this.value)" aria-label="Observação do EPI">
+                                <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" placeholder="Qtd" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'quantidade', this.value)" aria-label="Quantidade do EPI">
+                                <input type="text" value="${escapeHtml(epi.nome || "")}" placeholder="Descrição do item" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'nome', this.value)" aria-label="Nome do EPI">
+                                <input type="text" value="${escapeHtml(epi.ca || "")}" placeholder="C.A." autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'ca', this.value)" aria-label="CA do EPI">
+                                <input type="text" value="${escapeHtml(epi.dataEntrega || "")}" placeholder="Data de entrega" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'dataEntrega', this.value)" aria-label="Data de entrega do EPI">
+                                <input type="text" value="${escapeHtml(epi.observacao || "")}" placeholder="OBS" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'observacao', this.value)" aria-label="Observação do EPI">
                                 <button type="button" class="btn-danger" onclick="removerEpiFuncionarioExtra(${index}, ${epiIndex})">Remover EPI</button>
                             </div>
                         `).join("") : `
@@ -1218,19 +1218,116 @@ export function renderAdminVistoriadores() {
     const list = document.getElementById("admin-vistoriadores-list");
     if (!list) return;
 
-    list.innerHTML = vistoriadores.map(vistoriador => `
-        <div class="admin-config-row">
-            <div>
-                <strong>${escapeHtml(vistoriador.nome)}</strong>
-                <p class="substitution-note">${escapeHtml(vistoriador.email)} - ${vistoriador.tipo === "tablets" ? "Somente tablets" : "Vistorias gerais"}${vistoriador.padrao ? " - padrão" : ""}</p>
+    const permissionHeader = renderVistoriadorPermissionHeaders();
+    list.innerHTML = `
+        <div class="admin-vistoriadores-table">
+            <div class="admin-vistoriador-row admin-vistoriador-head">
+                <span>Vistoriador</span>
+                <span>E-mail</span>
+                ${permissionHeader}
+                <span>Ações</span>
             </div>
+            ${vistoriadores.map(vistoriador => renderVistoriadorRow(vistoriador)).join("")}
+        </div>
+    `;
+}
+
+function getVistoriadorPermissionLabel(category) {
+    const labels = {
+        todas: "Todas as categorias",
+        ferramentas: "Ferramentas",
+        epis: "EPI",
+        viaturas: "Viaturas",
+        tablets: "Tablets",
+        notebooks: "Notebooks"
+    };
+    return labels[category] || categoryNames[category] || category;
+}
+
+function renderVistoriadorPermissionCheckbox({ id, checked, onchange, label, compact = false }) {
+    return `
+        <label class="admin-permission-check ${compact ? "compact" : ""}" title="${escapeHtml(label)}">
+            <input type="checkbox" ${id ? `id="${escapeHtml(id)}"` : ""} ${checked ? "checked" : ""} onchange="${onchange}">
+            <span>${escapeHtml(label)}</span>
+        </label>
+    `;
+}
+
+function renderVistoriadorPermissionHeaders() {
+    return ["todas", ...vistoriadorPermissionCategories].map(category => `
+        <span class="admin-vistoriador-permission-head">${escapeHtml(getVistoriadorPermissionLabel(category))}</span>
+    `).join("");
+}
+
+function renderVistoriadorRow(vistoriador) {
+    const permissoes = normalizeVistoriadorPermissoes(vistoriador);
+    const hasAll = vistoriadorPermissionCategories.every(category => permissoes.includes(category));
+    return `
+        <div class="admin-vistoriador-row">
+            <div class="admin-vistoriador-person">
+                <span class="admin-vistoriador-avatar">${escapeHtml(getInitials(vistoriador.nome))}</span>
+                <span>
+                    <strong>${escapeHtml(vistoriador.nome)}</strong>
+                    <small>${isAlissonVistoriadorAdmin(vistoriador) ? "Admin" : "Padrão"}</small>
+                </span>
+            </div>
+            <span class="admin-vistoriador-email">${escapeHtml(vistoriador.email)}</span>
+            ${renderVistoriadorPermissionCheckbox({
+                checked: hasAll,
+                onchange: `alterarPermissoesVistoriador('${escapeJsString(vistoriador.id)}', 'todas', this.checked)`,
+                label: "Todas as categorias",
+                compact: true
+            })}
+            ${vistoriadorPermissionCategories.map(category => renderVistoriadorPermissionCheckbox({
+                checked: permissoes.includes(category),
+                onchange: `alterarPermissoesVistoriador('${escapeJsString(vistoriador.id)}', '${category}', this.checked)`,
+                label: getVistoriadorPermissionLabel(category),
+                compact: true
+            })).join("")}
             <div class="admin-config-actions">
-                ${vistoriador.padrao
-                    ? ''
-                    : `<button type="button" class="btn-danger" onclick="removerVistoriador('${escapeJsString(vistoriador.id)}')">Remover</button>`}
+                <button type="button" class="btn-danger" onclick="removerVistoriador('${escapeJsString(vistoriador.id)}')">Remover</button>
             </div>
         </div>
-    `).join("");
+    `;
+}
+
+function getInitials(name = "") {
+    return String(name || "")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(part => part[0] || "")
+        .join("")
+        .toUpperCase() || "VT";
+}
+
+function isAlissonVistoriadorAdmin(vistoriador = {}) {
+    return String(vistoriador.nome || "").trim().toLowerCase() === "alisson"
+        || String(vistoriador.email || "").trim().toLowerCase() === "alisson.tavares@digitalonline.com.br";
+}
+
+export async function alterarPermissoesVistoriador(id, category, checked) {
+    if (!requireAlissonAdmin()) return;
+    const vistoriador = vistoriadores.find(item => item.id === id);
+    if (!vistoriador) return;
+
+    const permissoes = new Set(normalizeVistoriadorPermissoes(vistoriador));
+    if (category === "todas") {
+        permissoes.clear();
+        if (checked) vistoriadorPermissionCategories.forEach(item => permissoes.add(item));
+    } else if (checked) {
+        permissoes.add(category);
+    } else {
+        permissoes.delete(category);
+    }
+
+    vistoriador.permissoes = [...permissoes].filter(item => vistoriadorPermissionCategories.includes(item));
+    vistoriador.tipo = vistoriador.permissoes.length === 1 && vistoriador.permissoes[0] === "tablets" ? "tablets" : "geral";
+    syncVistoriadoresTablet();
+    registrarHistoricoConfig("Permissões de vistoriador alteradas", `${vistoriador.nome}: ${vistoriador.permissoes.map(getVistoriadorPermissionLabel).join(", ") || "sem categorias"}.`);
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+    renderAdminVistoriadores();
 }
 
 function normalizeAdminEmail(value) {
@@ -1242,21 +1339,20 @@ function clearVistoriadorForm() {
         const input = document.getElementById(id);
         if (input) input.value = "";
     });
-    const tipo = document.getElementById("admin-vistoriador-tipo");
-    if (tipo) tipo.value = "geral";
 }
 
-async function salvarNovoVistoriador({ nome, email, tipo }) {
+async function salvarNovoVistoriador({ nome, email, permissoes }) {
     const vistoriador = normalizeVistoriador({
         id: `vistoriador-${Date.now()}`,
         nome,
         email,
-        tipo,
+        tipo: permissoes.length === 1 && permissoes[0] === "tablets" ? "tablets" : "geral",
+        permissoes,
         padrao: false
     }, vistoriadores.length);
     vistoriadores.push(vistoriador);
     syncVistoriadoresTablet();
-    registrarHistoricoConfig("Vistoriador adicionado", `${nome} foi adicionado como ${tipo === "tablets" ? "vistoriador de tablets" : "vistoriador geral"}.`);
+    registrarHistoricoConfig("Vistoriador adicionado", `${nome} foi adicionado com permissões: ${permissoes.map(getVistoriadorPermissionLabel).join(", ")}.`);
     await salvarConfiguracoes();
     clearVistoriadorForm();
     showAdminPeopleTab("vistoriadores");
@@ -1270,7 +1366,7 @@ export async function adicionarVistoriador() {
     const nome = document.getElementById("admin-vistoriador-nome")?.value.trim() || "";
     const email = normalizeAdminEmail(document.getElementById("admin-vistoriador-email")?.value || "");
     const senha = document.getElementById("admin-vistoriador-senha")?.value || "";
-    const tipo = document.getElementById("admin-vistoriador-tipo")?.value === "tablets" ? "tablets" : "geral";
+    const permissoes = [...vistoriadorPermissionCategories];
 
     if (!nome || !email || !senha) {
         alert("Informe nome, e-mail e senha do novo vistoriador.");
@@ -1300,12 +1396,12 @@ export async function adicionarVistoriador() {
 
     try {
         await criarUsuarioAuthSecundario(email, senha);
-        await salvarNovoVistoriador({ nome, email, tipo });
+        await salvarNovoVistoriador({ nome, email, permissoes });
         alert("Vistoriador criado com sucesso.");
     } catch (error) {
         if (error?.code === "auth/email-already-in-use") {
             if (!confirm("Este e-mail já existe no Firebase Auth. Deseja vincular esse usuário como vistoriador do sistema?")) return;
-            await salvarNovoVistoriador({ nome, email, tipo });
+            await salvarNovoVistoriador({ nome, email, permissoes });
             alert("Vistoriador vinculado ao sistema com sucesso.");
             return;
         }
@@ -1321,11 +1417,6 @@ export async function removerVistoriador(id) {
     const index = vistoriadores.findIndex(vistoriador => vistoriador.id === id);
     const vistoriador = vistoriadores[index];
     if (!vistoriador) return;
-
-    if (vistoriador.padrao) {
-        alert("Vistoriadores padrão não podem ser removidos.");
-        return;
-    }
 
     if (!confirm(`Tem certeza que deseja remover o vistoriador ${vistoriador.nome}?`)) return;
 
@@ -1808,6 +1899,15 @@ function getStatusVistoria(vistoria) {
     return "ok";
 }
 
+function getStatusHistoricoLabel(status) {
+    const labels = {
+        ok: "Tudo OK",
+        pendente: "Pendência",
+        resolvida: "Pendência resolvida"
+    };
+    return labels[status] || "Tudo OK";
+}
+
 function vistoriaTemPendencia(vistoria) {
     if (vistoria.pendenciaResolvida?.resolvida) return false;
 
@@ -1873,7 +1973,7 @@ function renderHistoricoTable(dados) {
     tbody.innerHTML = "";
 
     if (dados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhuma vistoria encontrada com os filtros aplicados.</td></tr>';
         renderHistoricoPager(0, 0);
         return;
     }
@@ -1893,6 +1993,8 @@ function renderHistoricoTable(dados) {
         const tipoClass = tipoVistoriaLabel === "COMPLETA" ? "complete" : "partial";
         const todasCategoriasLabel = getCategoriaHistoricoLabel(data);
         const checkboxChecked = (data.ids || [data.id]).every(id => state.selectedVistorias.has(id));
+        const status = data.grouped ? (data.statusGroup || "ok") : getStatusVistoria(data);
+        const statusLabel = getStatusHistoricoLabel(status);
 
         tbody.innerHTML += `
             <tr onclick="verDetalhes('${data.id}')">
@@ -1903,7 +2005,8 @@ function renderHistoricoTable(dados) {
                 <td>${escapeHtml(viaturaLabel)}</td>
                 <td>${escapeHtml(todasCategoriasLabel)}</td>
                 <td>${dateObj.toLocaleString("pt-BR")}</td>
-                <td onclick="event.stopPropagation();">
+                <td><span class="status-${status}">${escapeHtml(statusLabel)}</span></td>
+                <td class="history-actions-cell" onclick="event.stopPropagation();">
                     <button type="button" class="history-row-action" onclick="verDetalhes('${data.id}')" aria-label="Ver detalhes">Detalhes</button>
                 </td>
             </tr>
@@ -2204,12 +2307,6 @@ export function verDetalhes(docId) {
     if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
 
-    if (vistoria.categoria === "notebooks") {
-        if (vistoria.analistaNome) {
-            html += `<p><strong>Analista:</strong> ${escapeHtml(vistoria.analistaNome)} ${vistoria.analistaCpf ? `(CPF: ${escapeHtml(vistoria.analistaCpf)})` : ""}</p>`;
-        }
-    }
-
     const auxiliares = Array.isArray(vistoria.auxiliares) ? vistoria.auxiliares : [];
     if (vistoria.categoria !== "notebooks" && auxiliares.length > 0) {
         auxiliares.forEach((aux, idx) => {
@@ -2224,7 +2321,16 @@ export function verDetalhes(docId) {
         html += `<p><strong>EPIs vistoriados:</strong> ${vistoria.epiResponsavelTipo || "Funcionário"} - ${vistoria.epiResponsavelNome}</p>`;
     }
     if (vistoria.categoria === "notebooks") {
+        const analistaNome = String(vistoria.analistaNome || "").trim();
+        const analistaCpf = String(vistoria.analistaCpf || "").trim();
+        const notebookModelo = String(vistoria.notebookModelo || "").trim();
+        const notebookNumeroSerie = String(vistoria.notebookNumeroSerie || "").trim();
+
         html += `<p><strong>Movimentação:</strong> ${getNotebookTermLabel(vistoria)}</p>`;
+        html += `<p><strong>Analista:</strong> ${escapeHtml(analistaNome || "Não informado")}</p>`;
+        html += `<p><strong>CPF do analista:</strong> ${escapeHtml(analistaCpf || "Não informado")}</p>`;
+        html += `<p><strong>Notebook:</strong> ${escapeHtml(notebookModelo || "Não informado")}</p>`;
+        html += `<p><strong>Nº de série:</strong> ${escapeHtml(notebookNumeroSerie || "Não informado")}</p>`;
         const usageInfo = getNotebookUsageInfo(vistoria);
         if (usageInfo) {
             const diasLabel = usageInfo.dias === 1 ? "1 dia" : `${usageInfo.dias} dias`;

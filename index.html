@@ -1306,8 +1306,8 @@
             <ul id="menu-list" class="nav-links">
                 <li><a href="#" id="menu-inicio" class="nav-link-home active" onclick="showHome()"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10.8 9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg></span><span>Início</span></a></li>
                 <li><a href="#" id="menu-ferramentas" class="nav-link-tools" onclick="showPage('ferramentas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14.7 6.3 3 3"></path><path d="M8 16 18.5 5.5a2.1 2.1 0 0 1 3 3L11 19l-5 1z"></path><path d="M3 7l4 4"></path><path d="M5 5l4 4"></path></svg></span><span>Ferramentas</span></a></li>
-                <li><a href="#" id="menu-epis" class="nav-link-epis" onclick="showPage('epis')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9V7a6 6 0 0 1 12 0v2"></path><path d="M5 9h14l-1.2 11H6.2z"></path><path d="M9 13h6"></path><path d="M9.5 17h5"></path></svg></span><span>EPIs</span></a></li>
-                <li><a href="#" id="menu-viaturas" class="nav-link-cars" onclick="showPage('viaturas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="m7 16 1.5-5h7L17 16"></path><path d="M6 19h.01"></path><path d="M18 19h.01"></path><path d="M4 16v3h16v-3l-2-3H6z"></path></svg></span><span>Viaturas</span></a></li>
+                <li><a href="#" id="menu-epis" class="nav-link-epis" onclick="showPage('epis')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 14a7 7 0 0 1 14 0"></path><path d="M3 14h18"></path><path d="M7 14v3h10v-3"></path><path d="M9 7v5"></path><path d="M15 7v5"></path></svg></span><span>EPIs</span></a></li>
+                <li><a href="#" id="menu-viaturas" class="nav-link-cars" onclick="showPage('viaturas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="M7 16l2-5h6l2 5"></path><path d="M4 16v3h16v-3"></path><path d="M7 19h1"></path><path d="M16 19h1"></path></svg></span><span>Viaturas</span></a></li>
                 <li><a href="#" id="menu-tablets" class="nav-link-tablets" onclick="showPage('tablets')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M12 17.5h.01"></path></svg></span><span>Tablets</span></a></li>
                 <li><a href="#" id="menu-notebooks" class="nav-link-notebooks" onclick="showPage('notebooks')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H5z"></path><path d="m3 19 2-4h14l2 4z"></path></svg></span><span>Notebooks</span></a></li>
                 <li class="nav-admin-link"><a href="#" id="menu-admin" class="nav-link-admin" onclick="showPage('admin')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6z"></path><path d="M9 12h6"></path><path d="M12 9v6"></path></svg></span><span>Painel Admin</span></a></li>
@@ -1542,11 +1542,14 @@
                                 <p>Preencha as informações e realize a inspeção visual do equipamento.</p>
                             </div>
                         </div>
+                        <button type="button" class="notebook-info-title" aria-expanded="true" aria-controls="notebook-inspection-info" onclick="toggleNotebookInspectionInfo()">
+                            <span class="notebook-info-button-label">Informações da Vistoria</span>
+                            <small>Ocultar</small>
+                        </button>
                         <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('notebooks')">Marcar tudo OK</button>
                     </div>
                     <div class="notebook-info-card">
-                        <h3 class="notebook-info-title"><span aria-hidden="true">▦</span> Informações da Vistoria</h3>
-                        <div class="notebook-inspection-layout">
+                        <div class="notebook-inspection-layout" id="notebook-inspection-info">
                         <div class="notebook-picker-card">
                             <h4>Analistas cadastrados</h4>
                             <input type="search" id="notebook-analyst-search" placeholder="Buscar analista..." oninput="renderAnalistasSelectOptions('inspection')">
@@ -1687,7 +1690,7 @@
                     <div class="admin-config-tabs admin-dashboard-cards" aria-label="Módulos da gestão de vistorias">
                         <button type="button" id="admin-tab-viaturas" class="admin-dashboard-card" onclick="showAdminConfigTab('viaturas')">
                             <span class="admin-dashboard-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="m7 16 1.5-5h7L17 16"></path><path d="M6 19h.01"></path><path d="M18 19h.01"></path><path d="M4 16v3h16v-3l-2-3H6z"></path></svg>
+                                <svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="M7 16l2-5h6l2 5"></path><path d="M4 16v3h16v-3"></path><path d="M7 19h1"></path><path d="M16 19h1"></path></svg>
                             </span>
                             <strong>Viaturas</strong>
                             <span>Gerencie vistorias de viaturas.</span>
@@ -1697,7 +1700,7 @@
                                 <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                             </span>
                             <strong>Funcionários</strong>
-                            <span>Gerencie técnicos e vistoriadores.</span>
+                            <span>Gerencie técnicos, analistas e permissões.</span>
                         </button>
                         <button type="button" id="admin-tab-itens" class="admin-dashboard-card" onclick="showAdminConfigTab('itens')">
                             <span class="admin-dashboard-icon" aria-hidden="true">
@@ -1708,10 +1711,10 @@
                         </button>
                         <button type="button" id="menu-funcionarios" class="admin-dashboard-card" onclick="showAdminConfigTab('tec-externos')">
                             <span class="admin-dashboard-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24"><path d="M6 9V7a6 6 0 0 1 12 0v2"></path><path d="M5 9h14l-1.2 11H6.2z"></path><path d="M9 13h6"></path><path d="M9.5 17h5"></path></svg>
+                                <svg viewBox="0 0 24 24"><path d="M5 14a7 7 0 0 1 14 0"></path><path d="M3 14h18"></path><path d="M7 14v3h10v-3"></path><path d="M9 7v5"></path><path d="M15 7v5"></path></svg>
                             </span>
                             <strong>EPI</strong>
-                            <span>Gerencie a lista de EPIs.</span>
+                            <span>Gerencie a planilha de EPIs.</span>
                         </button>
                         <button type="button" id="admin-tab-notebooks" class="admin-dashboard-card" onclick="showAdminConfigTab('notebooks')">
                             <span class="admin-dashboard-icon" aria-hidden="true">
@@ -1775,7 +1778,7 @@
                             <div id="admin-funcionarios-manager">
                                 <div class="admin-people-switch">
                                     <button type="button" id="admin-people-tab-funcionarios" class="active" onclick="showAdminPeopleTab('funcionarios')">Adicionar técnico/auxiliar</button>
-                                    <button type="button" id="admin-people-tab-vistoriadores" onclick="showAdminPeopleTab('vistoriadores')">Adicionar vistoriador</button>
+                                    <button type="button" id="admin-people-tab-vistoriadores" onclick="showAdminPeopleTab('vistoriadores')">Adicionar vistoriador/permissões</button>
                                 </div>
                                 <div id="admin-people-panel-funcionarios" class="admin-people-panel active">
                                     <div class="admin-item-form admin-employee-form admin-employee-create-form" autocomplete="off">
@@ -1794,11 +1797,7 @@
                                         <input type="text" id="admin-vistoriador-nome" value="" placeholder="Nome do vistoriador" autocomplete="new-password">
                                         <input type="email" id="admin-vistoriador-email" value="" placeholder="E-mail" autocomplete="new-password">
                                         <input type="password" id="admin-vistoriador-senha" value="" placeholder="Senha" autocomplete="new-password">
-                                        <select id="admin-vistoriador-tipo">
-                                            <option value="geral">Vistorias gerais</option>
-                                            <option value="tablets">Somente tablets</option>
-                                        </select>
-                                        <button type="button" onclick="adicionarVistoriador()">Adicionar vistoriador</button>
+                                        <button type="button" onclick="adicionarVistoriador()">Adicionar vistoriador/permissões</button>
                                     </div>
                                     <div id="admin-vistoriadores-list" class="admin-config-list"></div>
                                 </div>
@@ -1813,17 +1812,6 @@
                                 <div class="input-group">
                                     <label for="funcionario-search">Pesquisar funcionário</label>
                                     <input type="text" id="funcionario-search" placeholder="Nome, CPF ou função" oninput="renderFuncionariosPage()">
-                                </div>
-                                <div class="input-group">
-                                    <label for="funcionario-status-filter">Situação</label>
-                                    <select id="funcionario-status-filter" onchange="renderFuncionariosPage()">
-                                        <option value="">Todos</option>
-                                        <option value="Ativo">Ativo</option>
-                                        <option value="Férias">Férias</option>
-                                        <option value="Folga">Folga</option>
-                                        <option value="Atestado">Atestado</option>
-                                        <option value="Falta">Falta</option>
-                                    </select>
                                 </div>
                             </div>
                             <div id="funcionarios-list" class="employees-list">
@@ -1920,8 +1908,7 @@
                                     <label>
                                         <span>Categoria</span>
                                         <select id="filter-categoria" onchange="aplicarFiltros()">
-                                            <option value="">Todas</option>
-                                            <option value="todas">Todas as categorias</option>
+                                            <option value="">Todas as categorias</option>
                                             <option value="ferramentas">Ferramentas</option>
                                             <option value="epis">EPIs</option>
                                             <option value="viaturas">Viatura</option>
@@ -1954,7 +1941,8 @@
                                             <th>Viatura</th>
                                             <th>Categorias</th>
                                             <th>Data e hora</th>
-                                            <th>Detalhes</th>
+                                            <th>Status</th>
+                                            <th class="history-actions-col">Detalhes</th>
                                         </tr>
                                     </thead>
                                     <tbody id="history-tbody">

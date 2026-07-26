@@ -1996,17 +1996,21 @@ export const defaultViaturas = Array.from({ length: totalViaturas }, (_, index) 
     return { id, nome: `Viatura ${formatTwoDigits(id)}`, ativa: true };
 });
 export const categoryNames = { ferramentas: "Ferramentas", epis: "EPIs", viaturas: "Viatura", tablets: "Tablet", notebooks: "Notebook", manuais_pdf: "Manual PDF" };
+export const vistoriadorPermissionCategories = ["ferramentas", "epis", "viaturas", "tablets", "notebooks"];
 export const defaultVistoriadores = [
-    { id: "vistoriador-alisson", nome: "Alisson", email: "alisson.tavares@digitalonline.com.br", tipo: "geral", padrao: true },
-    { id: "vistoriador-marcos", nome: "Marcos", email: "marcos@digitalonline.com.br", tipo: "geral", padrao: true },
-    { id: "vistoriador-matheus", nome: "Matheus", email: "matheus@digitalonline.com.br", tipo: "tablets", padrao: true },
-    { id: "vistoriador-italo", nome: "Italo", email: "italo@digitalonline.com.br", tipo: "tablets", padrao: true }
+    { id: "vistoriador-alisson", nome: "Alisson", email: "alisson.tavares@digitalonline.com.br", tipo: "geral", permissoes: [...vistoriadorPermissionCategories], padrao: true },
+    { id: "vistoriador-marcos", nome: "Marcos", email: "marcos@digitalonline.com.br", tipo: "geral", permissoes: ["ferramentas", "epis", "viaturas"], padrao: true },
+    { id: "vistoriador-matheus", nome: "Matheus", email: "matheus@digitalonline.com.br", tipo: "tablets", permissoes: ["tablets", "notebooks"], padrao: true },
+    { id: "vistoriador-italo", nome: "Italo", email: "italo@digitalonline.com.br", tipo: "tablets", permissoes: ["tablets", "notebooks"], padrao: true }
 ];
 
-export const vistoriadores = defaultVistoriadores.map(vistoriador => ({ ...vistoriador }));
+export const vistoriadores = defaultVistoriadores.map(vistoriador => ({
+    ...vistoriador,
+    permissoes: [...normalizeVistoriadorPermissoes(vistoriador)]
+}));
 export const vistoriadoresTablet = [];
-export const vistoriadoresNotebook = ["Matheus", "Italo"];
-export const vistoriadoresAcessoNotebook = ["Alisson", ...vistoriadoresNotebook];
+export const vistoriadoresNotebook = [];
+export const vistoriadoresAcessoNotebook = [];
 
 export let notebooksInventory = [];
 
@@ -2018,21 +2022,42 @@ export function normalizeVistoriador(vistoriador = {}, index = 0) {
     const nome = String(vistoriador.nome || "").trim();
     const email = normalizeEmail(vistoriador.email);
     const tipo = String(vistoriador.tipo || "geral") === "tablets" ? "tablets" : "geral";
+    const permissoes = normalizeVistoriadorPermissoes(vistoriador);
     return {
         id: String(vistoriador.id || `vistoriador-${normalizePessoaKey(nome || email)}-${index}`),
         nome,
         email,
         tipo,
+        permissoes,
         padrao: Boolean(vistoriador.padrao)
     };
 }
 
+export function normalizeVistoriadorPermissoes(vistoriador = {}) {
+    if (Array.isArray(vistoriador.permissoes)) {
+        const normalized = vistoriador.permissoes.filter(category => vistoriadorPermissionCategories.includes(category));
+        if (normalized.length) return [...new Set(normalized)];
+    }
+
+    const tipo = String(vistoriador.tipo || "geral") === "tablets" ? "tablets" : "geral";
+    if (tipo === "tablets") return ["tablets", "notebooks"];
+    return ["ferramentas", "epis", "viaturas"];
+}
+
 export function syncVistoriadoresTablet() {
-    vistoriadoresTablet.splice(
-        0,
-        vistoriadoresTablet.length,
-        ...vistoriadores.filter(vistoriador => vistoriador.tipo === "tablets").map(vistoriador => vistoriador.nome)
-    );
+    const hasPermission = (vistoriador, category) => normalizeVistoriadorPermissoes(vistoriador).includes(category);
+    vistoriadoresTablet.splice(0, vistoriadoresTablet.length, ...vistoriadores.filter(vistoriador => hasPermission(vistoriador, "tablets")).map(vistoriador => vistoriador.nome));
+    vistoriadoresNotebook.splice(0, vistoriadoresNotebook.length, ...vistoriadores.filter(vistoriador => hasPermission(vistoriador, "notebooks")).map(vistoriador => vistoriador.nome));
+    vistoriadoresAcessoNotebook.splice(0, vistoriadoresAcessoNotebook.length, ...vistoriadoresNotebook);
+}
+
+export function getVistoriadorPermissoes(vistoriadorNome = "") {
+    const vistoriador = vistoriadores.find(item => item.nome === vistoriadorNome);
+    return vistoriador ? normalizeVistoriadorPermissoes(vistoriador) : [];
+}
+
+export function vistoriadorPodeVistoriar(vistoriadorNome = "", category = "") {
+    return getVistoriadorPermissoes(vistoriadorNome).includes(category);
 }
 
 export function setVistoriadores(data = []) {
@@ -2047,9 +2072,11 @@ export function setVistoriadores(data = []) {
             const normalized = normalizeVistoriador(vistoriador, index);
             if (!normalized.nome || !normalized.email) return;
             const atual = porEmail.get(normalized.email) || {};
+            const keepDefaultPermissions = Boolean(atual.padrao && !Array.isArray(vistoriador.permissoes));
             porEmail.set(normalized.email, {
                 ...atual,
                 ...normalized,
+                permissoes: keepDefaultPermissions ? normalizeVistoriadorPermissoes(atual) : normalized.permissoes,
                 padrao: Boolean(atual.padrao || normalized.padrao)
             });
         });

@@ -531,6 +531,11 @@
     height: 42px;
 }
 
+.history-table .history-actions-col,
+.history-table .history-actions-cell {
+    text-align: right;
+}
+
 .history-table tr:hover {
     background-color: #f7fbff;
     cursor: pointer;
@@ -979,6 +984,111 @@
 
 .admin-people-panel.active {
     display: block;
+}
+
+.admin-vistoriador-form {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.admin-vistoriador-form > input {
+    flex: 1 1 210px;
+    min-height: 38px;
+}
+
+.admin-vistoriadores-table {
+    display: grid;
+    gap: 5px;
+    overflow-x: auto;
+}
+
+.admin-vistoriador-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.35fr) minmax(220px, 1.15fr) repeat(6, 86px) 116px;
+    align-items: center;
+    gap: 8px;
+    min-width: 1128px;
+    padding: 8px 12px;
+    border: 1px solid #e5eaf1;
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+.admin-vistoriador-head {
+    border-color: transparent;
+    background: transparent;
+    color: #004aad;
+    font-size: 0.72rem;
+    font-weight: 900;
+    padding-top: 4px;
+    padding-bottom: 2px;
+}
+
+.admin-vistoriador-permission-head {
+    text-align: center;
+}
+
+.admin-vistoriador-person {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.admin-vistoriador-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-grid;
+    place-items: center;
+    background: #eaf2ff;
+    color: #0f62fe;
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+.admin-vistoriador-person strong,
+.admin-vistoriador-email {
+    overflow-wrap: anywhere;
+}
+
+.admin-vistoriador-person small {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 0.64rem;
+    font-weight: 800;
+}
+
+.admin-permission-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.admin-permission-check.compact {
+    justify-content: center;
+}
+
+.admin-permission-check.compact span {
+    display: none;
+}
+
+.admin-permission-check input {
+    width: 15px;
+    height: 15px;
+    accent-color: #0f62fe;
+    cursor: pointer;
 }
 
 .admin-employee-section-header {
@@ -1761,6 +1871,7 @@
 
 .admin-config-actions .btn-danger {
     background: #dc3545;
+    color: #ffffff;
 }
 
 .admin-config-actions .btn-muted {
