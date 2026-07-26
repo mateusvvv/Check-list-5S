@@ -525,10 +525,8 @@
 #notebooks .notebook-visual-card {
     background: #ffffff;
     padding: 22px;
-    width: min(100%, calc(100vw - 56px)) !important;
-    max-width: 1280px !important;
-    margin-left: auto;
-    margin-right: auto;
+    width: 100% !important;
+    max-width: none !important;
     overflow: hidden;
 }
 
@@ -579,28 +577,42 @@
 
 #notebooks .notebook-visual-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
     align-items: stretch;
 }
 
 #notebooks #notebook-map {
+    display: flex;
+    flex-direction: column;
     border: 1px solid #d8dee8;
     border-radius: 6px;
     background: #ffffff;
     padding: 18px;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    min-width: 0;
+    height: 100%;
 }
 
 #notebooks #notebook-map::before {
     content: "Clique ou toque nas áreas do notebook para marcar as avarias";
-    display: block;
-    margin: 0 0 10px;
+    display: flex;
+    align-items: flex-start;
+    min-height: 43px;
+    margin: 0 0 14px;
     color: var(--primary-blue);
     font-size: 0.9rem;
     font-weight: 800;
+    line-height: 1.35;
 }
 
 #notebooks #notebook-map .vehicle-photo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
     min-height: clamp(360px, 34vw, 500px);
     border: none;
     padding: 0;
@@ -613,11 +625,14 @@
 }
 
 #notebooks .notebook-photo-panel {
+    display: flex;
+    flex-direction: column;
     border: 1px solid #d8dee8;
     border-radius: 6px;
     background: #ffffff;
     padding: 18px;
     min-width: 0;
+    height: 100%;
 }
 
 #notebooks .notebook-photo-header {
@@ -665,6 +680,8 @@
     grid-template-columns: 1fr !important;
     gap: 10px !important;
     margin-top: 0 !important;
+    flex: 1;
+    align-content: start;
 }
 
 #notebooks .notebook-photo-slot {
@@ -726,6 +743,16 @@
     padding: 8px;
 }
 
+#notebooks .notebook-extra-photo-previews > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 54px;
+    text-align: center;
+}
+
 #notebooks .notebook-extra-photo-item {
     display: grid;
     gap: 6px;
@@ -779,10 +806,10 @@
 
 #notebooks .damage-list-wrap {
     display: grid;
-    grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
     align-items: start;
-    margin-top: 16px;
+    margin-top: 24px;
 }
 
 #notebooks .damage-list-wrap .tablet-observacoes {
