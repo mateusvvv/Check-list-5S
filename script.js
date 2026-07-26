@@ -994,6 +994,10 @@ function toggleMenu() {
     document.getElementById("menu-list").classList.toggle("show");
 }
 
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function showHome() {
     const categorias = getCategoriasVistoria(state.selectedViatura);
     const paginaPadrao = isTabletOnlyUser() ? "tablets" : (categorias[0] || "ferramentas");
@@ -2561,12 +2565,16 @@ function renderViaturaDashboard() {
     if (!grid) return;
 
     grid.innerHTML = "";
+    const expanded = getViaturasGridExpanded();
+    updateSelectedViaturaBanner();
+    grid.hidden = !expanded;
 
-    const visibleViaturas = getViaturasGridExpanded()
-        ? state.viaturas
-        : state.viaturas.filter(viatura => viatura.id === state.selectedViatura);
+    if (!expanded) {
+        updateViaturasToggleButton();
+        return;
+    }
 
-    visibleViaturas.forEach((viatura) => {
+    state.viaturas.forEach((viatura) => {
         const id = viatura.id;
         const status = state.surveyStatus[id] || {};
         const isActive = state.selectedViatura === id;
@@ -2601,6 +2609,17 @@ function renderViaturaDashboard() {
     });
 
     updateViaturasToggleButton();
+}
+
+function updateSelectedViaturaBanner() {
+    const viatura = getViaturaById(state.selectedViatura);
+    const label = viatura?.nome || `Viatura ${formatTwoDigits(state.selectedViatura)}`;
+
+    const headerName = document.getElementById("header-selected-viatura");
+    if (headerName) {
+        headerName.textContent = label;
+        headerName.title = label;
+    }
 }
 
 function getViaturasGridExpanded() {
@@ -2656,6 +2675,7 @@ function limparCamposViatura() {
 
 function updateVistoriaModeUI() {
     const label = document.getElementById("vistoria-mode-label");
+    updateSelectedViaturaBanner();
     if (!label) return;
 
     const viatura = getViaturaById(state.selectedViatura);
@@ -3691,6 +3711,7 @@ async function reiniciarTodasVistorias() {
 function bindWindowFunctions() {
     Object.assign(window, {
         toggleMenu,
+        scrollToTop,
         loginApp,
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,

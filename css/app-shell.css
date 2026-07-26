@@ -101,6 +101,12 @@ body > main {
     min-height: 0;
 }
 
+.header-selected-viatura {
+    display: none;
+    border: 0;
+    cursor: pointer;
+}
+
 .menu-btn {
     display: none;
     align-items: center;
@@ -416,6 +422,10 @@ body > main {
     background: #e8f1ff;
 }
 
+.viaturas-grid[hidden] {
+    display: none !important;
+}
+
 .vistoria-mode-options {
     display: flex;
     flex-wrap: wrap;
@@ -707,7 +717,36 @@ textarea {
 
     .menu-container {
         position: static;
+        display: flex;
+        align-items: center;
+        flex-direction: row;
+        gap: 8px;
         flex: 0 0 auto;
+        margin-left: auto;
+        min-width: 0;
+    }
+
+    .header-selected-viatura {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        max-width: min(42vw, 190px);
+        padding: 6px 9px;
+        border: 1px solid rgba(191, 219, 254, 0.55);
+        border-radius: 7px;
+        background: rgba(239, 246, 255, 0.13);
+        color: #dbeafe;
+        font-size: 0.74rem;
+        font-weight: 900;
+        line-height: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .header-selected-viatura:hover {
+        background: rgba(239, 246, 255, 0.22);
+        border-color: rgba(191, 219, 254, 0.78);
     }
 
     .menu-btn {
@@ -843,6 +882,12 @@ textarea {
     .user-selector select {
         width: 118px;
         font-size: 0.7rem;
+    }
+
+    .header-selected-viatura {
+        max-width: 40vw;
+        padding-inline: 7px;
+        font-size: 0.68rem;
     }
 
     .viaturas-grid {

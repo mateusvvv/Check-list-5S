@@ -860,6 +860,73 @@
         border-left: none;
     }
 
+    #notebooks .notebook-picker-card {
+        padding: 14px;
+    }
+
+    #notebooks .notebook-picker-card h4 {
+        margin-bottom: 10px;
+        font-size: 0.92rem;
+    }
+
+    #notebooks .notebook-picker-card input[type="search"] {
+        height: 40px;
+        margin-bottom: 10px;
+        padding: 0 10px;
+        font-size: 0.86rem;
+    }
+
+    #notebooks .notebook-picker-list {
+        max-height: 340px;
+        padding-right: 0;
+    }
+
+    #notebooks .notebook-picker-item {
+        grid-template-columns: 22px minmax(0, 1fr);
+        grid-template-areas:
+            "icon info"
+            "icon badge";
+        gap: 6px 9px;
+        padding: 10px 8px;
+    }
+
+    #notebooks .notebook-picker-icon {
+        grid-area: icon;
+        align-self: start;
+        padding-top: 2px;
+    }
+
+    #notebooks .notebook-picker-info {
+        grid-area: info;
+    }
+
+    #notebooks .notebook-picker-info strong {
+        font-size: 0.78rem;
+    }
+
+    #notebooks .notebook-picker-info small {
+        font-size: 0.68rem;
+    }
+
+    #notebooks .notebook-picker-badge,
+    #notebooks .notebook-usage-status {
+        grid-area: badge;
+        justify-self: start;
+        width: auto;
+        max-width: 100%;
+    }
+
+    #notebooks .notebook-usage-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+    }
+
+    #notebooks .notebook-usage-label,
+    #notebooks .notebook-usage-analyst {
+        font-size: 0.68rem;
+    }
+
     #notebooks .notebook-upload-box {
         grid-template-columns: auto minmax(0, auto);
         padding: 10px;

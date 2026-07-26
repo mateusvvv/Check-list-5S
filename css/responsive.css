@@ -505,12 +505,36 @@
 
     .login-box {
         max-width: 100%;
-        padding: 14px;
+        width: 100%;
+        padding: 10px;
     }
 
     .login-box input {
-        padding: 9px 8px;
-        font-size: 0.88rem;
+        padding: 9px 6px;
+        font-size: 0.82rem;
+    }
+
+    .auth-screen .login-box {
+        width: 100%;
+    }
+
+    .login-field {
+        gap: 8px;
+        padding: 0 10px;
+    }
+
+    .login-field-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .auth-screen .login-box input {
+        min-height: 54px;
+        font-size: 0.95rem;
+    }
+
+    .auth-screen .login-box input[type="email"] {
+        font-size: clamp(0.78rem, 3.5vw, 0.95rem);
     }
 
     .checking-meta {
