@@ -319,7 +319,7 @@
 
 #notebooks .notebook-picker-item {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-columns: 24px minmax(0, 1fr) minmax(150px, 42%);
     align-items: center;
     gap: 10px;
     width: 100%;
@@ -374,16 +374,64 @@
 }
 
 #notebooks .notebook-picker-badge {
+    justify-self: end;
     border-radius: 5px;
-    padding: 3px 7px;
+    padding: 4px 7px;
     color: #ffffff;
     background: #94a3b8;
-    font-size: 0.66rem;
+    font-size: 0.62rem;
     font-weight: 800;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
 }
 
 #notebooks .notebook-picker-badge.active {
     background: #22c55e;
+}
+
+#notebooks .notebook-picker-badge.available {
+    background: #16a34a;
+}
+
+#notebooks .notebook-picker-badge.usage {
+    background: #f97316;
+}
+
+#notebooks .notebook-usage-status {
+    justify-self: start;
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    width: 100%;
+    line-height: 1.15;
+}
+
+#notebooks .notebook-usage-label {
+    color: #f97316;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+#notebooks .notebook-usage-label small {
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+#notebooks .notebook-usage-days {
+    color: #64748b;
+    font-weight: 700;
+}
+
+#notebooks .notebook-usage-analyst {
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 600;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 #notebooks .notebook-picker-badge.inactive {

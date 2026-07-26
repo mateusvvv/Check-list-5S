@@ -1,5 +1,5 @@
 import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, resolveChecklistItemData, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
-import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc, storage, storageRef, uploadBytes, getDownloadURL } from "./firebase.js";
+import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc, storage, storageRef, uploadBytes, getDownloadURL } from "./firebase.js";
 import { getDamageMarkerLabel } from "./damages.js?v=3";
 import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=10";
 import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js?v=4";
@@ -160,6 +160,22 @@ function getDataEnvioDate(vistoria) {
     return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
 
+function getDataVistoriaDate(vistoria) {
+    const value = String(vistoria?.dataVistoria || "").trim();
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        const [, year, month, day] = match.map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    const dataEnvio = getDataEnvioDate(vistoria);
+    if (dataEnvio.getTime() > 0) {
+        return new Date(dataEnvio.getFullYear(), dataEnvio.getMonth(), dataEnvio.getDate());
+    }
+
+    return null;
+}
+
 function getVistoriadorResponsavel() {
     const email = String(auth.currentUser?.email || "").trim().toLowerCase();
     return document.getElementById("vistoriador-atual")?.value
@@ -173,14 +189,78 @@ function getViaturaLabel(viaturaId) {
     return viatura?.nome || `Viatura ${formatTwoDigits(viaturaId)}`;
 }
 
-function getNotebookTermLabel(vistoria) {
-    const termType = String(vistoria?.notebookTermType || "")
+function normalizeNotebookTermType(vistoria) {
+    return String(vistoria?.notebookTermType || "")
         .trim()
         .toUpperCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getNotebookTermLabel(vistoria) {
+    const termType = normalizeNotebookTermType(vistoria);
 
     return termType === "RETORNO" || termType === "DEVOLUCAO" ? "Devolução" : "Retirada";
+}
+
+function isNotebookDevolucao(vistoria) {
+    const termType = normalizeNotebookTermType(vistoria);
+    return termType === "RETORNO" || termType === "DEVOLUCAO";
+}
+
+function normalizeNotebookLookup(value = "") {
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
+}
+
+function getNotebookIdentity(vistoria) {
+    const serial = normalizeNotebookLookup(vistoria?.notebookNumeroSerie);
+    if (serial) return `serial:${serial}`;
+
+    const modelo = normalizeNotebookLookup(vistoria?.notebookModelo);
+    return modelo ? `modelo:${modelo}` : "";
+}
+
+function getNotebookAnalystIdentity(vistoria) {
+    const cpf = String(vistoria?.analistaCpf || "").replace(/\D/g, "");
+    if (cpf) return `cpf:${cpf}`;
+
+    const nome = normalizeNotebookLookup(vistoria?.analistaNome);
+    return nome ? `nome:${nome}` : "";
+}
+
+function getNotebookUsageInfo(vistoria) {
+    if (vistoria?.categoria !== "notebooks" || !isNotebookDevolucao(vistoria)) return null;
+
+    const notebookIdentity = getNotebookIdentity(vistoria);
+    const analystIdentity = getNotebookAnalystIdentity(vistoria);
+    const dataDevolucao = getDataVistoriaDate(vistoria);
+    if (!notebookIdentity || !analystIdentity || !dataDevolucao) return null;
+
+    const retirada = state.vistoriasCache
+        .filter(item => (
+            item.id !== vistoria.id
+            && item.categoria === "notebooks"
+            && !isNotebookDevolucao(item)
+            && getNotebookIdentity(item) === notebookIdentity
+            && getNotebookAnalystIdentity(item) === analystIdentity
+        ))
+        .map(item => ({ item, data: getDataVistoriaDate(item) }))
+        .filter(({ data }) => data && data <= dataDevolucao)
+        .sort((a, b) => b.data.getTime() - a.data.getTime())[0];
+
+    if (!retirada) return null;
+
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const dias = Math.max(0, Math.round((dataDevolucao.getTime() - retirada.data.getTime()) / MS_PER_DAY));
+    return {
+        dias,
+        dataRetirada: retirada.data
+    };
 }
 
 function getCategoriaHistoricoLabel(vistoria) {
@@ -361,6 +441,14 @@ export async function loginAdmin() {
 export async function logoutAdmin() {
     if (!confirm("Tem certeza que deseja sair?")) return;
     await signOut(auth);
+    Object.values(state.surveyStatus || {}).forEach((status) => {
+        Object.keys(status).forEach((category) => {
+            status[category] = false;
+        });
+    });
+    state.epiSurveyStatus = {};
+    document.querySelectorAll(".nav-links a.completed").forEach(link => link.classList.remove("completed"));
+    document.getElementById("btn-encerrar-geral")?.style.setProperty("display", "none");
 }
 
 function renderAdminConfig() {
@@ -1552,56 +1640,78 @@ export async function substituirItemChecklist(viaturaId, category, index, pessoa
     refreshAppAfterConfigChange();
 }
 
+function atualizarHistoricoComSnapshot(querySnapshot) {
+    const tbody = document.getElementById("history-tbody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    state.vistoriasCache = [];
+
+    const vistorias = [];
+    const resolucoes = [];
+
+    querySnapshot.forEach((doc) => {
+        const data = { id: doc.id, ...doc.data() };
+        if (data.tipoRegistro === "resolucaoPendencia") {
+            resolucoes.push(data);
+            return;
+        }
+        vistorias.push(data);
+    });
+
+    const resolucoesPorVistoria = {};
+    resolucoes.forEach((resolucao) => {
+        if (!resolucao.vistoriaOrigemId) return;
+        const atual = resolucoesPorVistoria[resolucao.vistoriaOrigemId];
+        const dataAtual = atual?.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
+        const dataResolucao = resolucao.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
+        if (!atual || dataResolucao >= dataAtual) {
+            resolucoesPorVistoria[resolucao.vistoriaOrigemId] = resolucao;
+        }
+    });
+
+    state.vistoriasCache = vistorias.map((vistoria) => {
+        const resolucao = resolucoesPorVistoria[vistoria.id];
+        if (!resolucao) return vistoria;
+        return {
+            ...vistoria,
+            pendenciaResolvida: resolucao.pendenciaResolvida
+        };
+    });
+
+    aplicarFiltros();
+}
+
 export async function carregarHistorico() {
     const tbody = document.getElementById("history-tbody");
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+    state.selectedVistorias.clear();
+    atualizarContadorSelecionadas();
 
-    try {
-        const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
-        const querySnapshot = await getDocs(q);
-
-        tbody.innerHTML = "";
-        state.vistoriasCache = [];
-        state.selectedVistorias.clear();
-        atualizarContadorSelecionadas();
-
-        const vistorias = [];
-        const resolucoes = [];
-
-        querySnapshot.forEach((doc) => {
-            const data = { id: doc.id, ...doc.data() };
-            if (data.tipoRegistro === "resolucaoPendencia") {
-                resolucoes.push(data);
-                return;
-            }
-            vistorias.push(data);
-        });
-
-        const resolucoesPorVistoria = {};
-        resolucoes.forEach((resolucao) => {
-            if (!resolucao.vistoriaOrigemId) return;
-            const atual = resolucoesPorVistoria[resolucao.vistoriaOrigemId];
-            const dataAtual = atual?.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
-            const dataResolucao = resolucao.pendenciaResolvida?.dataResolucao?.toDate?.() || new Date(0);
-            if (!atual || dataResolucao >= dataAtual) {
-                resolucoesPorVistoria[resolucao.vistoriaOrigemId] = resolucao;
-            }
-        });
-
-        state.vistoriasCache = vistorias.map((vistoria) => {
-            const resolucao = resolucoesPorVistoria[vistoria.id];
-            if (!resolucao) return vistoria;
-            return {
-                ...vistoria,
-                pendenciaResolvida: resolucao.pendenciaResolvida
-            };
-        });
-
-        aplicarFiltros();
-    } catch (error) {
-        console.error("Erro ao buscar histórico:", error);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
+    if (historyUnsubscribe) {
+        historyUnsubscribe();
+        historyUnsubscribe = null;
     }
+
+    return new Promise((resolve) => {
+        const q = query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"));
+        let resolved = false;
+
+        historyUnsubscribe = onSnapshot(q, (querySnapshot) => {
+            atualizarHistoricoComSnapshot(querySnapshot);
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        }, (error) => {
+            console.error("Erro ao buscar histórico:", error);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        });
+    });
 }
 
 export function aplicarFiltros() {
@@ -2094,12 +2204,18 @@ export function verDetalhes(docId) {
     if (vistoria.tecnicoNome) html += `<p><strong>Técnico:</strong> ${vistoria.tecnicoNome}</p>`;
     if (vistoria.tecnicoCpf) html += `<p><strong>CPF Técnico:</strong> ${vistoria.tecnicoCpf}</p>`;
 
+    if (vistoria.categoria === "notebooks") {
+        if (vistoria.analistaNome) {
+            html += `<p><strong>Analista:</strong> ${escapeHtml(vistoria.analistaNome)} ${vistoria.analistaCpf ? `(CPF: ${escapeHtml(vistoria.analistaCpf)})` : ""}</p>`;
+        }
+    }
+
     const auxiliares = Array.isArray(vistoria.auxiliares) ? vistoria.auxiliares : [];
-    if (auxiliares.length > 0) {
+    if (vistoria.categoria !== "notebooks" && auxiliares.length > 0) {
         auxiliares.forEach((aux, idx) => {
             html += `<p><strong>Auxiliar Técnico ${auxiliares.length > 1 ? idx + 1 : ""}:</strong> ${aux.nome} ${aux.cpf ? `(CPF: ${aux.cpf})` : ""}</p>`;
         });
-    } else if (vistoria.auxiliarTecnico) {
+    } else if (vistoria.categoria !== "notebooks" && vistoria.auxiliarTecnico) {
         html += `<p><strong>Auxiliar Técnico:</strong> ${vistoria.auxiliarTecnico}</p>`;
         if (vistoria.auxiliarCpf) html += `<p><strong>CPF Auxiliar:</strong> ${vistoria.auxiliarCpf}</p>`;
     }
@@ -2109,6 +2225,11 @@ export function verDetalhes(docId) {
     }
     if (vistoria.categoria === "notebooks") {
         html += `<p><strong>Movimentação:</strong> ${getNotebookTermLabel(vistoria)}</p>`;
+        const usageInfo = getNotebookUsageInfo(vistoria);
+        if (usageInfo) {
+            const diasLabel = usageInfo.dias === 1 ? "1 dia" : `${usageInfo.dias} dias`;
+            html += `<p><strong>Tempo com o notebook:</strong> ${diasLabel} <small>(retirado em ${usageInfo.dataRetirada.toLocaleDateString("pt-BR")})</small></p>`;
+        }
     }
     if (vistoria.km) html += `<p><strong>KM:</strong> ${vistoria.km}</p>`;
     if (vistoria.categoria === "viaturas" && vistoria.observacoesViatura) html += `<p><strong>Observações:</strong> ${vistoria.observacoesViatura}</p>`;

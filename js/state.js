@@ -21,6 +21,7 @@ export const state = {
     selectedNotebookDamageType: "amassado",
     notebookDamages: {},
     notebooksCadastrados: [],
+    notebookUsageStatus: {},
     analistasCadastrados: [],
     assinaturas: null,
     fotosEvidencia: {}

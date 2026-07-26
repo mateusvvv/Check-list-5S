@@ -7,6 +7,7 @@ import {
     deleteDoc,
     firestoreDoc,
     getDocs,
+    limit,
     onSnapshot,
     orderBy,
     query,
@@ -172,14 +173,14 @@ function renderVistoriadorOptions() {
     renderSelectOptions(
         document.getElementById("tablet-vistoriador"),
         vistoriadores
-            .filter(vistoriador => vistoriador.tipo === "tablets")
+            .filter(vistoriador => vistoriador.tipo === "tablets" || vistoriador.nome === "Alisson")
             .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
         "Selecione o Responsável"
     );
     renderSelectOptions(
         document.getElementById("notebook-vistoriador"),
         vistoriadores
-            .filter(vistoriador => vistoriadoresNotebook.includes(vistoriador.nome))
+            .filter(vistoriador => vistoriadoresAcessoNotebook.includes(vistoriador.nome))
             .map(vistoriador => ({ value: vistoriador.nome, label: vistoriador.nome })),
         "Selecione o Responsável"
     );
@@ -231,10 +232,10 @@ function syncSpecialVistoriadores() {
     const notebookSelect = document.getElementById("notebook-vistoriador");
 
     if (tabletSelect) {
-        tabletSelect.value = isTabletOnlyUser(vistoriador) ? vistoriador : "";
+        tabletSelect.value = (isTabletOnlyUser(vistoriador) || isAlissonVistoriador(vistoriador)) ? vistoriador : "";
     }
     if (notebookSelect) {
-        notebookSelect.value = vistoriadoresNotebook.includes(vistoriador) ? vistoriador : "";
+        notebookSelect.value = vistoriadoresAcessoNotebook.includes(vistoriador) ? vistoriador : "";
     }
     updateTabletInfo();
 }
@@ -315,7 +316,7 @@ function selecionarResponsavelNotebook() {
     const vistoriadorSelect = document.getElementById("vistoriador-atual");
     const responsavel = notebookSelect?.value || "";
 
-    if (!vistoriadoresNotebook.includes(responsavel)) {
+    if (!vistoriadoresAcessoNotebook.includes(responsavel)) {
         return;
     }
 
@@ -335,6 +336,56 @@ function preencherCamposNotebookCadastro(notebook, scope = "inspection") {
 
     if (modeloInput) modeloInput.value = notebook?.modelo || "";
     if (serialInput) serialInput.value = notebook?.numeroSerie || "";
+}
+
+function normalizeNotebookLookup(value = "") {
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
+}
+
+function getNotebookIdentityFromData(data = {}) {
+    const serial = normalizeNotebookLookup(data.numeroSerie || data.notebookNumeroSerie);
+    if (serial) return `serial:${serial}`;
+
+    const modelo = normalizeNotebookLookup(data.modelo || data.notebookModelo);
+    return modelo ? `modelo:${modelo}` : "";
+}
+
+function isNotebookReturnMovement(termType = "") {
+    const normalized = String(termType)
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    return normalized === "RETORNO" || normalized === "DEVOLUCAO";
+}
+
+function getNotebookUsageStatus(notebook = {}) {
+    const identity = getNotebookIdentityFromData(notebook);
+    return identity ? state.notebookUsageStatus[identity] : null;
+}
+
+function formatNotebookUsageDays(days = 0) {
+    const value = Math.max(0, Number(days || 0));
+    return value === 1 ? "1 dia" : `${value} dias`;
+}
+
+function renderNotebookStatusBadge(notebook = {}) {
+    const status = getNotebookUsageStatus(notebook);
+    if (status?.emUso) {
+        const analista = status.analistaNome || "Analista não informado";
+        return `
+            <span class="notebook-usage-status" title="Em uso por ${escapeHtml(analista)}">
+                <span class="notebook-usage-label">Em uso <span class="notebook-usage-days">(${formatNotebookUsageDays(status.diasUso)})</span></span>
+                <span class="notebook-usage-analyst">${escapeHtml(analista)}</span>
+            </span>
+        `;
+    }
+    return '<span class="notebook-picker-badge available">Disponível</span>';
 }
 
 function renderNotebookInspectionList() {
@@ -369,6 +420,7 @@ function renderNotebookInspectionList() {
                     <strong>${escapeHtml(modelo)}</strong>
                     <small>${escapeHtml(serial)}</small>
                 </span>
+                ${renderNotebookStatusBadge(notebook)}
             </button>
         `;
     }).join("");
@@ -758,10 +810,47 @@ async function carregarNotebooksCadastrados() {
     }
 }
 
+async function carregarNotebookUsageStatus() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "vistorias"), orderBy("dataEnvio", "desc"), limit(300)));
+        const statusPorNotebook = {};
+        const hoje = new Date();
+        const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.tipoRegistro === "resolucaoPendencia" || data.categoria !== "notebooks") return;
+
+            const identity = getNotebookIdentityFromData(data);
+            if (!identity || statusPorNotebook[identity]) return;
+
+            const emUso = !isNotebookReturnMovement(data.notebookTermType);
+            const dataRetirada = data.dataVistoria
+                ? new Date(`${data.dataVistoria}T00:00:00`)
+                : data.dataEnvio?.toDate?.();
+            const inicioRetirada = dataRetirada && !Number.isNaN(dataRetirada.getTime())
+                ? new Date(dataRetirada.getFullYear(), dataRetirada.getMonth(), dataRetirada.getDate())
+                : inicioHoje;
+            const diasUso = Math.max(0, Math.round((inicioHoje.getTime() - inicioRetirada.getTime()) / (24 * 60 * 60 * 1000)));
+            statusPorNotebook[identity] = {
+                emUso,
+                analistaNome: emUso ? String(data.analistaNome || "").trim() : "",
+                diasUso: emUso ? diasUso : 0
+            };
+        });
+
+        state.notebookUsageStatus = statusPorNotebook;
+        renderNotebookSelectOptions("inspection");
+    } catch (error) {
+        console.error("Erro ao carregar status dos notebooks:", error);
+    }
+}
+
 async function carregarCadastrosAposAutenticacao() {
     await Promise.all([
         carregarNotebooksCadastrados(),
-        carregarAnalistasCadastrados()
+        carregarAnalistasCadastrados(),
+        carregarNotebookUsageStatus()
     ]);
 }
 
@@ -2929,8 +3018,8 @@ async function finalizarVistoria(category) {
         return;
     }
 
-    if (category === "notebooks" && vistoriador && !vistoriadoresNotebook.includes(vistoriador)) {
-        alert(`O responsável pela vistoria de notebooks deve ser: ${vistoriadoresNotebook.join(" ou ")}.`);
+    if (category === "notebooks" && vistoriador && !vistoriadoresAcessoNotebook.includes(vistoriador)) {
+        alert(`O responsável pela vistoria de notebooks deve ser: ${vistoriadoresAcessoNotebook.join(" ou ")}.`);
         return;
     }
 
@@ -2946,8 +3035,8 @@ async function finalizarVistoria(category) {
 
     if (!vistoriador) {
         let msg = "Por favor, selecione quem está realizando a vistoria no topo da página.";
-        if (category === "tablets") msg = `Por favor, selecione um responsável de tablets: ${vistoriadoresTablet.join(", ")}.`;
-        if (category === "notebooks") msg = `Por favor, selecione um responsável de notebooks: ${vistoriadoresNotebook.join(", ")}.`;
+        if (category === "tablets") msg = `Por favor, selecione um responsável de tablets: Alisson, ${vistoriadoresTablet.join(", ")}.`;
+        if (category === "notebooks") msg = `Por favor, selecione um responsável de notebooks: ${vistoriadoresAcessoNotebook.join(", ")}.`;
         alert(msg);
         return;
     }
@@ -3260,6 +3349,7 @@ async function enviarVistoriaAoFirebase() {
             if (observacoesNotebook) observacoesNotebook.value = "";
             renderNotebookDamageMarkers();
             renderNotebookDamageList();
+            await carregarNotebookUsageStatus();
         }
         
         // Limpa a foto após o envio
@@ -3277,7 +3367,7 @@ async function enviarVistoriaAoFirebase() {
             if (epiPessoaKeySalva) getEpiSurveyMap(viaturaSalva)[epiPessoaKeySalva] = true;
             state.surveyStatus[state.selectedViatura][categoriaSalva] = todosEpisObrigatoriosVistoriados(viaturaSalva);
             renderEpiPessoaButtons();
-        } else {
+        } else if (categoriaSalva !== "notebooks") {
             state.surveyStatus[state.selectedViatura][categoriaSalva] = true;
         }
         
@@ -3399,7 +3489,7 @@ function sincronizarStatusViaturasRealtime() {
                     newSurveyStatus[viaturaId].epis = true;
                     newSurveyStatus[viaturaId].viaturas = true;
                     newSurveyStatus[viaturaId].tablets = true;
-                } else if (newSurveyStatus[viaturaId][categoria] !== undefined) {
+                } else if (categoria !== "notebooks" && newSurveyStatus[viaturaId][categoria] !== undefined) {
                     newSurveyStatus[viaturaId][categoria] = true;
                 }
             }
@@ -3750,7 +3840,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 renderTecnicoDatalist();
                 setupResponsavelPickers();
                 preencherResponsaveisViatura();
-                renderItems("ferramentas");
                 renderViaturaDashboard();
                 updateVehicleMapImage();
                 updateTabletInfo();
@@ -3763,6 +3852,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (sessionStorage.getItem("abrirPainelAdmin") === "1" && auth.currentUser) { // Verifica se há usuário logado antes de abrir o painel
                     sessionStorage.removeItem("abrirPainelAdmin");
                     showPage("admin");
+                } else {
+                    showHome();
                 }
             } catch (e) {
                 console.error('Erro durante inicialização de auth-ready:', e);
