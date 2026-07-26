@@ -2118,7 +2118,33 @@ export function getItemName(item) {
 export function getChecklistItemDefaults(category, itemName, viaturaId = "") {
     return checklistItemDefaultsByViatura[String(viaturaId)]?.[category]?.[itemName]
         || checklistItemDefaults[category]?.[itemName]
-        || { quantidade: 1, valor: 0, observacao: "" };
+        || { quantidade: 1, valor: 0, ca: "", dataEntrega: "", observacao: "" };
+}
+
+export function resolveChecklistItemData(category, item, viaturaId = "", index = 0) {
+    const itemName = getItemName(item);
+    const defaults = getChecklistItemDefaults(category, itemName, viaturaId);
+    const normalized = normalizeChecklistItem(item, index);
+    const isObjectItem = item && typeof item === "object";
+    const hasValor = isObjectItem && Object.prototype.hasOwnProperty.call(item, "valor");
+    const hasQuantidade = isObjectItem && Object.prototype.hasOwnProperty.call(item, "quantidade");
+    const defaultValor = Number(defaults.valor || 0);
+    const currentValor = Number(normalized.valor || 0);
+    const shouldRecoverDefaults = defaultValor > 0 && currentValor === 0;
+
+    return {
+        ...defaults,
+        ...normalized,
+        quantidade: (!hasQuantidade || shouldRecoverDefaults)
+            ? Number(defaults.quantidade || 1)
+            : Number(normalized.quantidade || 1),
+        valor: (!hasValor || shouldRecoverDefaults)
+            ? defaultValor
+            : currentValor,
+        ca: normalized.ca || defaults.ca || "",
+        dataEntrega: normalized.dataEntrega || defaults.dataEntrega || "",
+        observacao: normalized.observacao || defaults.observacao || ""
+    };
 }
 
 export function normalizeChecklistItem(item, index = 0) {
@@ -2127,6 +2153,11 @@ export function normalizeChecklistItem(item, index = 0) {
             id: `item-${Date.now()}-${index}`,
             nome: item,
             ativo: true,
+            quantidade: 1,
+            valor: 0,
+            ca: "",
+            dataEntrega: "",
+            observacao: "",
             substituicoes: []
         };
     }
@@ -2135,6 +2166,11 @@ export function normalizeChecklistItem(item, index = 0) {
         id: item.id || `item-${Date.now()}-${index}`,
         nome: item.nome || "",
         ativo: item.ativo !== false,
+        quantidade: Number(item.quantidade || 1),
+        valor: Number(item.valor || 0),
+        ca: String(item.ca || ""),
+        dataEntrega: String(item.dataEntrega || ""),
+        observacao: String(item.observacao || ""),
         substituicoes: Array.isArray(item.substituicoes) ? item.substituicoes : []
     };
 }
@@ -2154,7 +2190,7 @@ export function ensureChecklistForViatura(viaturaId) {
     if (!id) return checklistData;
 
     if (!checklistDataByViatura[id]) checklistDataByViatura[id] = {};
-    Object.keys(categoryNames).forEach(category => {
+    Object.keys(checklistData).forEach(category => {
         if (!checklistDataByViatura[id][category]) {
             checklistDataByViatura[id][category] = cloneChecklistItems(checklistData[category]);
         }

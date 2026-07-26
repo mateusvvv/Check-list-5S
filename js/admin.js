@@ -1,16 +1,20 @@
-import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
+import { categoryNames, checklistDataByViatura, cloneEmployeeEpis, damageTypeNames, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, normalizeChecklistItem, normalizeVistoriador, resolveChecklistItemData, viaturaResponsaveis, vehicleViewNames, vistoriadores, syncVistoriadoresTablet } from "./config.js";
 import { addDoc, auth, collection, criarUsuarioAuthSecundario, db, deleteDoc, firestoreDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, signInWithEmailAndPassword, signOut, updateDoc, storage, storageRef, uploadBytes, getDownloadURL } from "./firebase.js";
-import { getDamageMarkerLabel } from "./damages.js";
-import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=8";
-import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js";
-import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js";
+import { getDamageMarkerLabel } from "./damages.js?v=3";
+import { gerarPDF, gerarRelatorioComEscolha } from "./pdf.js?v=10";
+import { carregarConfiguracoes, salvarConfiguracoes } from "./settings.js?v=4";
+import { ensureViaturaState, getActiveViaturas, setSelectedViatura, state } from "./state.js?v=2";
 
 let authReadyCallback = async () => {};
 let historyUnsubscribe = null;
 const HISTORICO_PAGE_SIZE = 20;
+const HISTORICO_INITIAL_VISIBLE = 5;
+const HISTORICO_MAX_VISIBLE = 100;
+const CONFIG_HISTORY_COLLAPSED_LIMIT = 6;
 let historicoFiltradoAtual = [];
-let historicoVisibleCount = HISTORICO_PAGE_SIZE;
+let historicoVisibleCount = HISTORICO_INITIAL_VISIBLE;
 let historicoGroups = {};
+let configHistoryShowAll = false;
 
 function stringToSafeId(value = "") {
     return String(value)
@@ -102,6 +106,37 @@ function escapeJsString(value) {
         .replace(/'/g, "\\'")
         .replace(/\n/g, "\\n")
         .replace(/\r/g, "");
+}
+
+function parseNumberField(value, fallback = 0) {
+    const normalized = String(value ?? "").replace(",", ".");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : fallback;
+}
+
+function formatCurrency(value) {
+    return Number(value || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+    });
+}
+
+function getAdminItemTotal(quantidade, valor) {
+    return Number(quantidade || 0) * Number(valor || 0);
+}
+
+export function atualizarTotalNovoItemChecklist() {
+    const quantidade = parseNumberField(document.getElementById("admin-item-quantity")?.value, 1);
+    const valor = parseNumberField(document.getElementById("admin-item-value")?.value, 0);
+    const totalInput = document.getElementById("admin-item-total");
+    if (totalInput) totalInput.value = formatCurrency(getAdminItemTotal(quantidade, valor));
+}
+
+export function atualizarTotalItemChecklistAdmin(index) {
+    const quantidade = parseNumberField(document.getElementById(`admin-checklist-qtd-${index}`)?.value, 1);
+    const valor = parseNumberField(document.getElementById(`admin-checklist-valor-${index}`)?.value, 0);
+    const totalInput = document.getElementById(`admin-checklist-total-${index}`);
+    if (totalInput) totalInput.value = formatCurrency(getAdminItemTotal(quantidade, valor));
 }
 
 function formatDateBR(date = new Date()) {
@@ -351,14 +386,12 @@ function updateAdminTabsPermissions() {
         const btn = getAdminConfigTabButton(tabId);
         if (btn) {
             if (!isAlisson) {
-                btn.style.opacity = "0.4";
-                btn.style.filter = "grayscale(1)";
+                btn.classList.add("restricted");
                 btn.style.pointerEvents = "none"; // Bloqueia o clique completamente
                 btn.style.cursor = "not-allowed";
                 btn.title = "Acesso restrito ao administrador Alisson";
             } else {
-                btn.style.opacity = "1";
-                btn.style.filter = "none";
+                btn.classList.remove("restricted");
                 btn.style.pointerEvents = "auto";
                 btn.style.cursor = "pointer";
                 btn.title = "";
@@ -393,6 +426,7 @@ export function showAdminConfigTab(tab) {
     });
 
     if (tab === "tec-externos") window.renderFuncionariosPage?.();
+    if (tab === "historico") carregarHistorico();
 }
 
 function refreshAppAfterConfigChange() {
@@ -405,53 +439,206 @@ export function renderAdminViaturas() {
     if (!container) return;
 
     const tecnicoOptions = getTecnicoOptions();
+    const renderPessoaField = ({ viaturaId, tipo, nome, cpf, datalistId, index = 0, editable = true }) => {
+        const cpfCampo = tipo === "tecnico" ? "tecnicoCpf" : "auxiliarCpf";
+        const nomeHandler = tipo === "tecnico" ? "selecionarTecnicoViatura" : "selecionarAuxiliarViatura";
+        const emptyName = tipo === "tecnico" ? "Sem técnico" : "Sem auxiliar";
+        const label = tipo === "tecnico" ? "Técnico" : `Auxiliar${index > 0 ? ` ${index + 1}` : ""}`;
+        const readonlyAttrs = editable ? "" : "readonly";
+        const nameChange = editable
+            ? `onchange="${nomeHandler}('${viaturaId}', this.value)"`
+            : "";
+        const cpfChange = editable
+            ? `onchange="editarResponsavelViatura('${viaturaId}', '${cpfCampo}', this.value)"`
+            : "";
+
+        return `
+            <div class="admin-vehicle-person ${editable ? "" : "readonly"}">
+                <span class="admin-person-icon" aria-hidden="true">👤</span>
+                <div class="admin-person-fields">
+                    <label>
+                        <span>${label}</span>
+                        <textarea rows="2" placeholder="${emptyName}" data-admin-responsavel="true" data-viatura-id="${viaturaId}" data-tipo="${tipo}" ${nameChange} ${readonlyAttrs}>${escapeHtml(nome || "")}</textarea>
+                    </label>
+                    <label class="admin-person-cpf">
+                        <span>CPF</span>
+                        <input type="text" value="${escapeHtml(cpf || "")}" placeholder="CPF não informado" ${cpfChange} ${readonlyAttrs}>
+                    </label>
+                </div>
+            </div>
+        `;
+    };
 
     container.innerHTML = state.viaturas.map((viatura) => {
         const responsaveis = viaturaResponsaveis[viatura.id] || {};
+        const tecnicoTemNome = !isEmptyResponsavelName(responsaveis.tecnico, "Sem técnico");
+        const auxiliarTemNome = !isEmptyResponsavelName(responsaveis.auxiliar, "Sem auxiliar");
         const tecnicoDatalistId = `tecnicos-viatura-${viatura.id}`;
         const auxiliarDatalistId = `auxiliares-viatura-${viatura.id}`;
+        const auxiliares = auxiliarTemNome
+            ? [{ nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf || "" }]
+            : [];
+        const tecnicoCount = tecnicoTemNome ? 1 : 0;
+        const auxiliarCount = auxiliares.filter(auxiliar => auxiliar?.nome).length;
         return `
             <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
                 <div class="admin-vehicle-main">
-                    <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)">
+                    <div class="admin-vehicle-title">
+                        <span class="admin-vehicle-icon" aria-hidden="true">🚙</span>
+                        <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)" aria-label="Nome da viatura">
+                    </div>
                     <div class="admin-config-actions">
                         <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
                         <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
                     </div>
                 </div>
                 <div class="admin-responsaveis-grid">
-                    <label>
-                        <span>Pesquisar técnico</span>
-                        <input type="text" list="${tecnicoDatalistId}" value="${escapeHtml(responsaveis.tecnico || "")}" placeholder="Digite o nome do técnico" onchange="selecionarTecnicoViatura('${viatura.id}', this.value)">
+                    <section class="admin-vehicle-people-group">
+                        <h4>👥 Técnicos (${tecnicoCount})</h4>
+                        ${renderPessoaField({
+                            viaturaId: viatura.id,
+                            tipo: "tecnico",
+                            nome: tecnicoTemNome ? responsaveis.tecnico : "",
+                            cpf: tecnicoTemNome ? responsaveis.tecnicoCpf || "" : "",
+                            datalistId: tecnicoDatalistId
+                        })}
                         <datalist id="${tecnicoDatalistId}">
                             ${tecnicoOptions.map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`).join("")}
                         </datalist>
-                    </label>
-                    <label>
-                        <span>CPF técnico</span>
-                        <input type="text" value="${escapeHtml(responsaveis.tecnicoCpf || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'tecnicoCpf', this.value)">
-                    </label>
-                    <label>
-                        <span>Pesquisar auxiliar</span>
-                        <input type="text" list="${auxiliarDatalistId}" value="${escapeHtml(responsaveis.auxiliar || "")}" placeholder="Digite o nome do auxiliar" onchange="selecionarAuxiliarViatura('${viatura.id}', this.value)">
+                    </section>
+                    <section class="admin-vehicle-people-group">
+                        <h4>👤 Auxiliares (${auxiliarCount})</h4>
+                        ${
+                            auxiliares.length
+                                ? auxiliares.map((auxiliar, index) => renderPessoaField({
+                                    viaturaId: viatura.id,
+                                    tipo: "auxiliar",
+                                    nome: auxiliar.nome || "",
+                                    cpf: auxiliar.cpf || "",
+                                    datalistId: auxiliarDatalistId,
+                                    index,
+                                    editable: index === 0
+                                })).join("")
+                                : renderPessoaField({
+                                    viaturaId: viatura.id,
+                                    tipo: "auxiliar",
+                                    nome: "",
+                                    cpf: "",
+                                    datalistId: auxiliarDatalistId
+                                })
+                        }
                         <datalist id="${auxiliarDatalistId}">
                             ${tecnicoOptions.map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`).join("")}
                         </datalist>
-                    </label>
-                    <label>
-                        <span>CPF auxiliar</span>
-                        <input type="text" value="${escapeHtml(responsaveis.auxiliarCpf || "")}" onchange="editarResponsavelViatura('${viatura.id}', 'auxiliarCpf', this.value)">
-                    </label>
+                    </section>
                 </div>
+                <div class="admin-vehicle-footer">Cadastro da viatura: ${escapeHtml(viatura.nome)}</div>
             </div>
         `;
     }).join("");
+    setupAdminResponsavelPickers(container);
+}
+
+function getAdminResponsavelOptions(term = "") {
+    const normalizedTerm = normalizeSearch(term);
+    const digitsTerm = onlyDigits(term);
+    return getTecnicoOptions()
+        .filter((pessoa) => {
+            if (!normalizedTerm && !digitsTerm) return true;
+            return normalizeSearch(pessoa.nome).includes(normalizedTerm)
+                || onlyDigits(pessoa.cpf).includes(digitsTerm);
+        })
+        .sort((a, b) => {
+            if (!normalizedTerm) return a.nome.localeCompare(b.nome, "pt-BR");
+            const aStarts = normalizeSearch(a.nome).startsWith(normalizedTerm);
+            const bStarts = normalizeSearch(b.nome).startsWith(normalizedTerm);
+            if (aStarts !== bStarts) return aStarts ? -1 : 1;
+            return a.nome.localeCompare(b.nome, "pt-BR");
+        });
+}
+
+function ensureAdminResponsavelPicker(input) {
+    let picker = input.parentElement?.querySelector(".admin-responsavel-picker");
+    if (!picker) {
+        picker = document.createElement("div");
+        picker.className = "responsavel-picker-list admin-responsavel-picker";
+        picker.setAttribute("role", "listbox");
+        input.insertAdjacentElement("afterend", picker);
+    }
+    return picker;
+}
+
+function hideAdminResponsavelPicker(input) {
+    const picker = input?.parentElement?.querySelector(".admin-responsavel-picker");
+    if (picker) picker.hidden = true;
+}
+
+function showAdminResponsavelPicker(input, { showAll = false } = {}) {
+    if (!input || input.readOnly) return;
+    const picker = ensureAdminResponsavelPicker(input);
+    const options = getAdminResponsavelOptions(showAll ? "" : input.value);
+
+    picker.innerHTML = options.length
+        ? options.map((pessoa) => `
+            <button type="button" class="responsavel-picker-item" data-nome="${escapeHtml(pessoa.nome)}">
+                <strong>${escapeHtml(pessoa.nome)}</strong>
+                <span>${escapeHtml(pessoa.cpf)}</span>
+            </button>
+        `).join("")
+        : '<div class="responsavel-picker-empty">Nenhum nome encontrado.</div>';
+
+    picker.hidden = false;
+    picker.querySelectorAll(".responsavel-picker-item").forEach((button) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", async () => {
+            const nome = button.dataset.nome || "";
+            input.value = nome;
+            hideAdminResponsavelPicker(input);
+            if (input.dataset.tipo === "tecnico") {
+                await selecionarTecnicoViatura(input.dataset.viaturaId, nome);
+            } else {
+                await selecionarAuxiliarViatura(input.dataset.viaturaId, nome);
+            }
+        });
+    });
+}
+
+function setupAdminResponsavelPickers(container = document) {
+    container.querySelectorAll('textarea[data-admin-responsavel="true"]').forEach((input) => {
+        if (input.dataset.adminPickerBound === "true") return;
+        input.dataset.adminPickerBound = "true";
+        input.addEventListener("focus", () => showAdminResponsavelPicker(input, { showAll: true }));
+        input.addEventListener("click", () => showAdminResponsavelPicker(input, { showAll: true }));
+        input.addEventListener("input", () => showAdminResponsavelPicker(input));
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") hideAdminResponsavelPicker(input);
+        });
+    });
+}
+
+function isEmptyResponsavelName(value, emptyLabel) {
+    const normalized = normalizeSearch(value);
+    return !normalized
+        || normalized === normalizeSearch(emptyLabel)
+        || normalized === normalizeSearch("Veículo sem Técnico");
 }
 
 export async function selecionarTecnicoViatura(id, nome) {
     const viaturaId = String(id);
     if (!viaturaResponsaveis[viaturaId]) {
         viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+    }
+
+    if (isEmptyResponsavelName(nome, "Sem técnico")) {
+        const anterior = viaturaResponsaveis[viaturaId].tecnico || "Sem técnico";
+        viaturaResponsaveis[viaturaId].tecnico = "";
+        viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+        if (anterior !== "Sem técnico") {
+            registrarHistoricoConfig("Técnico alterado", `${getViaturaLabel(viaturaId)}: técnico alterado de "${anterior}" para "Sem técnico".`);
+        }
+        await salvarConfiguracoes();
+        refreshAppAfterConfigChange();
+        return;
     }
 
     const tecnico = findTecnicoByName(nome);
@@ -485,7 +672,7 @@ export async function selecionarAuxiliarViatura(id, nome) {
         viaturaResponsaveis[viaturaId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
     }
 
-    if (!String(nome || "").trim()) {
+    if (isEmptyResponsavelName(nome, "Sem auxiliar")) {
         const anterior = viaturaResponsaveis[viaturaId].auxiliar || "Sem auxiliar";
         viaturaResponsaveis[viaturaId].auxiliar = "";
         viaturaResponsaveis[viaturaId].auxiliarCpf = "";
@@ -531,27 +718,55 @@ export async function selecionarAuxiliarViatura(id, nome) {
     refreshAppAfterConfigChange();
 }
 
+document.addEventListener("click", (event) => {
+    if (event.target.closest(".admin-person-fields label:first-child")) return;
+    document.querySelectorAll(".admin-responsavel-picker").forEach((picker) => {
+        picker.hidden = true;
+    });
+});
+
 export function renderAdminHistory() {
     const container = document.getElementById("admin-config-history-list");
     if (!container) return;
+
+    const toggleButton = document.getElementById("btn-toggle-config-history");
+    const totalBadge = document.getElementById("history-alteracoes-count");
+    if (totalBadge) {
+        const total = state.configHistory.length;
+        totalBadge.innerText = `${total} ${total === 1 ? "registro" : "registros"}`;
+    }
+
+    if (toggleButton) {
+        toggleButton.style.display = state.configHistory.length > CONFIG_HISTORY_COLLAPSED_LIMIT ? "inline-flex" : "none";
+        toggleButton.textContent = configHistoryShowAll ? "Mostrar menos" : "Exibir todos";
+    }
 
     if (!state.configHistory.length) {
         container.innerHTML = '<p class="admin-history-empty">Nenhuma alteração registrada.</p>';
         return;
     }
 
-    container.innerHTML = state.configHistory.map(item => `
+    const visibleHistory = configHistoryShowAll
+        ? state.configHistory
+        : state.configHistory.slice(0, CONFIG_HISTORY_COLLAPSED_LIMIT);
+
+    container.innerHTML = visibleHistory.map(item => `
         <div class="admin-history-row">
-            <div class="admin-history-meta">
-                <span>${escapeHtml(item.vistoriador || "Não identificado")}</span>
-                <small>${escapeHtml(formatDateTimeBR(item.data))}</small>
-            </div>
             <div class="admin-history-change">
                 <strong>${escapeHtml(item.tipo)}</strong>
                 <p>${escapeHtml(item.descricao)}</p>
             </div>
+            <div class="admin-history-meta">
+                <span>${escapeHtml(item.vistoriador || "Não identificado")}</span>
+                <small>${escapeHtml(formatDateTimeBR(item.data))}</small>
+            </div>
         </div>
     `).join("");
+}
+
+export function toggleExibirTodosHistoricoConfig() {
+    configHistoryShowAll = !configHistoryShowAll;
+    renderAdminHistory();
 }
 
 export async function limparHistoricoConfig() {
@@ -559,22 +774,21 @@ export async function limparHistoricoConfig() {
     if (!confirm("Deseja limpar todo o histórico de alterações?")) return;
 
     state.configHistory = [];
+    configHistoryShowAll = false;
     await salvarConfiguracoes();
     await carregarConfiguracoes();
     renderAdminHistory();
 }
 
 export async function adicionarViatura() {
-    if (state.viaturas.length >= defaultViaturas.length) {
-        alert("O sistema está configurado para 9 viaturas.");
-        return;
-    }
-
     const proximoId = String(Math.max(0, ...state.viaturas.map(viatura => Number(viatura.id) || 0)) + 1);
     const nome = `Viatura ${formatTwoDigits(proximoId)}`;
     state.viaturas.push({ id: proximoId, nome, ativa: true });
     ensureViaturaState(proximoId);
     ensureChecklistForViatura(proximoId);
+    if (!viaturaResponsaveis[proximoId]) {
+        viaturaResponsaveis[proximoId] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+    }
     setSelectedViatura(proximoId);
     registrarHistoricoConfig("Viatura adicionada", `${nome} foi adicionada.`);
     await salvarConfiguracoes();
@@ -610,12 +824,23 @@ export async function editarResponsavelViatura(id, campo, valor) {
         auxiliarCpf: "CPF do auxiliar"
     };
     const anterior = viaturaResponsaveis[viaturaId][campo] || "Vazio";
-    viaturaResponsaveis[viaturaId][campo] = valor.trim();
+    const valorLimpo = valor.trim();
+    viaturaResponsaveis[viaturaId][campo] = valorLimpo;
+
+    if (campo === "tecnico" && isEmptyResponsavelName(valorLimpo, "Sem técnico")) {
+        viaturaResponsaveis[viaturaId].tecnico = "";
+        viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+    }
+
+    if (campo === "tecnicoCpf" && isEmptyResponsavelName(viaturaResponsaveis[viaturaId].tecnico, "Sem técnico")) {
+        viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+    }
 
     if (campo === "auxiliar" || campo === "auxiliarCpf") {
         const resp = viaturaResponsaveis[viaturaId];
         if (!Array.isArray(resp.auxiliares)) resp.auxiliares = [];
-        if (!resp.auxiliar) {
+        if (isEmptyResponsavelName(resp.auxiliar, "Sem auxiliar")) {
+            resp.auxiliar = "";
             resp.auxiliarCpf = "";
             resp.auxiliares = [];
         } else if (resp.auxiliares.length > 0) {
@@ -654,17 +879,26 @@ export async function alternarViaturaAtiva(id) {
 
 export async function removerViatura(id) {
     const viaturaId = String(id);
-    const viatura = state.viaturas.find(item => item.id === viaturaId);
+    const index = state.viaturas.findIndex(item => item.id === viaturaId);
+    const viatura = state.viaturas[index];
     if (!viatura) return;
 
     if (!confirm(`Deseja remover ${viatura.nome}?`)) return;
 
     registrarHistoricoConfig("Viatura removida", `${viatura.nome} foi removida.`);
 
-    // Marcamos como desativada em vez de deletar o objeto, para manter a persistência
-    viatura.ativa = false;
-    const index = state.viaturas.findIndex(v => v.id === viaturaId);
-    if (index !== -1) state.viaturas[index].ativa = false;
+    state.viaturas.splice(index, 1);
+    delete checklistDataByViatura[viaturaId];
+    delete viaturaResponsaveis[viaturaId];
+    delete state.surveyStatus[viaturaId];
+    delete state.epiSurveyStatus[viaturaId];
+    delete state.vehicleDamages[viaturaId];
+    delete state.tabletDamages[viaturaId];
+    delete state.notebookDamages[viaturaId];
+    delete state.vistoriaMode[viaturaId];
+    delete state.vistoriasLocais[viaturaId];
+    delete state.fotosEvidencia[viaturaId];
+
     if (state.viaturas.length === 0) {
         await adicionarViatura();
         return;
@@ -699,7 +933,7 @@ export function renderAdminChecklist() {
     const pessoaKey = category === "epis" ? (pessoaSelect?.value || "") : "";
     const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
     items.splice(0, items.length, ...items.map((item, index) => (
-        category === "epis" ? normalizeEmployeeEpiItem(item, index) : normalizeChecklistItem(item, index)
+        category === "epis" ? normalizeEmployeeEpiItem(item, index) : resolveChecklistItemData(category, item, viaturaId, index)
     )));
 
     container.innerHTML = items.map((item, index) => {
@@ -707,13 +941,35 @@ export function renderAdminChecklist() {
         const nota = ultimaSubstituicao
             ? `<span class="substitution-note">Substituiu "${escapeHtml(ultimaSubstituicao.itemAnterior)}" em ${escapeHtml(ultimaSubstituicao.data)}</span>`
             : "";
+        const quantidade = Number(item.quantidade || 1);
+        const valor = Number(item.valor || 0);
+        const total = getAdminItemTotal(quantidade, valor);
 
         return `
-            <div class="admin-config-row ${item.ativo === false ? "inactive" : ""}">
-                <input type="text" value="${escapeHtml(getItemName(item))}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, this.value, '${escapeJsString(pessoaKey)}')">
+            <div class="admin-config-row admin-checklist-row ${item.ativo === false ? "inactive" : ""}">
+                <div class="admin-checklist-fields">
+                    <label class="admin-checklist-name-field">
+                        <span>Item</span>
+                        <input type="text" value="${escapeHtml(getItemName(item))}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, 'nome', this.value, '${escapeJsString(pessoaKey)}')">
+                    </label>
+                    <label>
+                        <span>Qtd</span>
+                        <input type="number" id="admin-checklist-qtd-${index}" min="0" step="1" value="${quantidade}" oninput="atualizarTotalItemChecklistAdmin(${index})" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, 'quantidade', this.value, '${escapeJsString(pessoaKey)}')">
+                    </label>
+                    <label>
+                        <span>Valor</span>
+                        <input type="number" id="admin-checklist-valor-${index}" min="0" step="0.01" value="${valor.toFixed(2)}" oninput="atualizarTotalItemChecklistAdmin(${index})" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, 'valor', this.value, '${escapeJsString(pessoaKey)}')">
+                    </label>
+                    <label>
+                        <span>Total</span>
+                        <input type="text" id="admin-checklist-total-${index}" value="${escapeHtml(formatCurrency(total))}" readonly>
+                    </label>
+                    <label>
+                        <span>C.A.</span>
+                        <input type="text" value="${escapeHtml(item.ca || "")}" onchange="editarItemChecklist('${viaturaId}', '${category}', ${index}, 'ca', this.value, '${escapeJsString(pessoaKey)}')" placeholder="Certificado de aprovação">
+                    </label>
+                </div>
                 <div class="admin-config-actions">
-                    <button type="button" onclick="substituirItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">Substituir</button>
-                    <button type="button" class="btn-muted" onclick="alternarItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">${item.ativo === false ? "Ativar" : "Desativar"}</button>
                     <button type="button" class="btn-danger" onclick="removerItemChecklist('${viaturaId}', '${category}', ${index}, '${escapeJsString(pessoaKey)}')">Remover</button>
                 </div>
                 ${nota}
@@ -793,49 +1049,62 @@ export function renderAdminFuncionariosExtras() {
         const index = funcionario.originalIndex;
         const epis = Array.isArray(funcionario.epis) ? funcionario.epis : [];
         return `
-            <div class="admin-config-row admin-extra-employee-row">
-                <div class="admin-responsaveis-grid">
-                    <label>
-                        <span>Nome</span>
-                        <input type="text" value="${escapeHtml(funcionario.nome || "")}" onchange="editarFuncionarioExtra(${index}, 'nome', this.value)">
-                    </label>
-                    <label>
-                        <span>CPF</span>
-                        <input type="text" value="${escapeHtml(funcionario.cpf || "")}" onchange="editarFuncionarioExtra(${index}, 'cpf', this.value)">
-                    </label>
-                    <label>
-                        <span>Função</span>
-                        <select onchange="editarFuncionarioExtra(${index}, 'funcao', this.value)">
-                            <option value="Técnico" ${funcionario.funcao === "Técnico" ? "selected" : ""}>Técnico</option>
-                            <option value="Auxiliar técnico" ${funcionario.funcao === "Auxiliar técnico" ? "selected" : ""}>Auxiliar técnico</option>
-                        </select>
-                    </label>
-                    <label>
-                        <span>Status</span>
-                        <select onchange="editarFuncionarioExtra(${index}, 'status', this.value)">
-                            ${["Ativo", "Férias", "Folga", "Atestado", "Falta"].map(status => `
-                                <option value="${status}" ${funcionario.status === status ? "selected" : ""}>${status}</option>
-                            `).join("")}
-                        </select>
-                    </label>
-                </div>
-                <div class="admin-config-actions">
-                    <button type="button" class="btn-submit" onclick="finalizarCadastroFuncionarioExtra(${index})">Finalizar e Salvar no Sistema</button>
-                    <button type="button" class="btn-danger" onclick="removerFuncionarioExtra(${index})">Remover</button>
-                </div>
-                <div class="admin-extra-epi-wrap">
-                    <strong>EPIs</strong>
-                    <div class="admin-extra-epi-form">
+            <div class="admin-employee-draft">
+                <section class="admin-employee-card-panel">
+                    <div class="admin-panel-heading">
+                        <span class="admin-section-icon small" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+                        </span>
+                        <h4>Dados do Funcionário</h4>
+                    </div>
+                    <div class="admin-employee-data-grid">
+                        <label>
+                            <span>Nome</span>
+                            <input type="text" value="${escapeHtml(funcionario.nome || "")}" onchange="editarFuncionarioExtra(${index}, 'nome', this.value)">
+                        </label>
+                        <label>
+                            <span>CPF</span>
+                            <input type="text" value="${escapeHtml(funcionario.cpf || "")}" onchange="editarFuncionarioExtra(${index}, 'cpf', this.value)">
+                        </label>
+                        <label>
+                            <span>Função</span>
+                            <select onchange="editarFuncionarioExtra(${index}, 'funcao', this.value)">
+                                <option value="Técnico" ${funcionario.funcao === "Técnico" ? "selected" : ""}>Técnico</option>
+                                <option value="Auxiliar técnico" ${funcionario.funcao === "Auxiliar técnico" ? "selected" : ""}>Auxiliar técnico</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Status</span>
+                            <select onchange="editarFuncionarioExtra(${index}, 'status', this.value)">
+                                ${["Ativo", "Férias", "Folga", "Atestado", "Falta"].map(status => `
+                                    <option value="${status}" ${funcionario.status === status ? "selected" : ""}>${status}</option>
+                                `).join("")}
+                            </select>
+                        </label>
+                    </div>
+                    <div class="admin-employee-card-actions">
+                        <button type="button" class="btn-submit" onclick="finalizarCadastroFuncionarioExtra(${index})">Salvar</button>
+                        <button type="button" class="btn-danger" onclick="removerFuncionarioExtra(${index})">Remover</button>
+                    </div>
+                </section>
+                <section class="admin-employee-card-panel">
+                    <div class="admin-panel-heading">
+                        <span class="admin-section-icon small" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6z"></path></svg>
+                        </span>
+                        <h4>EPIs do Funcionário</h4>
+                    </div>
+                    <div class="admin-extra-epi-form admin-employee-epi-form">
                         <input type="number" id="extra-epi-qtd-${index}" min="1" step="1" value="1" aria-label="Quantidade">
                         <input type="text" id="extra-epi-nome-${index}" value="" placeholder="Nome do EPI" autocomplete="new-password">
                         <input type="text" id="extra-epi-ca-${index}" value="" placeholder="C.A." autocomplete="new-password">
-                        <input type="text" id="extra-epi-entrega-${index}" value="" placeholder="Data" autocomplete="new-password">
-                        <input type="text" id="extra-epi-obs-${index}" value="" placeholder="OBS" autocomplete="new-password">
+                        <input type="text" id="extra-epi-entrega-${index}" value="" placeholder="dd/mm/aaaa" autocomplete="new-password">
+                        <input type="text" id="extra-epi-obs-${index}" value="" placeholder="Observações (opcional)" autocomplete="new-password">
                         <button type="button" onclick="adicionarEpiFuncionarioExtra(${index})">Salvar EPI</button>
                     </div>
-                    <div class="admin-extra-epi-list">
+                    <div class="admin-extra-epi-list admin-employee-epi-list">
                         ${epis.length ? epis.map((epi, epiIndex) => `
-                            <div class="admin-extra-epi-row">
+                            <div class="admin-extra-epi-row admin-employee-epi-row">
                                 <input type="number" min="1" step="1" value="${Number(epi.quantidade || 1)}" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'quantidade', this.value)" aria-label="Quantidade do EPI">
                                 <input type="text" value="${escapeHtml(epi.nome || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'nome', this.value)" aria-label="Nome do EPI">
                                 <input type="text" value="${escapeHtml(epi.ca || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'ca', this.value)" aria-label="CA do EPI">
@@ -843,9 +1112,15 @@ export function renderAdminFuncionariosExtras() {
                                 <input type="text" value="${escapeHtml(epi.observacao || "")}" autocomplete="new-password" onchange="editarEpiFuncionarioExtra(${index}, ${epiIndex}, 'observacao', this.value)" aria-label="Observação do EPI">
                                 <button type="button" class="btn-danger" onclick="removerEpiFuncionarioExtra(${index}, ${epiIndex})">Remover EPI</button>
                             </div>
-                        `).join("") : '<p class="admin-history-empty">Nenhum EPI cadastrado para este funcionário.</p>'}
+                        `).join("") : `
+                            <div class="admin-employee-empty-epis">
+                                <span aria-hidden="true">▱</span>
+                                <strong>Nenhum EPI cadastrado para este funcionário.</strong>
+                                <p>Adicione os EPIs utilizados por este funcionário.</p>
+                            </div>
+                        `}
                     </div>
-                </div>
+                </section>
             </div>
         `;
     }).join("");
@@ -1158,6 +1433,9 @@ export async function adicionarItemChecklist() {
     const pessoaKey = category === "epis" ? (document.getElementById("admin-item-pessoa")?.value || "") : "";
     const input = document.getElementById("admin-item-name");
     const nome = input?.value.trim();
+    const quantidade = parseNumberField(document.getElementById("admin-item-quantity")?.value, 1);
+    const valor = parseNumberField(document.getElementById("admin-item-value")?.value, 0);
+    const ca = document.getElementById("admin-item-ca")?.value.trim() || "";
     if (!nome) {
         alert("Informe o nome do item.");
         return;
@@ -1168,23 +1446,51 @@ export async function adicionarItemChecklist() {
         id: `item-${Date.now()}`,
         nome,
         ativo: true,
-        quantidade: 1,
-        valor: 0,
+        quantidade,
+        valor,
+        ca,
         substituicoes: []
     }));
     if (input) input.value = "";
+    const quantityInput = document.getElementById("admin-item-quantity");
+    const valueInput = document.getElementById("admin-item-value");
+    const caInput = document.getElementById("admin-item-ca");
+    if (quantityInput) quantityInput.value = "1";
+    if (valueInput) valueInput.value = "0";
+    if (caInput) caInput.value = "";
+    atualizarTotalNovoItemChecklist();
     registrarHistoricoConfig("Item adicionado", `${nome} foi adicionado em ${getChecklistHistoryContext(viaturaId, category, pessoaKey)}.`);
     await salvarConfiguracoes();
+    setSelectedViatura(viaturaId);
+    window.sincronizarItemAdicionadoChecklist?.({ category, viaturaId, pessoaKey });
     refreshAppAfterConfigChange();
 }
 
-export async function editarItemChecklist(viaturaId, category, index, nome, pessoaKey = "") {
+export async function editarItemChecklist(viaturaId, category, index, campo, valor, pessoaKey = "") {
     const items = getChecklistItemsForPessoa(category, viaturaId, pessoaKey);
     items[index] = category === "epis" ? normalizeEmployeeEpiItem(items[index], index) : normalizeChecklistItem(items[index], index);
-    const nomeAnterior = items[index].nome;
-    items[index].nome = nome.trim() || items[index].nome;
-    if (nomeAnterior !== items[index].nome) {
-        registrarHistoricoConfig("Item alterado", `${getChecklistHistoryContext(viaturaId, category, pessoaKey)}: "${nomeAnterior}" foi alterado para "${items[index].nome}".`);
+    const allowedFields = ["nome", "quantidade", "valor", "ca"];
+    if (!allowedFields.includes(campo)) return;
+
+    const labels = {
+        nome: "Nome",
+        quantidade: "Quantidade",
+        valor: "Valor",
+        ca: "C.A."
+    };
+    const anterior = items[index][campo];
+    if (campo === "nome") {
+        items[index].nome = String(valor || "").trim() || items[index].nome;
+    } else if (campo === "quantidade") {
+        items[index].quantidade = parseNumberField(valor, 1);
+    } else if (campo === "valor") {
+        items[index].valor = parseNumberField(valor, 0);
+    } else {
+        items[index].ca = String(valor || "").trim();
+    }
+
+    if (String(anterior ?? "") !== String(items[index][campo] ?? "")) {
+        registrarHistoricoConfig("Item alterado", `${getChecklistHistoryContext(viaturaId, category, pessoaKey)}: ${labels[campo]} de "${items[index].nome}" alterado de "${anterior || "Vazio"}" para "${items[index][campo] || "Vazio"}".`);
     }
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
@@ -1299,16 +1605,33 @@ export async function carregarHistorico() {
 }
 
 export function aplicarFiltros() {
-    const vistoriador = document.getElementById("filter-vistoriador").value;
+    const busca = (document.getElementById("filter-history-search")?.value || "").trim().toLowerCase();
+    const tipoVistoria = document.getElementById("filter-tipo-vistoria")?.value || "";
+    const categoria = document.getElementById("filter-categoria")?.value || "";
+    const vistoriador = document.getElementById("filter-vistoriador")?.value || "";
     const viaturaId = document.getElementById("filter-viatura")?.value || "";
-    const dataInicio = document.getElementById("filter-data-inicio").value;
-    const dataFim = document.getElementById("filter-data-fim").value;
+    const dataInicio = document.getElementById("filter-data-inicio")?.value || "";
+    const dataFim = document.getElementById("filter-data-fim")?.value || "";
     const status = document.getElementById("filter-status")?.value || "";
 
     if (vistoriador) window.sincronizarVistoriadorLogado?.(vistoriador);
 
     let filtrados = state.vistoriasCache;
 
+    if (busca) {
+        filtrados = filtrados.filter(v => {
+            const texto = [
+                v.vistoriador,
+                v.tipoVistoria || "parcial",
+                getViaturaLabel(v.viaturaId),
+                getCategoriaHistoricoLabel(v),
+                getStatusVistoria(v)
+            ].join(" ").toLowerCase();
+            return texto.includes(busca);
+        });
+    }
+    if (tipoVistoria) filtrados = filtrados.filter(v => String(v.tipoVistoria || "parcial").toLowerCase() === tipoVistoria);
+    if (categoria) filtrados = filtrados.filter(v => String(v.categoria || "").toLowerCase() === categoria);
     if (vistoriador) filtrados = filtrados.filter(v => v.vistoriador === vistoriador);
     if (viaturaId) filtrados = filtrados.filter(v => String(v.viaturaId) === String(viaturaId));
     if (dataInicio) {
@@ -1325,8 +1648,28 @@ export function aplicarFiltros() {
 
     atualizarCardsEstatisticas(filtrados);
     historicoFiltradoAtual = filtrados;
-    historicoVisibleCount = HISTORICO_PAGE_SIZE;
+    historicoVisibleCount = HISTORICO_INITIAL_VISIBLE;
     renderHistoricoTable(filtrados);
+}
+
+export function limparFiltrosHistoricoVistorias() {
+    [
+        "filter-history-search",
+        "filter-tipo-vistoria",
+        "filter-categoria",
+        "filter-vistoriador",
+        "filter-viatura",
+        "filter-data-inicio",
+        "filter-data-fim",
+        "filter-status"
+    ].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) field.value = "";
+    });
+    state.selectedVistorias.clear();
+    const selectAll = document.getElementById("select-all-vistorias");
+    if (selectAll) selectAll.checked = false;
+    aplicarFiltros();
 }
 
 /**
@@ -1406,9 +1749,11 @@ function atualizarCardsEstatisticas(dados) {
         vistoria.grouped ? vistoria.statusGroup === "pendente" : vistoriaTemPendencia(vistoria)
     )).length;
 
-    document.getElementById("stat-total").innerText = total;
-    document.getElementById("stat-pending").innerText = pendentes;
-    document.getElementById("stat-ok").innerText = total - pendentes;
+    const totalBadge = document.getElementById("history-vistorias-count");
+    if (totalBadge) totalBadge.innerText = `${total} ${total === 1 ? "registro" : "registros"}`;
+    if (document.getElementById("stat-total")) document.getElementById("stat-total").innerText = total;
+    if (document.getElementById("stat-pending")) document.getElementById("stat-pending").innerText = pendentes;
+    if (document.getElementById("stat-ok")) document.getElementById("stat-ok").innerText = total - pendentes;
     const users = document.getElementById("stat-users");
     if (users) users.innerText = vistoriadores.length;
 }
@@ -1424,21 +1769,18 @@ function renderHistoricoTable(dados) {
     }
 
     const dadosAgrupados = agruparVistoriasHistorico(dados);
-    const dadosVisiveis = dadosAgrupados.slice(0, historicoVisibleCount);
+    const limiteDisponivel = Math.min(dadosAgrupados.length, HISTORICO_MAX_VISIBLE);
+    const quantidadeVisivel = Math.min(historicoVisibleCount, limiteDisponivel);
+    const dadosVisiveis = dadosAgrupados.slice(0, quantidadeVisivel);
 
     dadosVisiveis.forEach((data) => {
         const dateObj = getDataReferenciaFiltro(data);
-        const status = data.grouped ? data.statusGroup : getStatusVistoria(data);
-        const statusHTML = status === "pendente"
-            ? '<span class="status-pendente">Pendência</span>'
-            : status === "resolvida"
-                ? '<span class="status-resolvida">Resolvida</span>'
-            : '<span class="status-ok">Tudo OK</span>';
         const viaturaLabel = data.categoria === "notebooks"
             ? "Vistoria"
             : getViaturaLabel(data.viaturaId);
 
         const tipoVistoriaLabel = (data.tipoVistoria || "").toString().toUpperCase() || "PARCIAL";
+        const tipoClass = tipoVistoriaLabel === "COMPLETA" ? "complete" : "partial";
         const todasCategoriasLabel = getCategoriaHistoricoLabel(data);
         const checkboxChecked = (data.ids || [data.id]).every(id => state.selectedVistorias.has(id));
 
@@ -1447,11 +1789,13 @@ function renderHistoricoTable(dados) {
                 <td onclick="event.stopPropagation();">
                     <input type="checkbox" class="history-select" value="${data.id}" ${checkboxChecked ? "checked" : ""} onchange="toggleSelecionarVistoria('${data.id}', this.checked)">
                 </td>
-                <td>${dateObj.toLocaleString("pt-BR")}</td>
-                <td>${tipoVistoriaLabel}</td>
+                <td><span class="history-type-badge ${tipoClass}">${tipoVistoriaLabel}</span></td>
                 <td>${escapeHtml(viaturaLabel)}</td>
                 <td>${escapeHtml(todasCategoriasLabel)}</td>
-                <td>${statusHTML}</td>
+                <td>${dateObj.toLocaleString("pt-BR")}</td>
+                <td onclick="event.stopPropagation();">
+                    <button type="button" class="history-row-action" onclick="verDetalhes('${data.id}')" aria-label="Ver detalhes">Detalhes</button>
+                </td>
             </tr>
         `;
     });
@@ -1460,6 +1804,9 @@ function renderHistoricoTable(dados) {
 }
 
 function renderHistoricoPager(visibleCount, totalCount) {
+    const displayTotal = Math.min(totalCount, HISTORICO_MAX_VISIBLE);
+    const hasMore = visibleCount < displayTotal;
+    const canShowLess = visibleCount > HISTORICO_INITIAL_VISIBLE;
     const tableScroll = document.querySelector("#history-tbody")?.closest(".table-scroll");
     if (!tableScroll) return;
 
@@ -1471,25 +1818,26 @@ function renderHistoricoPager(visibleCount, totalCount) {
         tableScroll.insertAdjacentElement("afterend", pager);
     }
 
-    if (totalCount <= HISTORICO_PAGE_SIZE || visibleCount >= totalCount) {
-        pager.innerHTML = totalCount > HISTORICO_PAGE_SIZE
-            ? `<span>Mostrando ${visibleCount} de ${totalCount} registros.</span>`
-            : "";
-        pager.style.display = pager.innerHTML ? "flex" : "none";
-        return;
-    }
+    pager.innerHTML = totalCount > HISTORICO_INITIAL_VISIBLE
+        ? `
+            <span>Mostrando ${visibleCount} de ${displayTotal} registros${totalCount > HISTORICO_MAX_VISIBLE ? " mais recentes" : ""}.</span>
+            <button type="button" onclick="exibirMenosHistoricoVistorias()" ${canShowLess ? "" : "disabled"}>Exibir menos</button>
+            ${hasMore ? '<button type="button" onclick="toggleExibirTodosHistoricoVistorias()">Exibir mais</button>' : ""}
+        `
+        : "";
+    pager.style.display = pager.innerHTML ? "flex" : "none";
+}
 
-    const remainingCount = totalCount - visibleCount;
-    const nextCount = Math.min(HISTORICO_PAGE_SIZE, remainingCount);
-    pager.style.display = "flex";
-    pager.innerHTML = `
-        <span>Mostrando ${visibleCount} de ${totalCount} registros.</span>
-        <button type="button">Ver mais ${nextCount}</button>
-    `;
-    pager.querySelector("button")?.addEventListener("click", () => {
-        historicoVisibleCount += HISTORICO_PAGE_SIZE;
-        renderHistoricoTable(historicoFiltradoAtual);
-    });
+export function toggleExibirTodosHistoricoVistorias() {
+    const totalAgrupado = agruparVistoriasHistorico(historicoFiltradoAtual).length;
+    const limiteDisponivel = Math.min(totalAgrupado, HISTORICO_MAX_VISIBLE);
+    historicoVisibleCount = Math.min(historicoVisibleCount + HISTORICO_PAGE_SIZE, limiteDisponivel);
+    renderHistoricoTable(historicoFiltradoAtual);
+}
+
+export function exibirMenosHistoricoVistorias() {
+    historicoVisibleCount = Math.max(historicoVisibleCount - HISTORICO_PAGE_SIZE, HISTORICO_INITIAL_VISIBLE);
+    renderHistoricoTable(historicoFiltradoAtual);
 }
 
 export function toggleSelecionarVistoria(id, checked) {
@@ -1894,6 +2242,8 @@ export function initAdminAuthListener() {
         const panelSec = document.getElementById("admin-panel-section");
 
         if (!user) {
+            document.body.classList.add("is-logged-out");
+            document.getElementById("menu-list")?.classList.remove("show");
             if (loginScreen) loginScreen.style.display = "grid";
             if (header) header.style.display = "none";
             if (main) main.style.display = "none";
@@ -1904,6 +2254,7 @@ export function initAdminAuthListener() {
             return;
         }
 
+        document.body.classList.remove("is-logged-out");
         if (loginScreen) loginScreen.style.display = "none";
         if (loginSec) loginSec.style.display = "none";
         if (panelSec) panelSec.style.display = "block";
@@ -1912,7 +2263,6 @@ export function initAdminAuthListener() {
             await carregarConfiguracoes();
             await authReadyCallback();
             renderAdminConfig();
-            carregarHistorico();
             if (auth.currentUser !== user) return;
         } catch (error) {
             console.error("Erro ao preparar interface após login:", error);

@@ -256,6 +256,87 @@ body > main {
     font-size: 0.84rem;
 }
 
+.tech-field,
+.search-field-wrapper {
+    position: relative;
+}
+
+.responsavel-picker-list {
+    position: absolute;
+    z-index: 1200;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+}
+
+.responsavel-picker-list[hidden] {
+    display: none;
+}
+
+.responsavel-picker-item {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #edf2f7;
+    padding: 10px 12px;
+    background: #ffffff;
+    color: #0f172a;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.responsavel-picker-item:hover,
+.responsavel-picker-item:focus {
+    background: #eff6ff;
+    outline: none;
+}
+
+.responsavel-picker-list .responsavel-picker-item {
+    min-height: 46px;
+    background: #ffffff !important;
+    color: #0f172a !important;
+}
+
+.responsavel-picker-list .responsavel-picker-item:hover,
+.responsavel-picker-list .responsavel-picker-item:focus {
+    background: #f1f7ff !important;
+}
+
+.responsavel-picker-item strong {
+    color: var(--primary-blue);
+    font-size: 0.78rem;
+    line-height: 1.25;
+}
+
+.responsavel-picker-list .responsavel-picker-item strong {
+    color: #0f52a0 !important;
+}
+
+.responsavel-picker-item span,
+.responsavel-picker-empty {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.responsavel-picker-list .responsavel-picker-item span {
+    color: #475569 !important;
+}
+
+.responsavel-picker-empty {
+    padding: 12px;
+    text-align: center;
+}
+
 @media (min-width: 901px) {
     .checking-meta {
         grid-template-columns: minmax(180px, 0.95fr) minmax(0, 1.65fr) minmax(165px, 0.8fr);
@@ -330,8 +411,8 @@ body > main {
 }
 
 .viatura-card.active {
-    border-color: var(--primary-blue);
-    background-color: var(--secondary-blue);
+    border-color: #94a3b8;
+    background-color: #f8fafc;
     transform: scale(1.05);
 }
 

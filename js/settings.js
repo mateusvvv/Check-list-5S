@@ -1,6 +1,6 @@
-import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturaResponsaveis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
+import { checklistData, checklistDataByViatura, categoryNames, cloneChecklistItems, cloneEmployeeEpis, defaultViaturaResponsaveis, defaultVistoriadores, defaultViaturas, employeeEpisByPerson, ensureChecklistForViatura, funcionariosExtras, getDefaultChecklistDataByViatura, getFuncionarioKeyFromFields, normalizeChecklistItem, normalizeEmployeeEpiItem, normalizeVistoriador, resolveChecklistItemData, setVistoriadores, viaturaResponsaveis, vistoriadores } from "./config.js";
 import { db, firestoreDoc, getDoc, onSnapshot, serverTimestamp, setDoc } from "./firebase.js";
-import { setViaturas, state } from "./state.js";
+import { setViaturas, state } from "./state.js?v=2";
 
 const SETTINGS_COLLECTION = "configuracoes";
 const SETTINGS_DOC = "app";
@@ -10,11 +10,18 @@ function getChecklistCategories() {
     return Object.keys(checklistData);
 }
 
-export function normalizeAllChecklistData(data = checklistData) {
+function getKnownViaturaIds() {
+    return new Set([
+        ...defaultViaturas.map(viatura => String(viatura.id)),
+        ...state.viaturas.map(viatura => String(viatura.id))
+    ]);
+}
+
+export function normalizeAllChecklistData(data = checklistData, viaturaId = "") {
     const normalized = {};
     getChecklistCategories().forEach(category => {
         normalized[category] = (data[category] || checklistData[category] || [])
-            .map((item, index) => normalizeChecklistItem(item, index))
+            .map((item, index) => resolveChecklistItemData(category, item, viaturaId, index))
             .filter(item => item.nome);
     });
     return normalized;
@@ -36,11 +43,11 @@ function applyChecklistData(data) {
 }
 
 function applyChecklistDataByViatura(data = {}) {
-    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+    const knownIds = getKnownViaturaIds();
     Object.keys(checklistDataByViatura).forEach(viaturaId => delete checklistDataByViatura[viaturaId]);
     Object.entries(data).forEach(([viaturaId, porCategoria]) => {
-        if (!defaultIds.has(String(viaturaId))) return;
-        const normalized = normalizeAllChecklistData(porCategoria);
+        if (!knownIds.has(String(viaturaId))) return;
+        const normalized = normalizeAllChecklistData(porCategoria, viaturaId);
 
         // Migração por viatura específica: se houver lista customizada antiga, remove para usar a nova global
         const itensViatura = normalized.viaturas?.map(i => i.nome) || [];
@@ -71,22 +78,34 @@ function mergeResponsaveisWithDefaults(defaults = {}, saved = {}) {
         const normalized = String(value || "").trim().toLowerCase();
         return !normalized || normalized === "veículo sem técnico" || normalized === "veiculo sem tecnico";
     };
-    const tecnico = isEmptyResponsavel(saved?.tecnico) && !isEmptyResponsavel(defaults?.tecnico)
-        ? defaults.tecnico
-        : saved?.tecnico;
+    const hasSavedTecnico = Object.prototype.hasOwnProperty.call(saved || {}, "tecnico");
+    const hasSavedAuxiliar = Object.prototype.hasOwnProperty.call(saved || {}, "auxiliar");
+    const tecnico = hasSavedTecnico
+        ? saved?.tecnico
+        : (isEmptyResponsavel(defaults?.tecnico) ? "" : defaults?.tecnico);
+    const auxiliar = hasSavedAuxiliar
+        ? saved?.auxiliar
+        : (savedAuxiliares[0]?.nome || defaults?.auxiliar || defaultAuxiliares[0]?.nome || "");
+    const auxiliarCpf = hasSavedAuxiliar
+        ? saved?.auxiliarCpf
+        : (savedAuxiliares[0]?.cpf || defaults?.auxiliarCpf || defaultAuxiliares[0]?.cpf || "");
+    const auxiliares = hasSavedAuxiliar && !auxiliar
+        ? []
+        : (savedAuxiliares.length ? savedAuxiliares : defaultAuxiliares);
 
     return {
-        tecnico: String(tecnico || defaults?.tecnico || ""),
-        tecnicoCpf: String(saved?.tecnicoCpf || defaults?.tecnicoCpf || ""),
-        auxiliar: String(saved?.auxiliar || savedAuxiliares[0]?.nome || defaults?.auxiliar || defaultAuxiliares[0]?.nome || ""),
-        auxiliarCpf: String(saved?.auxiliarCpf || savedAuxiliares[0]?.cpf || defaults?.auxiliarCpf || defaultAuxiliares[0]?.cpf || ""),
-        auxiliares: (savedAuxiliares.length ? savedAuxiliares : defaultAuxiliares).map(auxiliar => ({ ...auxiliar }))
+        tecnico: String(tecnico || ""),
+        tecnicoCpf: String((hasSavedTecnico && !tecnico) ? "" : (saved?.tecnicoCpf || defaults?.tecnicoCpf || "")),
+        auxiliar: String(auxiliar || ""),
+        auxiliarCpf: String(auxiliarCpf || ""),
+        auxiliares: auxiliares.map(auxiliar => ({ ...auxiliar }))
     };
 }
 
 function applyViaturaResponsaveis(data = {}) {
-    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
-    const source = Object.fromEntries(defaultViaturas.map(viatura => {
+    const knownIds = getKnownViaturaIds();
+    const baseViaturas = state.viaturas.length ? state.viaturas : defaultViaturas;
+    const source = Object.fromEntries(baseViaturas.map(viatura => {
         const viaturaId = String(viatura.id);
         const hasSavedResponsaveis = Object.prototype.hasOwnProperty.call(data, viaturaId);
         return [
@@ -98,22 +117,25 @@ function applyViaturaResponsaveis(data = {}) {
     }));
 
     Object.keys(viaturaResponsaveis).forEach(viaturaId => {
-        if (!defaultIds.has(String(viaturaId))) delete viaturaResponsaveis[viaturaId];
+        if (!knownIds.has(String(viaturaId))) delete viaturaResponsaveis[viaturaId];
     });
     Object.entries(source).forEach(([viaturaId, responsaveis]) => {
-        if (!defaultIds.has(String(viaturaId))) return;
+        if (!knownIds.has(String(viaturaId))) return;
         if (!viaturaResponsaveis[String(viaturaId)]) {
             viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
         }
-        const auxiliaresArr = Array.isArray(responsaveis?.auxiliares) && responsaveis.auxiliares.length > 0
-            ? responsaveis.auxiliares.map(a => ({...a})) 
-            : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : []);
+        const hasExplicitAuxiliar = Object.prototype.hasOwnProperty.call(responsaveis || {}, "auxiliar");
+        const auxiliaresArr = hasExplicitAuxiliar && !responsaveis?.auxiliar
+            ? []
+            : (Array.isArray(responsaveis?.auxiliares) && responsaveis.auxiliares.length > 0
+                ? responsaveis.auxiliares.map(a => ({...a}))
+                : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : []));
 
         viaturaResponsaveis[String(viaturaId)] = {
             tecnico: String(responsaveis?.tecnico || ""),
             tecnicoCpf: String(responsaveis?.tecnicoCpf || ""),
-            auxiliar: String(responsaveis?.auxiliar || auxiliaresArr[0]?.nome || ""),
-            auxiliarCpf: String(responsaveis?.auxiliarCpf || auxiliaresArr[0]?.cpf || ""),
+            auxiliar: String(hasExplicitAuxiliar ? (responsaveis?.auxiliar || "") : (auxiliaresArr[0]?.nome || "")),
+            auxiliarCpf: String(hasExplicitAuxiliar ? (responsaveis?.auxiliarCpf || "") : (auxiliaresArr[0]?.cpf || "")),
             auxiliares: auxiliaresArr
         };
     });
@@ -241,10 +263,10 @@ function clearFuncionarioResponsavel(key) {
 }
 
 function syncFuncionariosExtrasViaturas() {
-    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+    const knownIds = getKnownViaturaIds();
 
     funcionariosExtras
-        .filter(funcionario => funcionario.finalizado && funcionario.viaturaId && defaultIds.has(String(funcionario.viaturaId)))
+        .filter(funcionario => funcionario.finalizado && funcionario.viaturaId && knownIds.has(String(funcionario.viaturaId)))
         .forEach(funcionario => {
             const viaturaId = String(funcionario.viaturaId);
             const key = getFuncionarioKeyFromFields(funcionario.nome, funcionario.cpf);
@@ -257,6 +279,8 @@ function syncFuncionariosExtrasViaturas() {
             const destino = viaturaResponsaveis[viaturaId];
             const destinoNome = destino[fields.campoNome];
             const destinoKey = getFuncionarioKeyFromFields(destinoNome, destino[fields.campoCpf]);
+            const destinoFoiEsvaziado = Object.prototype.hasOwnProperty.call(destino, fields.campoNome) && !String(destinoNome || "").trim();
+            if (destinoFoiEsvaziado) return;
             const destinoLivre = !destinoNome || destinoNome === "Veículo sem Técnico" || destinoKey === key;
             if (!destinoLivre) return;
 
@@ -282,7 +306,23 @@ function applyDefaultVehicleInventories() {
     Object.entries(getDefaultChecklistDataByViatura()).forEach(([viaturaId, porCategoria]) => {
         if (!checklistDataByViatura[viaturaId]) checklistDataByViatura[viaturaId] = {};
         Object.entries(porCategoria).forEach(([category, items]) => {
-            checklistDataByViatura[viaturaId][category] = items.map((item, index) => normalizeChecklistItem(item, index));
+            const atuais = Array.isArray(checklistDataByViatura[viaturaId][category])
+                ? checklistDataByViatura[viaturaId][category]
+                : [];
+            const porNomeAtual = new Map(
+                atuais
+                    .map((item, index) => resolveChecklistItemData(category, item, viaturaId, index))
+                    .filter(item => item.nome)
+                    .map(item => [item.nome, item])
+            );
+            const defaults = items
+                .map((item, index) => resolveChecklistItemData(category, item, viaturaId, index))
+                .filter(item => item.nome)
+                .map(item => porNomeAtual.get(item.nome) || item);
+            const defaultNames = new Set(defaults.map(item => item.nome));
+            const adicionados = [...porNomeAtual.values()].filter(item => !defaultNames.has(item.nome));
+
+            checklistDataByViatura[viaturaId][category] = [...defaults, ...adicionados];
         });
     });
 }
@@ -367,13 +407,13 @@ export async function carregarConfiguracoes() {
 }
 
 function buildConfigPayload(atualizadoEm) {
-    const defaultIds = new Set(defaultViaturas.map(viatura => String(viatura.id)));
+    const knownIds = getKnownViaturaIds();
 
     return {
         checklistData: normalizeAllChecklistData(checklistData),
         checklistDataByViatura: Object.fromEntries(
             Object.entries(checklistDataByViatura)
-                .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
+                .filter(([viaturaId]) => knownIds.has(String(viaturaId)))
                 .map(([viaturaId, porCategoria]) => [
                     viaturaId,
                     Object.fromEntries(
@@ -391,14 +431,14 @@ function buildConfigPayload(atualizadoEm) {
         vistoriadores: vistoriadores.map((vistoriador, index) => normalizeVistoriador(vistoriador, index)),
         viaturaResponsaveis: Object.fromEntries(
             Object.entries(viaturaResponsaveis)
-                .filter(([viaturaId]) => defaultIds.has(String(viaturaId)))
+                .filter(([viaturaId]) => knownIds.has(String(viaturaId)))
                 .map(([viaturaId, responsaveis]) => [
                     viaturaId,
                     {
                         tecnico: responsaveis.tecnico || "",
                         tecnicoCpf: responsaveis.tecnicoCpf || "",
-                        auxiliar: responsaveis.auxiliar || (responsaveis.auxiliares?.[0]?.nome || ""),
-                        auxiliarCpf: responsaveis.auxiliarCpf || (responsaveis.auxiliares?.[0]?.cpf || ""),
+                        auxiliar: responsaveis.auxiliar || "",
+                        auxiliarCpf: responsaveis.auxiliarCpf || "",
                         auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({ ...a })) : []
                     }
                 ])

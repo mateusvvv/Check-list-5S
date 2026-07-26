@@ -1,14 +1,15 @@
 import { categoryNames, damageTypeNames, formatTwoDigits, getVehicleMapConfig, vehicleViewNames } from "./config.js";
 import { collection, db, getDocs, orderBy, query, where } from "./firebase.js";
-import { getDamageColor, getDamageMarkerLabel, renderDamageList, renderDamageMarkers, renderTabletDamageList, renderTabletDamageMarkers } from "./damages.js";
+import { getDamageColor, getDamageMarkerLabel, renderDamageList, renderDamageMarkers, renderTabletDamageList, renderTabletDamageMarkers } from "./damages.js?v=3";
 import {
     buscarVistoriasLocaisHoje,
     buscarVistoriasLocaisViatura,
     getActiveViaturas,
+    getCategoriasVistoria,
     isVistoriaParcial,
     state,
     todasEtapasConcluidas
-} from "./state.js";
+} from "./state.js?v=2";
 import { getDataEnvioDate, getInicioFimData, getInicioFimHoje, sortVistoriasPorCategoria } from "./utils.js";
 
 const uiCallbacks = {
@@ -1139,6 +1140,26 @@ export async function gerarRelatorioComEscolha(options = {}) {
 
 export async function encerrarVistoriaCompleta() {
     if (!confirm("Deseja realmente encerrar a vistoria e gerar o relatório final?")) {
+        return;
+    }
+
+    if (isVistoriaParcial()) {
+        const status = state.surveyStatus[state.selectedViatura] || {};
+        const algumEpiFeito = Object.values(state.epiSurveyStatus[state.selectedViatura] || {}).some(value => value === true);
+        const categorias = getCategoriasVistoria(state.selectedViatura).filter(category => {
+            if (category === "epis") return status.epis || algumEpiFeito;
+            return status[category];
+        });
+        if (categorias.length === 0) {
+            alert("Finalize pelo menos uma categoria da vistoria parcial antes de gerar o PDF.");
+            return;
+        }
+        await gerarRelatorioViatura(state.selectedViatura, {
+            confirmar: false,
+            resetarStatus: true,
+            categorias,
+            tipoVistoria: "parcial"
+        });
         return;
     }
 

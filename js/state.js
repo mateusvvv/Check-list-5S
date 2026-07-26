@@ -8,6 +8,8 @@ export const state = {
     vehicleDamages: {},
     tabletDamages: {},
     vistoriaMode: {},
+    vistoriaCategorias: {},
+    vistoriaModeConfigured: {},
     pendingCompleteVistorias: {}, // Esta propriedade será removida
     vistoriasLocais: {},
     selectedVistorias: new Set(),
@@ -24,6 +26,8 @@ export const state = {
     fotosEvidencia: {}
 };
 
+export const checklistReportCategories = ["ferramentas", "epis", "viaturas", "tablets"];
+
 export function ensureViaturaState(id) {
     id = String(id);
     if (!state.surveyStatus[id]) state.surveyStatus[id] = { ferramentas: false, epis: false, viaturas: false, tablets: false, notebooks: false };
@@ -32,6 +36,9 @@ export function ensureViaturaState(id) {
     if (!state.tabletDamages[id]) state.tabletDamages[id] = [];
     if (!state.notebookDamages[id]) state.notebookDamages[id] = [];
     if (!state.vistoriaMode[id]) state.vistoriaMode[id] = "completa";
+    if (!Array.isArray(state.vistoriaCategorias[id]) || state.vistoriaCategorias[id].length === 0) {
+        state.vistoriaCategorias[id] = [...checklistReportCategories];
+    }
 }
 
 defaultViaturas.forEach(viatura => ensureViaturaState(viatura.id));
@@ -39,6 +46,7 @@ defaultViaturas.forEach(viatura => ensureViaturaState(viatura.id));
 export function setViaturas(viaturas) {
     // Garante que temos um array de dados vindos do Firebase
     const savedData = Array.isArray(viaturas) ? viaturas : Object.values(viaturas || {});
+    const hasSavedViaturas = savedData.length > 0;
 
     const finalViaturasMap = new Map();
 
@@ -53,12 +61,14 @@ export function setViaturas(viaturas) {
         }
     });
         
-    // 2. Adiciona viaturas padrão que não vieram do Firebase (garantindo que todas as viaturas existam)
-    defaultViaturas.forEach(dv => {
-        if (!finalViaturasMap.has(String(dv.id))) {
-            finalViaturasMap.set(String(dv.id), { ...dv, ativa: true }); // Padrão é ativa
-        }
-    });
+    // 2. Em instalações sem configuração salva, carrega as viaturas padrão.
+    if (!hasSavedViaturas) {
+        defaultViaturas.forEach(dv => {
+            if (!finalViaturasMap.has(String(dv.id))) {
+                finalViaturasMap.set(String(dv.id), { ...dv, ativa: true });
+            }
+        });
+    }
 
     state.viaturas = Array.from(finalViaturasMap.values()).sort((a, b) => Number(a.id) - Number(b.id));
 
@@ -92,6 +102,24 @@ export function getCategoriasConcluidas(viaturaId = state.selectedViatura) {
 
 export function isVistoriaParcial(viaturaId = state.selectedViatura) {
     return state.vistoriaMode[viaturaId] === "parcial";
+}
+
+export function getCategoriasVistoria(viaturaId = state.selectedViatura) {
+    const categorias = state.vistoriaCategorias[String(viaturaId)];
+    if (!Array.isArray(categorias) || categorias.length === 0) return [...checklistReportCategories];
+    return categorias.filter(category => checklistReportCategories.includes(category));
+}
+
+export function setModoVistoria(viaturaId = state.selectedViatura, mode = "completa", categorias = checklistReportCategories) {
+    const id = String(viaturaId);
+    ensureViaturaState(id);
+    const modo = mode === "parcial" ? "parcial" : "completa";
+    state.vistoriaMode[id] = modo;
+    state.vistoriaCategorias[id] = modo === "parcial"
+        ? categorias.filter(category => checklistReportCategories.includes(category))
+        : [...checklistReportCategories];
+    if (state.vistoriaCategorias[id].length === 0) state.vistoriaCategorias[id] = ["tablets"];
+    state.vistoriaModeConfigured[id] = true;
 }
 
 export function todasEtapasConcluidas(viaturaId = state.selectedViatura) {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=48">
     <style>
         /* Estilos Gerais para Gestão de Funcionários (Admin) */
         * {
@@ -290,6 +290,11 @@
             text-align: center !important;
         }
 
+        .admin-config-header.admin-history-actions-header {
+            justify-content: flex-end !important;
+            text-align: right !important;
+        }
+
         .admin-extra-epi-form button,
         .admin-extra-epi-row button {
             width: 120px !important;
@@ -566,9 +571,9 @@
 
         /* Destaque para Viatura Selecionada (Modo Claro) */
         .viatura-card.active {
-            border-color: #0f52a0 !important;
-            background-color: #f0f7ff !important;
-            box-shadow: 0 10px 25px rgba(15, 82, 160, 0.2) !important;
+            border-color: #94a3b8 !important;
+            background-color: #f8fafc !important;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10) !important;
             transform: translateY(-5px);
         }
 
@@ -588,12 +593,9 @@
             margin-top: 4px;
             display: block;
         }
-        body.dark-mode .viatura-concluded-label {
-            color: #4ade80;
-        }
 
         .viatura-card.active .viatura-name {
-            color: #0f52a0 !important;
+            color: #1e293b !important;
             font-weight: 700 !important; /* Ajustado para um negrito mais estável */
         }
 
@@ -749,475 +751,18 @@
             border: 1px solid #86efac !important;
         }
 
-        body.dark-mode .resolution-box {
-            background-color: rgba(34, 197, 94, 0.1) !important;
-            border-color: #10b981 !important;
-        }
 
         /* Ajuste de Hover no Menu (Modo Claro) */
         .nav-links li a:hover {
-            background-color: #f0f7ff !important;
-            color: #0f52a0 !important;
+            background-color: rgba(37, 99, 235, 0.18) !important;
+            color: #0B5ED7 !important;
             border-radius: 5px;
-        }
-
-        /* --- Dark Mode (Modo Escuro) --- */
-        body.dark-mode {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
-        }
-
-        body.dark-mode .btn-login {
-            background-color: #38bdf8 !important;
-            color: #0f172a !important;
-        }
-        /* Containers Principais */
-        body.dark-mode header,
-        body.dark-mode main,
-        body.dark-mode .container {
-            background-color: #0f172a !important;
-        }
-
-        /* Títulos e Textos Principais */
-        body.dark-mode h1, 
-        body.dark-mode h2, 
-        body.dark-mode h3, 
-        body.dark-mode h4 {
-            color: #f8fafc !important;
-        }
-
-        /* Ajuste do Bloco de Cabeçalho (Painel de Viaturas, Modo de Vistoria, Metadados) */
-        body.dark-mode .header-info {
-            background-color: #1e293b !important;
-            border: 1px solid #334155 !important;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-        }
-
-        body.dark-mode .vistoria-mode-bar,
-        body.dark-mode .checking-meta {
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
-            color: #f1f5f9 !important;
-        }
-
-        /* Cards, Itens e Modais */
-        body.dark-mode .card,
-        body.dark-mode .auth-card,
-        body.dark-mode .viatura-card,
-        body.dark-mode .modal-content,
-        body.dark-mode .checklist-item,
-        body.dark-mode .employee-card,
-        body.dark-mode .admin-config-panel,
-        body.dark-mode .revisao-modal-content,
-        body.dark-mode .admin-extra-employee-row,
-        body.dark-mode .admin-config-row,
-        body.dark-mode .auth-screen,
-        body.dark-mode #admin-login-section,
-        body.dark-mode .admin-history-row,
-        body.dark-mode .stat-card {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 2px solid #334155 !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
-            height: auto !important; /* Reforço para o modo escuro */
-        }
-
-        body.dark-mode .admin-item-form,
-        body.dark-mode .admin-employee-form,
-        body.dark-mode .admin-vistoriador-form,
-        body.dark-mode .admin-people-panel {
-            background-color: #0f172a !important;
-            border: 1px solid #334155 !important;
-            border-radius: 8px !important;
-            padding: 15px !important;
-            margin-bottom: 15px !important;
-        }
-
-        /* Estilo dos itens do Checklist e Labels (QTD, VALOR, TOTAL, STATUS) */
-        body.dark-mode .checklist-item-header label,
-        body.dark-mode .checklist-item .item-label,
-        body.dark-mode .checklist-extra-fields label span,
-        body.dark-mode .filters-bar label,
-        body.dark-mode .input-group label {
-            color: #cbd5e1 !important; /* Cinza claro com ótimo contraste */
-            font-weight: 500;
-        }
-
-        /* Campos de Entrada (Inputs/Selects) na tela de login e formulários */
-        body.dark-mode input,
-        body.dark-mode select,
-        body.dark-mode textarea,
-        body.dark-mode .login-box input {
-            background-color: #0f172a !important;
-            color: #f8fafc !important;
-            border-color: #334155 !important;
-        }
-
-        /* Campos somente leitura (Total) */
-        body.dark-mode input[readonly] {
-            background-color: #334155 !important;
-            color: #94a3b8 !important;
-        }
-
-        /* Ajuste do Bloco de Filtros e Ações em Massa */
-        body.dark-mode .filters-bar, 
-        body.dark-mode .bulk-actions-bar {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-            color: #f1f5f9 !important;
-        }
-
-        /* Ajuste da Tabela de Histórico no Modo Escuro */
-        body.dark-mode .history-table th {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
-            border-bottom-color: #334155 !important;
-        }
-
-        body.dark-mode .history-table td {
-            border-bottom-color: #334155 !important;
-            color: #cbd5e1 !important;
-        }
-
-        /* Correção do Bloco Branco ao passar o mouse no histórico */
-        body.dark-mode .history-table tr:hover td {
-            background-color: #334155 !important;
-            color: #38bdf8 !important;
-        }
-
-        /* Erros de Login no Modo Escuro */
-        body.dark-mode .login-error {
-            color: #f87171 !important; /* Vermelho mais suave para fundo escuro */
-        }
-
-        /* Menu de Contexto (Long Press) */
-        body.dark-mode .long-press-menu {
-            background: rgba(30, 41, 59, 0.95) !important;
-            border-color: #475569 !important;
-        }
-        body.dark-mode .long-press-item {
-            color: #cbd5e1 !important;
-        }
-        
-        body.dark-mode .long-press-item.completed {
-            color: #2ecc71 !important;
-        }
-
-        body.dark-mode .long-press-item:hover {
-            background-color: #334155 !important;
-            color: #38bdf8 !important;
-        }
-
-        /* Botões de Ação no Modo Escuro */
-        body.dark-mode .btn-submit {
-            background-color: #2ecc71 !important;
-            color: #ffffff !important;
-            border-color: #2ecc71 !important;
-        }
-        body.dark-mode .btn-submit:hover {
-            background-color: #27ae60 !important;
-            border-color: #27ae60 !important;
-        }
-        body.dark-mode .btn-admin-pdf {
-            background-color: #334155 !important;
-            color: #f1f5f9 !important;
-            border-color: #475569 !important;
-        }
-        body.dark-mode .btn-admin-pdf:hover {
-            background-color: #475569 !important;
-            color: #38bdf8 !important;
-        }
-        body.dark-mode .btn-muted {
-            background-color: #334155 !important;
-            color: #cbd5e1 !important;
-            border-color: #475569 !important;
-        }
-        body.dark-mode .btn-muted:hover {
-            background-color: #475569 !important;
-            color: #f1f5f9 !important;
-        }
-        body.dark-mode .btn-menu-logout {
-            background-color: #ef4444 !important;
-            color: #f1f5f9 !important;
-            border-color: #ef4444 !important;
-        }
-        body.dark-mode .btn-menu-logout:hover {
-            background-color: #dc2626 !important;
-            border-color: #dc2626 !important;
-        }
-        body.dark-mode .btn-reset-survey,
-        body.dark-mode .btn-change-mode {
-            background-color: #334155 !important;
-            color: #f1f5f9 !important;
-            border-color: #475569 !important;
-        }
-
-        body.dark-mode .btn-toggle-actions {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-            color: #f1f5f9 !important;
-        }
-        body.dark-mode .btn-toggle-actions.active {
-            background-color: #334155 !important;
-            border-color: #38bdf8 !important;
-            color: #38bdf8 !important;
-        }
-        /* Cores das Etiquetas de Status no Modo Escuro (Mantendo Pretas) */
-        body.dark-mode .label-ok,
-        body.dark-mode .label-pendente,
-        body.dark-mode .label-perdeu,
-        body.dark-mode .label-quebrou {
-            color: #000000 !important; 
-        }
-
-        /* Textos Secundários */
-        body.dark-mode .viatura-disabled-label,
-        body.dark-mode .employee-meta span,
-        body.dark-mode .admin-history-meta small,
-        body.dark-mode .placeholder {
-            color: #94a3b8 !important;
-        }
-
-        body.dark-mode .viatura-responsaveis,
-        body.dark-mode .employee-card-header p,
-        body.dark-mode .employee-status-control span {
-            color: #94a3b8 !important;
-            border-top-color: #334155 !important;
-        }
-
-        /* No modo escuro, se a viatura estiver ativa, o nome do técnico brilha mais */
-        body.dark-mode .viatura-card.active .viatura-responsaveis {
-            color: #cbd5e1 !important;
-        }
-
-        /* Menu sanduíche mobile */
-        body.dark-mode .nav-links {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-        }
-
-        body.dark-mode .menu-btn {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
-        }
-
-        body.dark-mode .nav-links li a {
-            color: #f1f5f9 !important;
-        }
-
-        /* Ajuste do hover no menu para evitar bloco branco no modo escuro */
-        body.dark-mode .nav-links li a:hover {
-            background-color: #334155 !important;
-            color: #38bdf8 !important;
-        }
-
-        /* Destaque verde para itens concluídos no menu (Modo Escuro) */
-        body.dark-mode .nav-links li a.completed {
-            color: #2ecc71 !important;
-            font-weight: bold;
-        }
-
-        /* Abas do Painel Admin no Modo Escuro */
-        body.dark-mode .admin-config-tabs button,
-        body.dark-mode .admin-people-switch button {
-            background-color: #1e293b !important;
-            color: #cbd5e1 !important;
-            border: 1px solid #334155 !important;
-        }
-        body.dark-mode .admin-config-tabs button.active,
-        body.dark-mode .admin-people-switch button.active {
-            background-color: #334155 !important;
-            color: #38bdf8 !important;
-            border-color: #38bdf8 !important;
-        }
-        body.dark-mode .admin-config-tabs button:hover,
-        body.dark-mode .admin-people-switch button:hover {
-            background-color: #334155 !important;
-            color: #38bdf8 !important;
-            border-color: #38bdf8 !important;
-        }
-
-        body.dark-mode .employee-edit-items-btn {
-            background-color: #334155 !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
-        }
-        body.dark-mode .employee-edit-items-btn.editing {
-            background-color: #0f52a0 !important;
-            border-color: #38bdf8 !important;
-        }
-
-        body.dark-mode .employee-edit-items-btn {
-            background-color: #334155 !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
-        }
-        body.dark-mode .employee-edit-items-btn.editing {
-            background-color: #0f52a0 !important;
-            border-color: #38bdf8 !important;
-        }
-
-        /* --- Ajustes específicos para a parte de funcionários no Modo Escuro --- */
-        body.dark-mode .employee-epi-table th {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
-            border-bottom: 2px solid #334155 !important;
-        }
-        
-        /* Ajuste do contador total de funcionários */
-        body.dark-mode .employee-total {
-            color: #38bdf8 !important;
-            background: rgba(56, 189, 248, 0.1) !important;
-        }
-
-        body.dark-mode .employee-inline-person-form label span,
-        body.dark-mode .admin-extra-employee-row .admin-responsaveis-grid label span,
-        body.dark-mode .admin-extra-employee-row label span {
-            color: #cbd5e1 !important;
-        }
-
-        body.dark-mode .employee-epi-table td {
-            border-bottom: 1px solid #334155 !important;
-            color: #cbd5e1 !important;
-        }
-
-        /* Container da tabela de EPIs */
-        body.dark-mode .employee-epi-table-wrap,
-        body.dark-mode .checklist-items,
-        body.dark-mode .employee-items-editor-list {
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
-        }
-
-        /* Ajuste específico para a tabela de funcionários no mobile (Modo Escuro) */
-        @media (max-width: 480px) {
-            body.dark-mode .employee-epi-table tr {
-                background-color: #1e293b !important;
-                border: 1px solid #334155 !important;
-                margin-bottom: 12px !important;
-            }
-            body.dark-mode .employee-epi-table td {
-                background-color: transparent !important; /* Deixa o TR comandar o fundo */
-                border-color: #334155 !important;
-                color: #f1f5f9 !important;
-            }
-            
-            /* Força o fundo escuro nos itens de checklist no mobile */
-            body.dark-mode .checklist-item {
-                background-color: #1e293b !important;
-                border-color: #334155 !important;
-            }
-
-            body.dark-mode .employee-epi-table td::before {
-                color: #38bdf8 !important; 
-            }
-        }
-
-        /* Cores de situação dos funcionários no Modo Escuro */
-        body.dark-mode .employee-status {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        body.dark-mode .employee-status.active { background-color: rgba(46, 204, 113, 0.15); color: #2ecc71 !important; }
-        body.dark-mode .employee-status.vacation { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b !important; }
-        body.dark-mode .employee-status.danger { background-color: rgba(239, 68, 68, 0.15); color: #ef4444 !important; }
-        body.dark-mode .employee-status.dayoff { background-color: rgba(56, 189, 248, 0.15); color: #38bdf8 !important; }
-
-        body.dark-mode .employee-epi-table tr:hover td {
-            background-color: #334155 !important;
-        }
-
-        body.dark-mode .employee-inline-editor {
-            background-color: #1e293b !important;
-            border-top: 1px solid #334155 !important;
-        }
-
-        body.dark-mode .employee-items-add-form,
-        body.dark-mode .admin-extra-epi-form,
-        body.dark-mode .admin-extra-epi-row,
-        body.dark-mode .employee-items-editor-row,
-        body.dark-mode .employee-inline-editor-row,
-        body.dark-mode .employee-inline-add-form,
-        body.dark-mode .employee-inline-person-form {
-            background-color: #0f172a !important;
-            border: 1px solid #334155 !important;
-        }
-
-        body.dark-mode .employee-items-editor-row {
-            border-bottom: 1px solid #334155 !important;
-            background-color: transparent !important;
-        }
-
-        body.dark-mode .admin-extra-epi-wrap {
-            border-top-color: #334155 !important;
-        }
-        
-        /* Textos explicativos e vazios */
-        body.dark-mode .employee-empty-epis,
-        body.dark-mode .employee-card-header p {
-            color: #94a3b8 !important;
-        }
-
-        body.dark-mode .employee-delete-btn,
-        body.dark-mode .employee-item-remove-btn {
-            color: #f87171 !important;
-        }
-        
-        /* Labels dentro do editor de itens do funcionário */
-        body.dark-mode .employee-inline-person-form label span,
-        body.dark-mode .employee-inline-add-form label span,
-        body.dark-mode .employee-items-add-form label span {
-            color: #cbd5e1 !important;
-        }
-
-        /* --- Ajustes específicos para Modo Escuro (Danos e Observações) --- */
-        body.dark-mode .damage-inspection {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-        }
-
-        body.dark-mode .damage-list li {
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
-            color: #cbd5e1 !important;
-        }
-
-        body.dark-mode .btn-remove-damage {
-            color: #f87171 !important;
-        }
-        
-        body.dark-mode .status-options {
-            border-top-color: #334155 !important;
-        }
-
-        /* Destaque para Viatura Selecionada (Modo Escuro) */
-        body.dark-mode .viatura-card.active {
-            border: 2px solid #38bdf8 !important;
-            background-color: #2e3b52 !important;
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.45) !important;
-            transform: translateY(-5px);
-        }
-
-        body.dark-mode .viatura-card.fully-concluded {
-            background-color: #064e3b !important; /* Verde escuro para modo escuro */
-            border-color: #10b981 !important;
-        }
-
-        body.dark-mode .viatura-card.active .viatura-name {
-            color: #38bdf8 !important;
-            font-weight: bold;
-            text-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
         }
 
         /* Otimização Desktop Extrema para Telas Largas (> 1200px) */
         @media (min-width: 1200px) {
             .container { max-width: 98% !important; }
-            .header-info { padding: 15px 20px !important; margin-bottom: 15px !important; }
+            .header-info { padding: 0 20px 12px !important; margin-bottom: 15px !important; }
             .viaturas-grid { gap: 10px !important; margin-bottom: 15px !important; }
             .card { padding: 12px 15px !important; margin-bottom: 12px !important; }
             .checklist-section-header { margin-bottom: 10px !important; }
@@ -1407,10 +952,6 @@
         .epi-person-button.pending .epi-btn-status-label { color: #dc2626 !important; }
         .epi-person-button.done .epi-btn-status-label { color: #16a34a !important; }
 
-        /* Dark Mode para seletores de EPI */
-        body.dark-mode .epi-person-button.pending { background-color: rgba(239, 68, 68, 0.1) !important; }
-        body.dark-mode .epi-person-button.done { background-color: rgba(34, 197, 94, 0.1) !important; }
-        body.dark-mode .epi-btn-role-name { color: #000000 !important; }
 
         /* Estilos para Miniaturas de Fotos */
         .photo-previews {
@@ -1459,7 +1000,6 @@
             color: #0f52a0 !important;
             margin-left: 8px !important;
         }
-        body.dark-mode .photo-counter { color: #38bdf8 !important; }
 
         /* Botão de Upload Customizado */
         .custom-file-upload {
@@ -1479,7 +1019,6 @@
             border: 1px solid #0f52a0 !important;
         }
         .custom-file-upload:hover { background-color: #0a3d7a !important; }
-        body.dark-mode .custom-file-upload { background-color: #334155 !important; color: #f1f5f9 !important; border-color: #475569 !important; }
 
         /* Melhorias na seção de Pesquisa de Técnicos/Auxiliares */
         .checking-meta {
@@ -1490,10 +1029,6 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-        }
-        body.dark-mode .checking-meta {
-            background-color: #1e293b;
-            border-color: #334155;
         }
 
         .checking-main-row {
@@ -1596,13 +1131,10 @@
             border-left: 4px solid #0f52a0;
         }
         .assistant-card:hover { transform: scale(1.02); }
-        body.dark-mode .assistant-card { background: #1e293b; border-color: #334155; }
 
         .assistant-card-info { display: flex; flex-direction: column; gap: 2px; overflow: hidden; padding-right: 8px; flex: 1; }
         .assistant-card-name { font-weight: 700; color: #1e293b; font-size: 0.65rem; line-height: 1.2; overflow-wrap: anywhere; } /* Reduzido para melhor visualização de nomes longos */
-        body.dark-mode .assistant-card-name { color: #f1f5f9; }
         .assistant-card-cpf { color: #64748b; font-size: 0.68rem; font-family: monospace; }
-        body.dark-mode .assistant-card-cpf { color: #94a3b8; }
 
         .btn-remove-assistant {
             background: rgba(239, 68, 68, 0.1);
@@ -1637,7 +1169,6 @@
                 padding-top: 15px !important;
                 margin-top: 0px !important;
             }
-            body.dark-mode .assistant-search-row { border-top-color: #334155; }
         }
 
         /* Estilos para o Dropdown da Equipe Responsável */
@@ -1700,11 +1231,6 @@
             flex: 0 0 auto !important;
         }
 
-        body.dark-mode .team-member-name { color: #f1f5f9 !important; }
-        body.dark-mode .team-member-cpf { color: #94a3b8 !important; }
-        body.dark-mode .team-actions-container { background-color: #1e293b !important; border-color: #334155 !important; }
-        body.dark-mode .team-member-item { border-bottom-color: #334155 !important; }
-        body.dark-mode .team-member-role { color: #38bdf8 !important; background: rgba(56, 189, 248, 0.1) !important; }
 
         @media (max-width: 600px) {
             .team-member-item {
@@ -1730,16 +1256,33 @@
         }
     </style>
 </head>
-<body>
+<body class="is-logged-out">
     <section id="app-login-screen" class="auth-screen" style="display: none;">
         <div class="auth-card">
-            <div class="logo auth-logo">
-                <img src="assets/logo.png" alt="Logo">
+            <div class="auth-app-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 4h6l1 2h3v15H5V6h3z"></path>
+                    <path d="M9 4v3h6V4"></path>
+                    <path d="M8.5 11.5 10 13l3-3"></path>
+                    <path d="M8.5 16.5 10 18l3-3"></path>
+                    <path d="M15 12h1.8"></path>
+                    <path d="M15 17h1.8"></path>
+                </svg>
             </div>
             <h1>Checklist 5S</h1>
             <div class="login-box">
-                <input type="email" id="app-login-email" placeholder="E-mail">
-                <input type="password" id="app-login-password" placeholder="Senha">
+                <label class="login-field" for="app-login-email">
+                    <span class="login-field-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"></path><path d="m4 7 8 6 8-6"></path></svg>
+                    </span>
+                    <input type="email" id="app-login-email" placeholder="E-mail">
+                </label>
+                <label class="login-field" for="app-login-password">
+                    <span class="login-field-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path><path d="M12 14.5v2"></path></svg>
+                    </span>
+                    <input type="password" id="app-login-password" placeholder="Senha">
+                </label>
                 <button class="btn-login" onclick="loginApp()">Entrar</button>
                 <p id="app-login-error" class="login-error"></p>
             </div>
@@ -1750,23 +1293,25 @@
         <div class="logo">
             <img src="assets/logo.png" alt="Logo">
         </div>
-        <div class="user-selector">
+        <div class="user-selector" hidden aria-hidden="true" style="display: none !important;">
             <select id="vistoriador-atual" onchange="selecionarVistoriadorAtivo()">
                 <option value="">Selecione o Vistoriador</option>
             </select>
         </div>
         <nav class="menu-container">
-            <button class="menu-btn" onclick="toggleMenu()">☰ Menu</button>
+            <button class="menu-btn" onclick="toggleMenu()" aria-label="Abrir menu">
+                <span class="menu-btn-icon" aria-hidden="true"></span>
+                <span class="menu-btn-text">Menu</span>
+            </button>
             <ul id="menu-list" class="nav-links">
-                <li><a href="#" id="menu-inicio" onclick="showHome()">🏠 Início</a></li>
-                <li><a href="#" id="menu-ferramentas" onclick="showPage('ferramentas')">🔧 Ferramentas</a></li>
-                <li><a href="#" id="menu-epis" onclick="showPage('epis')">🦺 EPIs</a></li>
-                <li><a href="#" id="menu-viaturas" onclick="showPage('viaturas')">🚗 Viaturas</a></li>
-                <li><a href="#" id="menu-tablets" onclick="showPage('tablets')">📱 Tablets</a></li>
-                <li><a href="#" id="menu-notebooks" onclick="showPage('notebooks')">💻 Notebooks</a></li>
-                <li><a href="#" id="menu-dark-mode" onclick="toggleDarkMode()">🌓 Modo Escuro</a></li>
-                <li class="nav-admin-link"><a href="#" id="menu-admin" onclick="showPage('admin')">🔐 Painel Admin</a></li>
-                <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()">Sair</button></li>
+                <li><a href="#" id="menu-inicio" class="nav-link-home" onclick="showHome()"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10.8 9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg></span><span>Início</span></a></li>
+                <li><a href="#" id="menu-ferramentas" class="nav-link-tools" onclick="showPage('ferramentas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14.7 6.3 3 3"></path><path d="M8 16 18.5 5.5a2.1 2.1 0 0 1 3 3L11 19l-5 1z"></path><path d="M3 7l4 4"></path><path d="M5 5l4 4"></path></svg></span><span>Ferramentas</span></a></li>
+                <li><a href="#" id="menu-epis" class="nav-link-epis" onclick="showPage('epis')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9V7a6 6 0 0 1 12 0v2"></path><path d="M5 9h14l-1.2 11H6.2z"></path><path d="M9 13h6"></path><path d="M9.5 17h5"></path></svg></span><span>EPIs</span></a></li>
+                <li><a href="#" id="menu-viaturas" class="nav-link-cars" onclick="showPage('viaturas')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="m7 16 1.5-5h7L17 16"></path><path d="M6 19h.01"></path><path d="M18 19h.01"></path><path d="M4 16v3h16v-3l-2-3H6z"></path></svg></span><span>Viaturas</span></a></li>
+                <li><a href="#" id="menu-tablets" class="nav-link-tablets" onclick="showPage('tablets')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M12 17.5h.01"></path></svg></span><span>Tablets</span></a></li>
+                <li><a href="#" id="menu-notebooks" class="nav-link-notebooks" onclick="showPage('notebooks')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H5z"></path><path d="m3 19 2-4h14l2 4z"></path></svg></span><span>Notebooks</span></a></li>
+                <li class="nav-admin-link"><a href="#" id="menu-admin" class="nav-link-admin" onclick="showPage('admin')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6z"></path><path d="M9 12h6"></path><path d="M12 9v6"></path></svg></span><span>Painel Admin</span></a></li>
+                <li class="nav-logout-link"><button type="button" class="btn-menu-logout" onclick="logoutAdmin()"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 17 15 12l-5-5"></path><path d="M15 12H3"></path><path d="M13 4h6v16h-6"></path></svg></span><span>Sair</span></button></li>
             </ul>
         </nav>
     </header>
@@ -1777,7 +1322,10 @@
     <main>
         <div class="container">
             <div class="header-info">
-                <h1>Painel de Viaturas</h1>
+                <div class="viaturas-panel-header">
+                    <h1>PAINEL DE VIATURAS</h1>
+                    <button type="button" id="btn-toggle-viaturas-grid" class="btn-toggle-viaturas-grid" onclick="toggleViaturasGrid()" aria-expanded="true">Ocultar viaturas</button>
+                </div>
                 <div id="viaturas-grid" class="viaturas-grid">
                     <!-- Botões das viaturas gerados via JS -->
                 </div>
@@ -1787,58 +1335,27 @@
                         <span class="toggle-icon">▼</span>
                     </button>
                     <div id="vistoria-actions-container" class="vistoria-actions-container">
-                        <button type="button" class="btn-change-mode" onclick="configurarModoVistoria()">Alterar modo</button>
+                        <div class="vistoria-mode-options" role="group" aria-label="Tipo de vistoria">
+                            <button type="button" class="btn-change-mode vistoria-mode-option" data-mode="completa" onclick="definirModoVistoria('completa')">Vistoria completa</button>
+                            <button type="button" class="btn-change-mode vistoria-mode-option" data-mode="parcial" onclick="definirModoVistoria('parcial')">Vistoria parcial</button>
+                        </div>
                         <button type="button" class="btn-reset-survey" onclick="reiniciarVistoria()">Reiniciar vistoria</button>
                         <button type="button" class="btn-reset-survey btn-reset-all" onclick="reiniciarTodasVistorias()" style="border-color: #ef4444; color: #ef4444;">Reiniciar todas</button>
                     </div>
                 </div>
 
-                <div class="vistoria-mode-bar">
-                    <button type="button" class="btn-toggle-actions" id="btn-toggle-team" onclick="toggleTeamActions()">
-                        <span id="team-count-label">Equipe Responsável (0)</span>
-                        <span class="toggle-icon">▼</span>
-                    </button>
-                    <div id="team-actions-container" class="vistoria-actions-container team-actions-container">
-                        <div class="checking-main-row">
-                            <div class="input-group date-group">
-                                <label for="checking-date">Data da vistoria:</label>
-                                <input type="date" id="checking-date">
-                            </div>
-                            <div class="input-group technician-group">
-                                <div class="tech-field">
-                                    <label for="tecnico-nome">Técnico:</label>
-                                    <input type="text" id="tecnico-nome" list="tecnicos-list" placeholder="Pesquisar técnico" onchange="selecionarTecnicoVistoriaAtual(this.value)" oninput="updateInputFontSize(this)">
-                                    <datalist id="tecnicos-list"></datalist>
-                                </div>
-                                <div class="cpf-field">
-                                    <label for="tecnico-cpf">CPF:</label>
-                                    <input type="text" id="tecnico-cpf" placeholder="000.000.000-00" onchange="salvarCpfTecnicoVistoriaAtual(this.value)">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="assistant-search-row">
-                            <div class="date-group-placeholder"></div>
-                            <div class="input-group search-field-wrapper">
-                                <label for="responsavel-pesquisa">Add Auxiliares:</label>
-                                <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list" placeholder="Nome ou CPF" oninput="updateInputFontSize(this)">
-                                <datalist id="tecnicos-auxiliares-list"></datalist>
-                            </div>
-                            <div class="input-group search-button-wrapper">
-                                <label class="desktop-only">&nbsp;</label>
-                                <button type="button" class="btn-add-auxiliar" onclick="adicionarAuxiliarExtra()">➕ Adicionar Auxiliar</button>
-                            </div>
-                        </div>
-
-                        <div id="lista-auxiliares-selecionados" class="assistant-cards-container"></div>
-                        
-                        <!-- Campos ocultos para compatibilidade com lógica antiga -->
-                        <div style="display: none;">
-                            <input type="text" id="auxiliar-nome">
-                            <input type="text" id="auxiliar-cpf">
-                            <datalist id="auxiliares-list"></datalist>
-                        </div>
-                    </div>
+                <div id="team-actions-container" class="checking-hidden-fields" hidden>
+                    <input type="date" id="checking-date">
+                    <input type="text" id="tecnico-nome" list="tecnicos-list" onchange="selecionarTecnicoVistoriaAtual(this.value)">
+                    <input type="text" id="tecnico-cpf" onchange="salvarCpfTecnicoVistoriaAtual(this.value)">
+                    <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list">
+                    <input type="text" id="auxiliar-nome">
+                    <input type="text" id="auxiliar-cpf">
+                    <div id="lista-auxiliares-selecionados"></div>
+                    <span id="team-count-label"></span>
+                    <datalist id="tecnicos-list"></datalist>
+                    <datalist id="tecnicos-auxiliares-list"></datalist>
+                    <datalist id="auxiliares-list"></datalist>
                 </div>
                 <button id="btn-encerrar-geral" class="btn-encerrar" onclick="encerrarVistoriaCompleta()">📁 Encerrar Vistoria e Gerar PDF</button>
             </div>
@@ -2027,57 +1544,67 @@
                         </div>
                         <button type="button" class="btn-mark-ok" onclick="marcarTodosComoOk('notebooks')">Marcar tudo OK</button>
                     </div>
-                    <div class="notebook-data-card">
-                        <h3><span aria-hidden="true">▣</span> Dados da Vistoria</h3>
-                        <div class="tablet-meta notebook-meta">
-                            <div class="notebook-meta-column">
-                                <div class="input-group">
-                                    <label for="notebook-vistoriador">Responsável *</label>
-                                    <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
-                                        <option value="">Selecione o Responsável</option>
-                                        <option value="Matheus">Matheus</option>
-                                        <option value="Italo">Italo</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label for="notebook-term-type">Tipo de Movimentação *</label>
-                                    <select id="notebook-term-type">
-                                        <option value="RETIRADA">Retirada</option>
-                                        <option value="DEVOLUCAO">Devolução</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label for="analista-select">Analista cadastrado</label>
-                                    <select id="analista-select" onchange="selecionarAnalistaCadastrado()">
-                                        <option value="">Selecione um analista cadastrado</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label for="notebook-select">Notebook cadastrado</label>
-                                    <select id="notebook-select" onchange="selecionarNotebookCadastrado()">
-                                        <option value="">Selecione um notebook cadastrado</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="notebook-meta-column">
-                                <div class="input-group">
-                                    <label for="notebook-analista-cpf">CPF do Analista</label>
-                                    <input type="text" id="notebook-analista-cpf" placeholder="CPF do analista responsável" readonly>
-                                </div>
-                                <div class="input-group">
-                                    <label for="notebook-serial">Nº de série</label>
-                                    <input type="text" id="notebook-serial" placeholder="Ex.: PF123456789" readonly>
-                                </div>
-                            </div>
-                            <div class="input-group notebook-upload-group">
-                                <label>Foto do Notebook <span id="count-notebooks" class="photo-counter">(0 fotos)</span></label>
-                                <label for="foto-notebook" class="custom-file-upload">📁 Escolher arquivos</label>
-                                <input type="file" id="foto-notebook" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
-                                <div id="previews-notebooks" class="photo-previews"></div>
+                    <div class="notebook-info-card">
+                        <h3 class="notebook-info-title"><span aria-hidden="true">▦</span> Informações da Vistoria</h3>
+                        <div class="notebook-inspection-layout">
+                        <div class="notebook-picker-card">
+                            <h4>Analistas cadastrados</h4>
+                            <input type="search" id="notebook-analyst-search" placeholder="Buscar analista..." oninput="renderAnalistasSelectOptions('inspection')">
+                            <div id="notebook-analyst-list" class="notebook-picker-list">
+                                <p class="placeholder">Nenhum analista cadastrado.</p>
                             </div>
                         </div>
+                        <div class="notebook-picker-card">
+                            <h4>Notebooks cadastrados</h4>
+                            <input type="search" id="notebook-device-search" placeholder="Buscar notebook..." oninput="renderNotebookSelectOptions('inspection')">
+                            <div id="notebook-device-list" class="notebook-picker-list">
+                                <p class="placeholder">Nenhum notebook cadastrado.</p>
+                            </div>
+                        </div>
+                        <div class="notebook-data-card">
+                            <h3><span aria-hidden="true">▣</span> Dados da Vistoria</h3>
+                            <div class="tablet-meta notebook-meta">
+                                <div class="notebook-meta-column">
+                                    <div class="input-group">
+                                        <label for="notebook-vistoriador">Responsável *</label>
+                                        <select id="notebook-vistoriador" onchange="selecionarResponsavelNotebook()">
+                                            <option value="">Selecione o Responsável</option>
+                                            <option value="Matheus">Matheus</option>
+                                            <option value="Italo">Italo</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="notebook-term-type">Tipo de Movimentação *</label>
+                                        <select id="notebook-term-type">
+                                            <option value="RETIRADA">Retirada</option>
+                                            <option value="DEVOLUCAO">Devolução</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="notebook-analista-nome">Analista *</label>
+                                        <input type="text" id="notebook-analista-nome" placeholder="Selecione um analista na lista ao lado" readonly>
+                                        <small>O CPF será preenchido automaticamente.</small>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="notebook-analista-cpf">CPF do Analista</label>
+                                        <input type="text" id="notebook-analista-cpf" placeholder="Será preenchido automaticamente" readonly>
+                                    </div>
+                                </div>
+                                <div class="notebook-meta-column">
+                                    <div class="input-group">
+                                        <label for="notebook-modelo">Notebook *</label>
+                                        <input type="text" id="notebook-modelo" placeholder="Selecione um notebook cadastrado" readonly>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="notebook-serial">Nº de série</label>
+                                        <input type="text" id="notebook-serial" placeholder="Será preenchido automaticamente" readonly>
+                                        <small>O número de série será preenchido após selecionar o notebook.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
                     </div>
-
                     <div class="damage-inspection notebook-visual-card">
                         <div class="damage-header">
                             <div>
@@ -2095,10 +1622,22 @@
                             <button type="button" class="damage-type notebook-damage-type" data-type="quebrado" onclick="setNotebookDamageType('quebrado')">Q - Quebrado</button>
                         </div>
 
-                        <div class="vehicle-map" id="notebook-map">
-                            <button type="button" class="vehicle-view vehicle-photo" data-view="notebook" onclick="marcarAvariaNotebook(event)" aria-label="Marcar avaria no notebook">
-                                <img id="notebook-map-image" src="assets/notebook.png" alt="Mapa visual do notebook">
-                            </button>
+                        <div class="notebook-visual-grid">
+                            <div class="vehicle-map" id="notebook-map">
+                                <button type="button" class="vehicle-view vehicle-photo" data-view="notebook" onclick="marcarAvariaNotebook(event)" aria-label="Marcar avaria no notebook">
+                                    <img id="notebook-map-image" src="assets/notebook.png" alt="Mapa visual do notebook">
+                                </button>
+                            </div>
+
+                            <div class="notebook-photo-panel">
+                                <div class="notebook-photo-header">
+                                    <div>
+                                        <h4>Fotos do notebook</h4>
+                                        <p>Adicione e gerencie as fotos tiradas do notebook.</p>
+                                    </div>
+                                </div>
+                                <div id="previews-notebooks" class="photo-previews notebook-photo-previews"></div>
+                            </div>
                         </div>
 
                         <div class="damage-list-wrap">
@@ -2145,19 +1684,54 @@
                         </div>
                     </div>
 
-                    <div class="admin-config-tabs">
-                        <button type="button" id="admin-tab-viaturas" onclick="showAdminConfigTab('viaturas')">Viaturas</button>
-                        <button type="button" id="admin-tab-itens" onclick="showAdminConfigTab('itens')">Itens do checklist</button>
-                        <button type="button" id="admin-tab-funcionarios" onclick="showAdminConfigTab('funcionarios')">Adicionar Funcionários</button>
-                        <button type="button" id="menu-funcionarios" onclick="showAdminConfigTab('tec-externos')">Lista de EPI</button>
-                        <button type="button" id="admin-tab-notebooks" onclick="showAdminConfigTab('notebooks')">Notebooks</button>
-                        <button type="button" id="admin-tab-historico" onclick="abrirPaginaHistoricoVistorias()">Histórico</button>
+                    <div class="admin-config-tabs admin-dashboard-cards" aria-label="Módulos da gestão de vistorias">
+                        <button type="button" id="admin-tab-viaturas" class="admin-dashboard-card" onclick="showAdminConfigTab('viaturas')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M5 16h14"></path><path d="m7 16 1.5-5h7L17 16"></path><path d="M6 19h.01"></path><path d="M18 19h.01"></path><path d="M4 16v3h16v-3l-2-3H6z"></path></svg>
+                            </span>
+                            <strong>Viaturas</strong>
+                            <span>Gerencie vistorias de viaturas.</span>
+                        </button>
+                        <button type="button" id="admin-tab-funcionarios" class="admin-dashboard-card" onclick="showAdminConfigTab('funcionarios')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                            </span>
+                            <strong>Funcionários</strong>
+                            <span>Gerencie técnicos e vistoriadores.</span>
+                        </button>
+                        <button type="button" id="admin-tab-itens" class="admin-dashboard-card" onclick="showAdminConfigTab('itens')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M9 5h6"></path><path d="M9 3h6v4H9z"></path><path d="M7 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><path d="m8 13 2 2 4-5"></path><path d="M8 18h8"></path></svg>
+                            </span>
+                            <strong>Checklist</strong>
+                            <span>Gerencie os itens do checklist.</span>
+                        </button>
+                        <button type="button" id="menu-funcionarios" class="admin-dashboard-card" onclick="showAdminConfigTab('tec-externos')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M6 9V7a6 6 0 0 1 12 0v2"></path><path d="M5 9h14l-1.2 11H6.2z"></path><path d="M9 13h6"></path><path d="M9.5 17h5"></path></svg>
+                            </span>
+                            <strong>EPI</strong>
+                            <span>Gerencie a lista de EPIs.</span>
+                        </button>
+                        <button type="button" id="admin-tab-notebooks" class="admin-dashboard-card" onclick="showAdminConfigTab('notebooks')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M5 5h14v10H5z"></path><path d="m3 19 2-4h14l2 4z"></path></svg>
+                            </span>
+                            <strong>Notebooks</strong>
+                            <span>Gerencie vistorias de notebooks.</span>
+                        </button>
+                        <button type="button" id="admin-tab-historico" class="admin-dashboard-card" onclick="showAdminConfigTab('historico')">
+                            <span class="admin-dashboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                            </span>
+                            <strong>Histórico</strong>
+                            <span>Consulte o histórico de vistorias.</span>
+                        </button>
                     </div>
 
                     <div class="admin-config-grid">
                         <div class="admin-config-panel admin-config-section" id="admin-config-viaturas">
                             <div class="admin-config-header">
-                                <h3>Viaturas</h3>
                                 <button type="button" onclick="adicionarViatura()">Adicionar viatura</button>
                             </div>
                             <div id="admin-viaturas-list" class="admin-config-list"></div>
@@ -2174,17 +1748,28 @@
                                     <option value="epis">EPIs</option>
                                     <option value="viaturas">Viatura</option>
                                     <option value="tablets">Tablet</option>
+                                    <option value="notebooks">Notebook</option>
                                 </select>
                                 <select id="admin-item-pessoa" class="admin-item-person-select" onchange="renderAdminChecklist()"></select>
                                 <input type="text" id="admin-item-name" placeholder="Nome do novo item">
+                                <input type="number" id="admin-item-quantity" min="0" step="1" value="1" placeholder="Qtd" aria-label="Quantidade" oninput="atualizarTotalNovoItemChecklist()">
+                                <input type="number" id="admin-item-value" min="0" step="0.01" value="0" placeholder="Valor" aria-label="Valor unitário" oninput="atualizarTotalNovoItemChecklist()">
+                                <input type="text" id="admin-item-total" value="R$ 0,00" aria-label="Valor total" readonly>
+                                <input type="text" id="admin-item-ca" placeholder="C.A." aria-label="Certificado de aprovação">
                                 <button type="button" onclick="adicionarItemChecklist()">Adicionar item</button>
                             </div>
                             <div id="admin-checklist-list" class="admin-config-list"></div>
                         </div>
 
                         <div class="admin-config-panel admin-config-section" id="admin-config-funcionarios">
-                            <div class="admin-config-header">
-                                <h3>Funcionários</h3>
+                            <div class="admin-config-header admin-employee-section-header">
+                                <span class="admin-section-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                </span>
+                                <div>
+                                    <h3>Funcionários</h3>
+                                    <p>Cadastre e gerencie técnicos, auxiliares e vistoriadores.</p>
+                                </div>
                             </div>
                             <div id="admin-funcionarios-alisson-only" class="admin-history-empty">Somente Alisson pode gerenciar funcionários e vistoriadores.</div>
                             <div id="admin-funcionarios-manager">
@@ -2193,7 +1778,7 @@
                                     <button type="button" id="admin-people-tab-vistoriadores" onclick="showAdminPeopleTab('vistoriadores')">Adicionar vistoriador</button>
                                 </div>
                                 <div id="admin-people-panel-funcionarios" class="admin-people-panel active">
-                                    <div class="admin-item-form admin-employee-form" autocomplete="off">
+                                    <div class="admin-item-form admin-employee-form admin-employee-create-form" autocomplete="off">
                                         <input type="text" id="admin-funcionario-nome" value="" placeholder="Nome do técnico ou auxiliar" autocomplete="new-password">
                                         <input type="text" id="admin-funcionario-cpf" value="" placeholder="CPF" autocomplete="new-password">
                                         <select id="admin-funcionario-funcao">
@@ -2269,9 +1854,6 @@
                                     <button type="button" onclick="salvarCpfAnalista('admin')">Salvar analista</button>
                                     <button type="button" class="btn-muted" onclick="removerCpfAnalista('admin')">Remover analista</button>
                                 </div>
-                                <div id="admin-analistas-cards" class="admin-analysts-cards">
-                                    <p class="placeholder">Nenhum analista cadastrado.</p>
-                                </div>
                                 <div class="admin-notebook-field">
                                     <label for="admin-notebook-modelo">Modelo do notebook</label>
                                     <input type="text" id="admin-notebook-modelo" placeholder="Ex.: ThinkPad T14">
@@ -2294,79 +1876,94 @@
                         </div>
 
                         <div class="admin-config-panel admin-config-section" id="admin-config-historico">
-                            <div class="admin-config-header">
+                            <div class="inspection-history-title admin-change-history-title">
                                 <h3>Histórico de alterações</h3>
+                                <span id="history-alteracoes-count">0 registros</span>
+                            </div>
+                            <div class="admin-config-header admin-history-actions-header">
+                                <button type="button" id="btn-toggle-config-history" onclick="toggleExibirTodosHistoricoConfig()">Exibir todos</button>
                                 <button type="button" class="btn-danger" onclick="limparHistoricoConfig()">Limpar histórico</button>
                             </div>
                             <div id="admin-config-history-list" class="admin-history-list"></div>
-                        </div>
-                    </div>
 
-                    <!-- Estatísticas Rápidas -->
-                    <div class="admin-stats">
-                        <div class="stat-card"><h3>Total Vistorias</h3><p id="stat-total">0</p></div>
-                        <div class="stat-card stat-card-ok"><h3>Tudo OK</h3><p id="stat-ok">0</p></div>
-                        <div class="stat-card stat-card-pending"><h3>Pendências</h3><p id="stat-pending">0</p></div>
-                        <div class="stat-card stat-card-users"><h3>Vistoriadores</h3><p id="stat-users">4</p></div>
-                    </div>
+                            <div class="inspection-history-panel">
+                                <div class="inspection-history-topbar">
+                                    <div class="inspection-history-title">
+                                        <h3>Histórico de vistorias</h3>
+                                        <span id="history-vistorias-count">0 registros</span>
+                                    </div>
+                                    <div class="inspection-history-actions">
+                                        <button onclick="exportarVistoriasSelecionadasPDF()" class="btn-export-selected">Baixar PDF selecionados</button>
+                                        <button onclick="excluirVistoriasSelecionadas()" class="btn-delete-selected">Excluir selecionadas</button>
+                                    </div>
+                                </div>
 
-                    <!-- Filtros do Histórico -->
-                    <div class="filters-bar">
-                        <div class="input-group filter-field filter-field-user">
-                            <label>Vistoriador</label>
-                            <select id="filter-vistoriador" onchange="aplicarFiltros()">
-                                <option value="">Todos</option>
-                            </select>
-                        </div>
-                        <div class="input-group filter-field">
-                            <label>Viatura</label>
-                            <select id="filter-viatura" onchange="aplicarFiltros()">
-                                <option value="">Todas</option>
-                            </select>
-                        </div>
-                        <div class="input-group filter-field">
-                            <label>Data Início</label>
-                            <input type="date" id="filter-data-inicio" onchange="aplicarFiltros()">
-                        </div>
-                        <div class="input-group filter-field">
-                            <label>Data Fim</label>
-                            <input type="date" id="filter-data-fim" onchange="aplicarFiltros()">
-                        </div>
-                        <div class="input-group filter-field">
-                            <label>Status</label>
-                            <select id="filter-status" onchange="aplicarFiltros()">
-                                <option value="">Todos</option>
-                                <option value="pendente">Pendência</option>
-                                <option value="resolvida">Resolvida</option>
-                                <option value="ok">Tudo OK</option>
-                            </select>
-                        </div>
-                        <button class="btn-refresh" onclick="carregarHistorico()" title="Atualizar Dados">🔄</button>
-                    </div>
+                                <div class="inspection-history-filters" hidden>
+                                    <label class="history-search-field">
+                                        <span>Buscar</span>
+                                        <input type="search" id="filter-history-search" placeholder="Buscar..." oninput="aplicarFiltros()">
+                                    </label>
+                                    <label>
+                                        <span>Tipo de vistoria</span>
+                                        <select id="filter-tipo-vistoria" onchange="aplicarFiltros()">
+                                            <option value="">Todos</option>
+                                            <option value="parcial">Parcial</option>
+                                            <option value="completa">Completa</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Equipamento/Viatura</span>
+                                        <select id="filter-viatura" onchange="aplicarFiltros()">
+                                            <option value="">Todos</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Categoria</span>
+                                        <select id="filter-categoria" onchange="aplicarFiltros()">
+                                            <option value="">Todas</option>
+                                            <option value="todas">Todas as categorias</option>
+                                            <option value="ferramentas">Ferramentas</option>
+                                            <option value="epis">EPIs</option>
+                                            <option value="viaturas">Viatura</option>
+                                            <option value="tablets">Tablet</option>
+                                            <option value="notebooks">Notebook</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Status</span>
+                                        <select id="filter-status" onchange="aplicarFiltros()">
+                                            <option value="">Todos</option>
+                                            <option value="pendente">Pendência</option>
+                                            <option value="resolvida">Resolvida</option>
+                                            <option value="ok">Tudo OK</option>
+                                        </select>
+                                    </label>
+                                    <button type="button" class="btn-refresh" onclick="limparFiltrosHistoricoVistorias()">Limpar filtros</button>
+                                </div>
 
-                    <div class="bulk-actions-bar">
-                        <button onclick="exportarVistoriasSelecionadasPDF()" class="btn-export-selected">Baixar PDF selecionados</button>
-                        <button onclick="resolverPendenciasSelecionadas()" class="btn-resolve-selected">Marcar pendência resolvida</button>
-                        <button onclick="excluirVistoriasSelecionadas()" class="btn-delete-selected">Excluir selecionadas</button>
-                        <span id="selected-count">0 selecionadas</span>
-                    </div>
+                                <div class="inspection-history-selection">
+                                    <span id="selected-count">0 selecionadas</span>
+                                </div>
 
-                    <div class="table-scroll">
-                        <table class="history-table">
-                            <thead>
-                                <tr>
-                                    <th class="select-col"><input type="checkbox" id="select-all-vistorias" onchange="toggleSelecionarTodasVistorias(this.checked)"></th>
-                                    <th>Data</th>
-                                    <th>Tipo de Vistoria</th>
-                                    <th>Equipamento/Viatura</th>
-                                    <th>Categoria</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-tbody">
-                                <!-- Dados virão do JS -->
-                            </tbody>
-                        </table>
+                                <div class="table-scroll inspection-history-table-wrap">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="select-col"><input type="checkbox" id="select-all-vistorias" onchange="toggleSelecionarTodasVistorias(this.checked)"></th>
+                                            <th>Tipo de vistoria</th>
+                                            <th>Viatura</th>
+                                            <th>Categorias</th>
+                                            <th>Data e hora</th>
+                                            <th>Detalhes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-tbody">
+                                        <!-- Dados virão do JS -->
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -2381,6 +1978,41 @@
         <div class="long-press-item" data-category="viaturas" onclick="handleLongPressAction('viaturas')">🚗 Viatura</div>
         <div class="long-press-item" data-category="tablets" onclick="handleLongPressAction('tablets')">📱 Tablet</div>
         <div class="long-press-item" data-category="notebooks" onclick="handleLongPressAction('notebooks')">💻 Notebook</div>
+    </div>
+
+    <!-- Modal obrigatório de tipo de vistoria -->
+    <div id="vistoria-mode-modal" class="modal mandatory-modal" aria-modal="true" role="dialog">
+        <div class="modal-content vistoria-mode-modal-content">
+            <button type="button" class="vistoria-mode-close" onclick="fecharModalTipoVistoria()" aria-label="Retornar">&times;</button>
+            <h3 id="vistoria-mode-modal-title">Definir tipo de vistoria</h3>
+            <p id="vistoria-mode-modal-subtitle">Selecione como esta viatura será vistoriada.</p>
+            <div class="vistoria-mode-choice-list">
+                <label class="vistoria-mode-choice">
+                    <input type="radio" name="vistoria-mode-required" value="completa" checked onchange="selecionarTipoVistoriaModal('completa')">
+                    <span>
+                        <strong>Vistoria completa</strong>
+                        <small>Ferramentas, EPIs, Viatura e Tablet.</small>
+                    </span>
+                </label>
+                <label class="vistoria-mode-choice">
+                    <input type="radio" name="vistoria-mode-required" value="parcial" onchange="selecionarTipoVistoriaModal('parcial')">
+                    <span>
+                        <strong>Vistoria parcial</strong>
+                        <small>Escolha somente as categorias que serão verificadas.</small>
+                    </span>
+                </label>
+            </div>
+            <div id="vistoria-partial-categories" class="vistoria-partial-categories" aria-label="Categorias da vistoria parcial">
+                <label><input type="checkbox" value="ferramentas"> Ferramentas</label>
+                <label><input type="checkbox" value="epis"> EPIs</label>
+                <label><input type="checkbox" value="viaturas"> Viatura</label>
+                <label><input type="checkbox" value="tablets"> Tablet</label>
+            </div>
+            <p id="vistoria-mode-error" class="vistoria-mode-error" aria-live="polite"></p>
+            <div class="vistoria-mode-modal-actions">
+                <button type="button" class="btn-submit" onclick="confirmarTipoVistoriaModal()">Confirmar vistoria</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Detalhes -->
@@ -2447,6 +2079,6 @@
             }, 3000);
         });
     </script>
-    <script type="module" src="script.js?v=54"></script>
+    <script type="module" src="script.js?v=81"></script>
 </body>
 </html>

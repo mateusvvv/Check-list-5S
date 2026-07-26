@@ -1,5 +1,5 @@
 import { damageTypeNames, getVehicleMapConfig, vehicleViewNames } from "./config.js";
-import { state } from "./state.js";
+import { state } from "./state.js?v=2";
 
 export function updateTabletInfo(viaturaId = state.selectedViatura) {
     const label = document.getElementById("tablet-current-label");

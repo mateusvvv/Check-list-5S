@@ -87,8 +87,18 @@
         margin-bottom: 12px;
     }
 
-    .notebook-meta {
+    #notebooks .notebook-inspection-layout {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .notebook-meta,
+    #notebooks .notebook-meta {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #notebooks .notebook-meta-column + .notebook-meta-column {
+        padding-left: 0;
+        border-left: 0;
     }
 
     .notebook-meta .input-group input,
@@ -185,6 +195,38 @@
         font-size: 0.82rem;
     }
 
+    .inspection-history-topbar,
+    .inspection-history-title,
+    .inspection-history-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .inspection-history-actions button,
+    .inspection-history-actions .btn-export-selected,
+    .inspection-history-actions .btn-resolve-selected,
+    .inspection-history-actions .btn-delete-selected {
+        width: 100%;
+    }
+
+    .inspection-history-filters {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .inspection-history-selection {
+        justify-content: flex-start;
+        padding: 10px 12px 0;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 9px 10px;
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+
     .btn-refresh {
         min-height: 34px;
         padding: 6px 8px;
@@ -209,8 +251,99 @@
         width: 100%;
     }
 
+    .admin-history-list,
+    .admin-history-row,
+    .admin-history-meta,
+    .admin-history-change {
+        min-width: 0;
+    }
+
+    .admin-history-list {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .admin-history-row {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        align-items: start;
+        min-height: 0;
+        padding: 12px;
+    }
+
+    .admin-history-change {
+        text-align: left;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .admin-history-change strong,
+    .admin-history-change p,
+    .admin-history-meta,
+    .admin-history-meta small {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-history-meta {
+        flex-wrap: wrap;
+        gap: 4px 10px;
+    }
+
+    .admin-history-meta small {
+        min-width: 0;
+    }
+
+    #admin-viaturas-list,
     .admin-responsaveis-grid {
         grid-template-columns: 1fr;
+    }
+
+    .admin-dashboard-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 24px;
+    }
+
+    .admin-dashboard-card {
+        min-height: 220px;
+    }
+
+    #admin-tab-historico.admin-dashboard-card {
+        grid-column: 1 / -1;
+        grid-template-columns: 72px minmax(0, 1fr);
+        grid-template-areas:
+            "icon title"
+            "icon text";
+        align-content: center;
+        justify-items: start;
+        min-height: 148px;
+        padding: 22px;
+        column-gap: 18px;
+        row-gap: 6px;
+        text-align: left;
+    }
+
+    #admin-tab-historico .admin-dashboard-icon {
+        grid-area: icon;
+        width: 72px;
+        height: 72px;
+    }
+
+    #admin-tab-historico .admin-dashboard-icon svg {
+        width: 38px;
+        height: 38px;
+    }
+
+    #admin-tab-historico.admin-dashboard-card strong {
+        grid-area: title;
+        align-self: end;
+    }
+
+    #admin-tab-historico.admin-dashboard-card > span:last-child {
+        grid-area: text;
+        max-width: none;
+        align-self: start;
     }
 
     .admin-vehicle-main {
@@ -218,9 +351,31 @@
         align-items: stretch;
     }
 
+    .admin-vehicle-title {
+        grid-template-columns: 44px minmax(0, 1fr);
+    }
+
+    .admin-vehicle-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .admin-vehicle-people-group + .admin-vehicle-people-group {
+        border-left: none;
+        border-top: 1px solid #dbe3ef;
+        padding-left: 0;
+        padding-top: 14px;
+    }
+
     .admin-config-actions {
         width: 100%;
         justify-content: stretch;
+    }
+
+    .admin-checklist-row,
+    .admin-checklist-fields {
+        grid-template-columns: 1fr;
+        align-items: stretch;
     }
 
     .admin-config-actions button {
@@ -233,6 +388,37 @@
         width: 100%;
         min-width: 0;
         max-width: 100%;
+    }
+
+    .admin-employee-section-header {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    .admin-employee-create-form,
+    .admin-employee-data-grid,
+    #admin-config-funcionarios .admin-employee-epi-form,
+    #admin-config-funcionarios .admin-employee-epi-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    #admin-config-funcionarios .admin-people-switch button,
+    .admin-employee-create-form button,
+    .admin-employee-card-actions button,
+    #admin-config-funcionarios .admin-employee-epi-form button {
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .admin-employee-card-actions {
+        flex-direction: column;
+    }
+
+    .admin-employee-empty-epis {
+        grid-template-columns: 1fr;
+        grid-template-areas: "icon" "title" "text";
+        justify-items: center;
+        text-align: center;
     }
 
     .admin-extra-epi-form,
@@ -257,6 +443,16 @@
         white-space: normal;
     }
 
+}
+
+@media (max-width: 420px) {
+    .admin-dashboard-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-dashboard-card {
+        min-height: 205px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -315,15 +511,6 @@
     .login-box input {
         padding: 9px 8px;
         font-size: 0.88rem;
-    }
-
-    .admin-history-row {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-history-meta {
-        justify-items: start;
-        white-space: normal;
     }
 
     .checking-meta {

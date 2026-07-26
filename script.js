@@ -1,4 +1,4 @@
-import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getChecklistItemDefaults, getVistoriadorByEmail, normalizeEmployeeEpiItem, viaturaResponsaveis, vistoriadores, vistoriadoresTablet, vistoriadoresNotebook, vistoriadoresAcessoNotebook } from "./js/config.js";
+import { categoryNames, employeeEpisByPerson, formatTwoDigits, funcionariosExtras, getChecklistItemsForPessoa, getEpiPessoaByKey, getEpiPessoaOptions, getFuncionarioKeyFromFields, getFuncionariosData, getItemName, getVistoriadorByEmail, normalizeEmployeeEpiItem, resolveChecklistItemData, viaturaResponsaveis, vistoriadores, vistoriadoresTablet, vistoriadoresNotebook, vistoriadoresAcessoNotebook } from "./js/config.js";
 import {
     addDoc,
     auth,
@@ -36,7 +36,7 @@ import {
     setNotebookDamageType,
     updateTabletInfo,
     updateVehicleMapImage
-} from "./js/damages.js?v=2";
+} from "./js/damages.js?v=3";
 import {
     aplicarFiltros,
     carregarHistorico,
@@ -49,7 +49,13 @@ import {
     loginAdmin,
     logoutAdmin,
     limparHistoricoConfig,
+    toggleExibirTodosHistoricoConfig,
+    toggleExibirTodosHistoricoVistorias,
+    exibirMenosHistoricoVistorias,
+    limparFiltrosHistoricoVistorias,
     adicionarItemChecklist,
+    atualizarTotalItemChecklistAdmin,
+    atualizarTotalNovoItemChecklist,
     importarPDFs,
     processarPDFsImportados,
     adicionarEpiFuncionarioExtra,
@@ -81,23 +87,25 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=9";
+} from "./js/admin.js?v=20";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
     setPdfUiCallbacks
-} from "./js/pdf.js?v=9";
+} from "./js/pdf.js?v=10";
 import {
-    getCategoriasConcluidas,
+    checklistReportCategories,
+    getCategoriasVistoria,
     getActiveViaturas,
     getViaturaById,
     isVistoriaParcial,
     salvarVistoriaLocal,
     setSelectedViatura,
+    setModoVistoria,
     state,
     todasEtapasConcluidas
-} from "./js/state.js";
-import { carregarConfiguracoes, salvarConfiguracoes } from "./js/settings.js";
+} from "./js/state.js?v=2";
+import { carregarConfiguracoes, salvarConfiguracoes } from "./js/settings.js?v=4";
 
 window.__APP_MODULE_BOOTED__ = true;
 
@@ -110,28 +118,12 @@ let signatureCanvasInitialized = false;
 let signatureDrawing = false;
 let signatureTarget = { type: "tecnico", index: 0 };
 const DOUBLE_TAP_DELAY = 300; // Tempo máximo entre toques para considerar clique duplo
-
-function initDarkMode() {
-    const savedMode = localStorage.getItem("darkMode");
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if (savedMode === "enabled" || (savedMode === null && systemPrefersDark)) {
-        document.body.classList.add("dark-mode");
-    }
-
-    // Ouve mudanças na preferência do sistema em tempo real
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
-        if (localStorage.getItem("darkMode") === null) {
-            document.body.classList.toggle("dark-mode", e.matches);
-        }
-    });
-}
-
-function toggleDarkMode() {
-    document.body.classList.toggle("dark-mode");
-    const isEnabled = document.body.classList.contains("dark-mode");
-    localStorage.setItem("darkMode", isEnabled ? "enabled" : "disabled");
-}
+const vistoriaCategoriaLabels = {
+    ferramentas: "Ferramentas",
+    epis: "EPIs",
+    viaturas: "Viatura",
+    tablets: "Tablet"
+};
 
 function getVistoriadorAtivo() {
     return document.getElementById("vistoriador-atual")?.value || "";
@@ -225,20 +217,12 @@ function getAccessDeniedMessage(category, vistoriador) {
 }
 
 function updateVistoriadorLogado() {
-    const vistoriador = getVistoriadorAtivo();
     const label = document.getElementById("vistoriador-logado");
     if (!label) return;
 
-    if (!vistoriador) {
-        label.innerText = "Nenhum vistoriador selecionado";
-        label.classList.remove("active");
-        return;
-    }
-
-    label.innerText = isTabletOnlyUser(vistoriador)
-        ? `Logado: ${vistoriador} - Tablets`
-        : `Logado: ${vistoriador}`;
-    label.classList.add("active");
+    label.innerText = "";
+    label.classList.remove("active");
+    label.hidden = true;
 }
 
 function syncSpecialVistoriadores() {
@@ -353,14 +337,53 @@ function preencherCamposNotebookCadastro(notebook, scope = "inspection") {
     if (serialInput) serialInput.value = notebook?.numeroSerie || "";
 }
 
+function renderNotebookInspectionList() {
+    const list = document.getElementById("notebook-device-list");
+    if (!list) return;
+
+    const busca = String(document.getElementById("notebook-device-search")?.value || "").trim().toLowerCase();
+    const selectedSerial = String(document.getElementById("notebook-serial")?.value || "");
+    const notebooksOrdenados = [...state.notebooksCadastrados].sort((a, b) => {
+        const modeloA = String(a?.modelo || "").toLowerCase();
+        const modeloB = String(b?.modelo || "").toLowerCase();
+        return modeloA.localeCompare(modeloB);
+    });
+    const notebooksFiltrados = notebooksOrdenados.filter((notebook) => {
+        const label = `${notebook?.modelo || ""} ${notebook?.numeroSerie || ""}`.toLowerCase();
+        return !busca || label.includes(busca);
+    });
+
+    if (!notebooksFiltrados.length) {
+        list.innerHTML = '<p class="placeholder">Nenhum notebook encontrado.</p>';
+        return;
+    }
+
+    list.innerHTML = notebooksFiltrados.map((notebook) => {
+        const modelo = String(notebook.modelo || "Notebook sem identificação").trim();
+        const serial = String(notebook.numeroSerie || "Nº de série não informado").trim();
+        const selected = selectedSerial && selectedSerial === String(notebook.numeroSerie || "");
+        return `
+            <button type="button" class="notebook-picker-item${selected ? " selected" : ""}" onclick="selecionarNotebookCadastrado('inspection', '${escapeJsString(notebook.id || "")}')">
+                <span class="notebook-picker-icon" aria-hidden="true">💻</span>
+                <span class="notebook-picker-info">
+                    <strong>${escapeHtml(modelo)}</strong>
+                    <small>${escapeHtml(serial)}</small>
+                </span>
+            </button>
+        `;
+    }).join("");
+}
+
 function renderNotebookSelectOptions(scope = "inspection") {
     const select = scope === "admin"
         ? document.getElementById("admin-notebook-select")
         : document.getElementById("notebook-select");
-    if (!select) return;
+    if (!select && scope !== "inspection") return;
 
-    const valorAnterior = select.value || "";
-    select.innerHTML = '<option value="">Selecione um notebook cadastrado</option>';
+    const valorAnterior = select?.value || "";
+    if (select) {
+        select.innerHTML = '<option value="">Selecione um notebook cadastrado</option>';
+    }
 
     const notebooksOrdenados = [...state.notebooksCadastrados].sort((a, b) => {
         const modeloA = String(a?.modelo || "").toLowerCase();
@@ -368,31 +391,38 @@ function renderNotebookSelectOptions(scope = "inspection") {
         return modeloA.localeCompare(modeloB);
     });
 
-    notebooksOrdenados.forEach((notebook) => {
-        const option = document.createElement("option");
-        option.value = notebook.id || "";
-        const label = notebook.modelo
-            ? notebook.modelo
-            : (notebook.numeroSerie || "Notebook sem identificação");
-        option.textContent = label;
-        select.appendChild(option);
-    });
+    if (select) {
+        notebooksOrdenados.forEach((notebook) => {
+            const option = document.createElement("option");
+            option.value = notebook.id || "";
+            const label = notebook.modelo
+                ? notebook.modelo
+                : (notebook.numeroSerie || "Notebook sem identificação");
+            option.textContent = label;
+            select.appendChild(option);
+        });
 
-    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior)) {
-        select.value = valorAnterior;
+        if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior)) {
+            select.value = valorAnterior;
+        }
     }
+
+    if (scope === "inspection") renderNotebookInspectionList();
 }
 
-function selecionarNotebookCadastrado(scope = "inspection") {
+function selecionarNotebookCadastrado(scope = "inspection", notebookIdSelecionado = null) {
     const select = scope === "admin"
         ? document.getElementById("admin-notebook-select")
         : document.getElementById("notebook-select");
-    if (!select) return;
+    const notebookId = notebookIdSelecionado ?? select?.value;
+    if (!notebookId) return;
 
-    const notebookSelecionado = state.notebooksCadastrados.find(item => String(item.id) === String(select.value));
+    const notebookSelecionado = state.notebooksCadastrados.find(item => String(item.id) === String(notebookId));
     if (notebookSelecionado) {
         preencherCamposNotebookCadastro(notebookSelecionado, scope);
     }
+    if (select) select.value = notebookId;
+    if (scope === "inspection") renderNotebookInspectionList();
 }
 
 async function removerNotebookCadastradoSelecionado(scope = "inspection") {
@@ -439,65 +469,90 @@ function isAnalistaAtivo(analista) {
     return analista?.ativo !== false;
 }
 
+function renderAnalistasInspectionList() {
+    const list = document.getElementById("notebook-analyst-list");
+    if (!list) return;
+
+    const busca = String(document.getElementById("notebook-analyst-search")?.value || "").trim().toLowerCase();
+    const selectedCpf = String(document.getElementById("notebook-analista-cpf")?.value || "");
+    const analistasOrdenados = [...state.analistasCadastrados].sort((a, b) => {
+        const nomeA = String(a?.nome || "").toLowerCase();
+        const nomeB = String(b?.nome || "").toLowerCase();
+        return nomeA.localeCompare(nomeB);
+    });
+    const analistasFiltrados = analistasOrdenados.filter((analista) => {
+        const label = `${analista?.nome || ""} ${analista?.cpf || ""}`.toLowerCase();
+        return !busca || label.includes(busca);
+    });
+
+    if (!analistasFiltrados.length) {
+        list.innerHTML = '<p class="placeholder">Nenhum analista encontrado.</p>';
+        return;
+    }
+
+    list.innerHTML = analistasFiltrados.map((analista) => {
+        const ativo = isAnalistaAtivo(analista);
+        const nome = String(analista.nome || "Analista sem nome").trim();
+        const cpf = String(analista.cpf || "").trim();
+        const selected = selectedCpf && selectedCpf === cpf;
+        return `
+            <button type="button" class="notebook-picker-item${selected ? " selected" : ""}${ativo ? "" : " inactive"}" onclick="selecionarAnalistaCadastrado('inspection', '${escapeJsString(cpf)}')" ${ativo ? "" : "disabled"}>
+                <span class="notebook-picker-icon" aria-hidden="true">👤</span>
+                <span class="notebook-picker-info">
+                    <strong>${escapeHtml(nome)}</strong>
+                    <small>${escapeHtml(cpf || "CPF não informado")}</small>
+                </span>
+                <span class="notebook-picker-badge ${ativo ? "active" : "inactive"}">${ativo ? "Ativo" : "Inativo"}</span>
+            </button>
+        `;
+    }).join("");
+}
+
 function renderAnalistasSelectOptions(scope = "inspection") {
     const select = scope === "admin"
         ? document.getElementById("admin-analista-select")
         : document.getElementById("analista-select");
-    if (!select) return;
+    if (!select && scope !== "inspection") return;
 
-    const valorAnterior = select.value || "";
-    select.innerHTML = '<option value="">Selecione um analista cadastrado</option>';
-
-    state.analistasCadastrados.forEach((analista) => {
-        const option = document.createElement("option");
-        option.value = analista.cpf || "";
-        const nome = String(analista.nome || "").trim();
-        const ativo = isAnalistaAtivo(analista);
-        option.textContent = `${nome || (analista.cpf || "")}${ativo ? "" : " (Inativo)"}`;
-        if (!ativo) {
-            option.className = "analista-option-inactive";
-            if (scope === "inspection") option.disabled = true;
-        }
-        select.appendChild(option);
-    });
-
-    if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior && !option.disabled)) {
-        select.value = valorAnterior;
-    } else if (scope === "inspection") {
-        select.value = "";
-        const nomeInput = document.getElementById("notebook-analista-nome");
-        const cpfInput = document.getElementById("notebook-analista-cpf");
-        if (nomeInput) nomeInput.value = "";
-        if (cpfInput) cpfInput.value = "";
+    const valorAnterior = select?.value || "";
+    if (select) {
+        select.innerHTML = '<option value="">Selecione um analista cadastrado</option>';
     }
+
+    if (select) {
+        state.analistasCadastrados.forEach((analista) => {
+            const option = document.createElement("option");
+            option.value = analista.cpf || "";
+            const nome = String(analista.nome || "").trim();
+            const ativo = isAnalistaAtivo(analista);
+            option.textContent = `${nome || (analista.cpf || "")}${ativo ? "" : " (Inativo)"}`;
+            if (!ativo) {
+                option.className = "analista-option-inactive";
+                if (scope === "inspection") option.disabled = true;
+            }
+            select.appendChild(option);
+        });
+
+        if (valorAnterior && Array.from(select.options).some(option => option.value === valorAnterior && !option.disabled)) {
+            select.value = valorAnterior;
+        } else if (scope === "inspection") {
+            select.value = "";
+            const nomeInput = document.getElementById("notebook-analista-nome");
+            const cpfInput = document.getElementById("notebook-analista-cpf");
+            if (nomeInput) nomeInput.value = "";
+            if (cpfInput) cpfInput.value = "";
+        }
+    }
+
+    if (scope === "inspection") renderAnalistasInspectionList();
 }
 
 function renderAnalistasGerenciamento() {
-    const cardsList = document.getElementById("admin-analistas-cards");
     const modalList = document.getElementById("analistas-modal-list");
 
     if (!state.analistasCadastrados.length) {
-        if (cardsList) cardsList.innerHTML = '<p class="placeholder">Nenhum analista cadastrado.</p>';
         if (modalList) modalList.innerHTML = '<p class="placeholder">Nenhum analista cadastrado.</p>';
         return;
-    }
-
-    if (cardsList) {
-        cardsList.innerHTML = state.analistasCadastrados.map((analista) => {
-            const ativo = isAnalistaAtivo(analista);
-            const nome = String(analista.nome || "Analista sem nome").trim();
-            const cpf = String(analista.cpf || "").trim();
-            return `
-                <div class="admin-analyst-card${ativo ? "" : " inactive"}">
-                    <span class="admin-analyst-icon" aria-hidden="true">👤</span>
-                    <div class="admin-analyst-info">
-                        <strong>${escapeHtml(nome)}</strong>
-                        <span>${escapeHtml(cpf || "CPF não informado")}</span>
-                    </div>
-                    <span class="admin-analyst-badge ${ativo ? "active" : "inactive"}">${ativo ? "Ativo" : "Inativo"}</span>
-                </div>
-            `;
-        }).join("");
     }
 
     if (!modalList) return;
@@ -534,7 +589,7 @@ function fecharGerenciadorAnalistas() {
     if (modal) modal.style.display = "none";
 }
 
-function selecionarAnalistaCadastrado(scope = "inspection") {
+function selecionarAnalistaCadastrado(scope = "inspection", cpfSelecionado = null) {
     const select = scope === "admin"
         ? document.getElementById("admin-analista-select")
         : document.getElementById("analista-select");
@@ -545,13 +600,17 @@ function selecionarAnalistaCadastrado(scope = "inspection") {
         ? document.getElementById("admin-notebook-analista-cpf")
         : document.getElementById("notebook-analista-cpf");
 
-    if (!select || !cpfInput) return;
+    const cpfSelecionadoFinal = cpfSelecionado ?? select?.value ?? "";
+    if (!cpfInput) return;
 
-    const analistaSelecionado = state.analistasCadastrados.find(item => String(item.cpf || "") === String(select.value || ""));
+    const analistaSelecionado = state.analistasCadastrados.find(item => String(item.cpf || "") === String(cpfSelecionadoFinal || ""));
+    if (scope === "inspection" && analistaSelecionado && !isAnalistaAtivo(analistaSelecionado)) return;
     if (nomeInput) {
         nomeInput.value = analistaSelecionado?.nome || "";
     }
-    cpfInput.value = analistaSelecionado?.cpf || select.value || "";
+    cpfInput.value = analistaSelecionado?.cpf || cpfSelecionadoFinal || "";
+    if (select) select.value = cpfInput.value;
+    if (scope === "inspection") renderAnalistasInspectionList();
 }
 
 async function carregarAnalistasCadastrados() {
@@ -804,10 +863,27 @@ function toggleMenu() {
 }
 
 function showHome() {
-    showPage(isTabletOnlyUser() ? "tablets" : "ferramentas");
+    const categorias = getCategoriasVistoria(state.selectedViatura);
+    const paginaPadrao = isTabletOnlyUser() ? "tablets" : (categorias[0] || "ferramentas");
+    showPage(paginaPadrao, { activeMenuId: "inicio" });
 }
 
-function showPage(pageId) {
+function updateActiveMenuLink(pageId) {
+    document.querySelectorAll(".nav-links li a.active").forEach(link => link.classList.remove("active"));
+    document.getElementById(`menu-${pageId}`)?.classList.add("active");
+}
+
+function isChecklistReportCategory(pageId) {
+    return checklistReportCategories.includes(pageId);
+}
+
+function isCategoriaNaVistoriaAtual(pageId) {
+    if (!isChecklistReportCategory(pageId)) return true;
+    if (!isVistoriaParcial(state.selectedViatura)) return true;
+    return getCategoriasVistoria(state.selectedViatura).includes(pageId);
+}
+
+function showPage(pageId, options = {}) {
     let vistoriador = getVistoriadorAtivo();
 
     // Bloqueio de acesso ao Painel Admin
@@ -831,20 +907,27 @@ function showPage(pageId) {
         return;
     }
 
+    if (!isCategoriaNaVistoriaAtual(pageId)) {
+        alert(`${categoryNames[pageId]} não faz parte da vistoria parcial selecionada para esta viatura.`);
+        document.getElementById("menu-list").classList.remove("show");
+        return;
+    }
+
     const headerInfo = document.querySelector(".header-info");
     if (headerInfo) headerInfo.style.display = ["admin", "funcionarios", "notebooks"].includes(pageId) ? "none" : "block";
     document.body.classList.toggle("page-funcionarios", pageId === "funcionarios");
+    document.body.classList.toggle("page-notebooks", pageId === "notebooks");
 
     document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
 
     const activePage = document.getElementById(pageId);
     if (activePage) {
         activePage.classList.add("active");
+        updateActiveMenuLink(options.activeMenuId || pageId);
         renderItems(pageId);
     }
 
     if (pageId === "funcionarios") renderFuncionariosPage();
-    if (pageId === "admin" && auth.currentUser) carregarHistorico();
 
     document.getElementById("menu-list").classList.remove("show");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -999,6 +1082,84 @@ function renderTecnicoDatalist() {
     if (tecnicoDatalist) tecnicoDatalist.innerHTML = options;
     if (auxiliarDatalist) auxiliarDatalist.innerHTML = options;
     if (tecnicoAuxiliarDatalist) tecnicoAuxiliarDatalist.innerHTML = options;
+}
+
+function getResponsavelPickerOptions(term = "") {
+    const normalizedTerm = normalizeSearch(term).trim();
+    const digitsTerm = onlyDigits(term);
+    return getTecnicoOptions()
+        .filter((pessoa) => {
+            if (!normalizedTerm && !digitsTerm) return true;
+            return normalizeSearch(pessoa.nome).includes(normalizedTerm)
+                || onlyDigits(pessoa.cpf).includes(digitsTerm);
+        })
+        .sort((a, b) => {
+            if (!normalizedTerm) return a.nome.localeCompare(b.nome, "pt-BR");
+            const aStarts = normalizeSearch(a.nome).startsWith(normalizedTerm);
+            const bStarts = normalizeSearch(b.nome).startsWith(normalizedTerm);
+            if (aStarts !== bStarts) return aStarts ? -1 : 1;
+            return a.nome.localeCompare(b.nome, "pt-BR");
+        });
+}
+
+function ensureResponsavelPicker(input) {
+    let picker = input.parentElement?.querySelector(".responsavel-picker-list");
+    if (!picker) {
+        picker = document.createElement("div");
+        picker.className = "responsavel-picker-list";
+        picker.setAttribute("role", "listbox");
+        input.insertAdjacentElement("afterend", picker);
+    }
+    return picker;
+}
+
+function hideResponsavelPicker(input) {
+    const picker = input?.parentElement?.querySelector(".responsavel-picker-list");
+    if (picker) picker.hidden = true;
+}
+
+function showResponsavelPicker(input, { showAll = false } = {}) {
+    if (!input) return;
+    renderTecnicoDatalist();
+    const picker = ensureResponsavelPicker(input);
+    const options = getResponsavelPickerOptions(showAll ? "" : input.value);
+
+    picker.innerHTML = options.length
+        ? options.map((pessoa) => `
+            <button type="button" class="responsavel-picker-item" data-nome="${escapeHtml(pessoa.nome)}">
+                <strong>${escapeHtml(pessoa.nome)}</strong>
+                <span>${escapeHtml(pessoa.funcao || "Equipe")} • ${escapeHtml(pessoa.cpf)}</span>
+            </button>
+        `).join("")
+        : '<div class="responsavel-picker-empty">Nenhum nome encontrado.</div>';
+
+    picker.hidden = false;
+    picker.querySelectorAll(".responsavel-picker-item").forEach((button) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", async () => {
+            const nome = button.dataset.nome || "";
+            input.value = nome;
+            updateInputFontSize(input);
+            hideResponsavelPicker(input);
+            if (input.id === "tecnico-nome") {
+                await selecionarTecnicoVistoriaAtual(nome);
+            }
+        });
+    });
+}
+
+function setupResponsavelPickers() {
+    ["tecnico-nome", "responsavel-pesquisa"].forEach((id) => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.responsavelPickerBound === "true") return;
+        input.dataset.responsavelPickerBound = "true";
+        input.addEventListener("focus", () => showResponsavelPicker(input, { showAll: true }));
+        input.addEventListener("click", () => showResponsavelPicker(input, { showAll: true }));
+        input.addEventListener("input", () => showResponsavelPicker(input));
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") hideResponsavelPicker(input);
+        });
+    });
 }
 
 async function selecionarTecnicoVistoriaAtual(nome) {
@@ -1679,8 +1840,8 @@ function abrirPaginaHistoricoVistorias() {
         return;
     }
 
-    const confirmado = confirm("Você será direcionado para uma página exclusiva do histórico de alterações. Deseja continuar?");
-    if (confirmado) window.location.href = "historico.html";
+    showPage("admin");
+    showAdminConfigTab("historico");
 }
 
 function preencherResponsaveisViatura() {
@@ -1761,6 +1922,14 @@ function ensureResponsaveisEquipe(viaturaId) {
     }
 
     const responsaveis = viaturaResponsaveis[id];
+    const hasExplicitAuxiliar = Object.prototype.hasOwnProperty.call(responsaveis, "auxiliar");
+    if (hasExplicitAuxiliar && !String(responsaveis.auxiliar || "").trim()) {
+        responsaveis.auxiliar = "";
+        responsaveis.auxiliarCpf = "";
+        responsaveis.auxiliares = [];
+        return responsaveis;
+    }
+
     if (!Array.isArray(responsaveis.auxiliares)) {
         responsaveis.auxiliares = responsaveis.auxiliar
             ? [{ nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf || "" }]
@@ -1998,6 +2167,27 @@ function selecionarPessoaEpi() {
     renderItems("epis");
 }
 
+function sincronizarItemAdicionadoChecklist({ category, viaturaId, pessoaKey = "" } = {}) {
+    if (!category || !viaturaId) return;
+
+    setSelectedViatura(viaturaId);
+    renderViaturaDashboard();
+
+    if (category === "epis" && pessoaKey) {
+        renderEpiPessoaOptions();
+        const pessoaSelect = document.getElementById("epi-pessoa");
+        if (pessoaSelect && [...pessoaSelect.options].some(option => option.value === pessoaKey)) {
+            pessoaSelect.value = pessoaKey;
+            renderEpiPessoaButtons();
+        }
+    }
+
+    const activePage = document.querySelector(".tab-content.active");
+    if (activePage?.id === category) {
+        renderItems(category);
+    }
+}
+
 function renderItems(pageId) {
     const containerMapping = {
         ferramentas: "lista-ferramentas",
@@ -2013,7 +2203,7 @@ function renderItems(pageId) {
 
     container.innerHTML = items.map((item, index) => {
         const itemName = getItemName(item);
-        const defaults = pageId === "epis" ? item : getChecklistItemDefaults(pageId, itemName, state.selectedViatura);
+        const defaults = resolveChecklistItemData(pageId, item, state.selectedViatura, index);
         const quantidade = Number(defaults.quantidade || 1);
         const valor = Number(defaults.valor || 0);
         const total = quantidade * valor;
@@ -2256,7 +2446,11 @@ function renderViaturaDashboard() {
 
     grid.innerHTML = "";
 
-    state.viaturas.forEach((viatura) => {
+    const visibleViaturas = getViaturasGridExpanded()
+        ? state.viaturas
+        : state.viaturas.filter(viatura => viatura.id === state.selectedViatura);
+
+    visibleViaturas.forEach((viatura) => {
         const id = viatura.id;
         const status = state.surveyStatus[id] || {};
         const isActive = state.selectedViatura === id;
@@ -2267,12 +2461,7 @@ function renderViaturaDashboard() {
             ? responsaveis.tecnico
             : "Sem técnico";
 
-        let auxiliaresTexto = "Sem auxiliar";
-        if (Array.isArray(responsaveis.auxiliares) && responsaveis.auxiliares.length > 0) {
-            auxiliaresTexto = responsaveis.auxiliares.map(a => a.nome).join(" / ");
-        } else if (responsaveis.auxiliar) {
-            auxiliaresTexto = responsaveis.auxiliar;
-        }
+        const auxiliaresTexto = responsaveis.auxiliar ? responsaveis.auxiliar : "Sem auxiliar";
 
         const card = document.createElement("div");
         card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""} ${isFullyConcluded ? "fully-concluded" : ""}`;
@@ -2294,6 +2483,26 @@ function renderViaturaDashboard() {
         `;
         grid.appendChild(card);
     });
+
+    updateViaturasToggleButton();
+}
+
+function getViaturasGridExpanded() {
+    return localStorage.getItem("viaturasGridExpanded") !== "0";
+}
+
+function updateViaturasToggleButton() {
+    const button = document.getElementById("btn-toggle-viaturas-grid");
+    if (!button) return;
+    const expanded = getViaturasGridExpanded();
+    button.textContent = expanded ? "Ocultar viaturas" : "Visualizar todas as viaturas";
+    button.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
+
+function toggleViaturasGrid() {
+    const expanded = getViaturasGridExpanded();
+    localStorage.setItem("viaturasGridExpanded", expanded ? "0" : "1");
+    renderViaturaDashboard();
 }
 
 function selectViatura(id) {
@@ -2306,6 +2515,7 @@ function selectViatura(id) {
     renderViaturaDashboard();
     updateMenuStatus();
     updateVistoriaModeUI();
+    ocultarOpcoesModoVistoria();
     preencherResponsaveisViatura();
     updateVehicleMapImage(id);
     updateTabletInfo(id);
@@ -2317,6 +2527,7 @@ function selectViatura(id) {
 
     const activeTab = document.querySelector(".tab-content.active");
     if (activeTab) renderItems(activeTab.id);
+    abrirModalTipoVistoria();
 }
 
 function limparCamposViatura() {
@@ -2331,9 +2542,109 @@ function updateVistoriaModeUI() {
     const label = document.getElementById("vistoria-mode-label");
     if (!label) return;
 
+    const viatura = getViaturaById(state.selectedViatura);
+    const viaturaPrefix = viatura?.nome ? `${viatura.nome} - ` : "";
+    const categorias = getCategoriasVistoria(state.selectedViatura)
+        .map(category => vistoriaCategoriaLabels[category] || categoryNames[category])
+        .join(", ");
     label.innerText = isVistoriaParcial()
-        ? "Modo: Vistoria parcial"
-        : "Modo: Vistoria completa";
+        ? `${viaturaPrefix}Modo: Vistoria parcial (${categorias})`
+        : `${viaturaPrefix}Modo: Vistoria completa`;
+
+    const mode = isVistoriaParcial() ? "parcial" : "completa";
+    document.querySelectorAll(".vistoria-mode-option").forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+    });
+}
+
+function setModalPartialCategoriasVisible(visible) {
+    const container = document.getElementById("vistoria-partial-categories");
+    if (container) container.classList.toggle("active", visible);
+}
+
+function selecionarTipoVistoriaModal(mode) {
+    const radio = document.querySelector(`input[name="vistoria-mode-required"][value="${mode}"]`);
+    if (radio) radio.checked = true;
+    setModalPartialCategoriasVisible(mode === "parcial");
+    const error = document.getElementById("vistoria-mode-error");
+    if (error) error.innerText = "";
+}
+
+function getCategoriasSelecionadasModal() {
+    return Array.from(document.querySelectorAll("#vistoria-partial-categories input[type='checkbox']:checked"))
+        .map(input => input.value)
+        .filter(category => checklistReportCategories.includes(category));
+}
+
+function preencherModalTipoVistoria() {
+    const viatura = getViaturaById(state.selectedViatura);
+    const title = document.getElementById("vistoria-mode-modal-title");
+    const subtitle = document.getElementById("vistoria-mode-modal-subtitle");
+    if (title) title.innerText = `Definir tipo de vistoria - ${viatura?.nome || "Viatura"}`;
+    if (subtitle) subtitle.innerText = "Escolha completa ou parcial antes de iniciar a vistoria.";
+
+    const mode = state.vistoriaMode[state.selectedViatura] === "parcial" ? "parcial" : "completa";
+    const categoriasAtuais = mode === "parcial" ? getCategoriasVistoria(state.selectedViatura) : ["tablets"];
+
+    document.querySelectorAll("input[name='vistoria-mode-required']").forEach(input => {
+        input.checked = input.value === mode;
+    });
+    document.querySelectorAll("#vistoria-partial-categories input[type='checkbox']").forEach(input => {
+        input.checked = categoriasAtuais.includes(input.value);
+    });
+
+    selecionarTipoVistoriaModal(mode);
+}
+
+function abrirModalTipoVistoria() {
+    preencherModalTipoVistoria();
+    const modal = document.getElementById("vistoria-mode-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function fecharModalTipoVistoria() {
+    const modal = document.getElementById("vistoria-mode-modal");
+    if (modal) modal.style.display = "none";
+}
+
+function confirmarTipoVistoriaModal() {
+    const selectedMode = document.querySelector("input[name='vistoria-mode-required']:checked")?.value || "completa";
+    const categorias = selectedMode === "parcial" ? getCategoriasSelecionadasModal() : [...checklistReportCategories];
+    const error = document.getElementById("vistoria-mode-error");
+
+    if (selectedMode === "parcial" && categorias.length === 0) {
+        if (error) error.innerText = "Selecione pelo menos uma categoria para a vistoria parcial.";
+        return;
+    }
+
+    setModoVistoria(state.selectedViatura, selectedMode, categorias);
+    fecharModalTipoVistoria();
+    updateVistoriaModeUI();
+    updateMenuStatus();
+    ocultarOpcoesModoVistoria();
+
+    const activeTab = document.querySelector(".tab-content.active");
+    if (activeTab && !isCategoriaNaVistoriaAtual(activeTab.id)) {
+        showPage(getCategoriasVistoria(state.selectedViatura)[0] || "tablets");
+    }
+}
+
+function mostrarOpcoesModoVistoria() {
+    const container = document.getElementById("vistoria-actions-container");
+    const btn = document.getElementById("btn-toggle-mode");
+    if (container && btn) {
+        container.classList.add("show");
+        btn.classList.add("active");
+    }
+}
+
+function ocultarOpcoesModoVistoria() {
+    const container = document.getElementById("vistoria-actions-container");
+    const btn = document.getElementById("btn-toggle-mode");
+    if (container && btn) {
+        container.classList.remove("show");
+        btn.classList.remove("active");
+    }
 }
 
 function toggleVistoriaActions() {
@@ -2380,21 +2691,17 @@ function renderTeamList() {
 }
 
 function configurarModoVistoria() {
-    const atual = isVistoriaParcial() ? "PARCIAL" : "COMPLETA";
-    const resposta = prompt(
-        "Digite COMPLETA para vistoria completa ou PARCIAL para vistoriar apenas algumas etapas.",
-        atual
-    );
+    abrirModalTipoVistoria();
+}
 
-    if (!resposta) return;
-
-    const valor = resposta.trim().toUpperCase();
-    if (valor !== "COMPLETA" && valor !== "PARCIAL") {
-        alert("Informe COMPLETA ou PARCIAL.");
+function definirModoVistoria(mode) {
+    if (mode === "parcial") {
+        abrirModalTipoVistoria();
+        selecionarTipoVistoriaModal("parcial");
         return;
     }
 
-    state.vistoriaMode[state.selectedViatura] = valor === "PARCIAL" ? "parcial" : "completa";
+    setModoVistoria(state.selectedViatura, "completa", checklistReportCategories);
     updateVistoriaModeUI();
     updateMenuStatus();
 }
@@ -2410,6 +2717,7 @@ function updateMenuStatus() {
     Object.keys(categoryNames).forEach(category => {
         const link = document.getElementById(`menu-${category}`);
         const btnPdfCategoria = document.getElementById(`btn-pdf-${category}`);
+        const categoriaNaVistoria = isCategoriaNaVistoriaAtual(category);
 
         if (link && status[category]) {
             link.classList.add("completed");
@@ -2418,8 +2726,13 @@ function updateMenuStatus() {
             link.classList.remove("completed");
         }
 
+        if (link) {
+            link.classList.toggle("not-in-scope", !categoriaNaVistoria);
+            link.setAttribute("aria-disabled", categoriaNaVistoria ? "false" : "true");
+        }
+
         if (btnPdfCategoria) {
-            btnPdfCategoria.style.display = vistoriaParcial && status[category] ? "block" : "none";
+            btnPdfCategoria.style.display = vistoriaParcial && categoriaNaVistoria && status[category] ? "block" : "none";
         }
     });
 
@@ -2466,6 +2779,7 @@ async function handleFotoUpload(input, categoria) {
     const files = Array.from(input.files);
     if (files.length === 0) return;
     const viaturaId = state.selectedViatura;
+    const slotIndex = input.dataset?.slotIndex !== undefined ? Number(input.dataset.slotIndex) : null;
 
     if (!state.fotosEvidencia) state.fotosEvidencia = {};
     if (!state.fotosEvidencia[viaturaId]) state.fotosEvidencia[viaturaId] = {};
@@ -2488,13 +2802,18 @@ async function handleFotoUpload(input, categoria) {
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-                state.fotosEvidencia[viaturaId][categoria].push(compressedBase64);
+                if (categoria === "notebooks" && Number.isInteger(slotIndex)) {
+                    state.fotosEvidencia[viaturaId][categoria][slotIndex] = compressedBase64;
+                } else {
+                    state.fotosEvidencia[viaturaId][categoria].push(compressedBase64);
+                }
                 localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
                 renderFotoPreviews(categoria);
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
+        if (categoria === "notebooks" && Number.isInteger(slotIndex)) break;
     }
     input.value = ""; // Limpa o input para permitir nova seleção
 }
@@ -2510,9 +2829,58 @@ function renderFotoPreviews(categoria) {
 
     const viaturaId = state.selectedViatura;
     const fotos = state.fotosEvidencia?.[viaturaId]?.[categoria] || [];
+    const fotosValidas = fotos.filter(Boolean);
     
     if (counter) {
-        counter.innerText = `(${fotos.length} foto${fotos.length === 1 ? '' : 's'})`;
+        counter.innerText = `(${fotosValidas.length} foto${fotosValidas.length === 1 ? '' : 's'})`;
+    }
+
+    if (categoria === "notebooks") {
+        const slots = ["Tampa superior", "Traseira", "Lateral direita", "Lateral esquerda"];
+        const mainSlotsHtml = slots.map((label, index) => {
+            const foto = fotos[index] || "";
+            const hasPhoto = Boolean(foto);
+            return `
+                <div class="notebook-photo-slot ${hasPhoto ? "has-photo" : ""}">
+                    <div class="notebook-photo-slot-label">
+                        <strong>${label}</strong>
+                    </div>
+                    <div class="notebook-photo-slot-preview">
+                        ${hasPhoto ? `<img src="${foto}" alt="${label}">` : '<span>Nenhuma foto</span>'}
+                    </div>
+                    <div class="notebook-photo-slot-actions">
+                        <label for="foto-notebook-slot-${index}" class="notebook-photo-action">${hasPhoto ? "Substituir" : "Adicionar"}</label>
+                        <input type="file" id="foto-notebook-slot-${index}" accept="image/*" data-slot-index="${index}" onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
+                        <button type="button" class="btn-remove-photo" onclick="removerFoto('notebooks', ${index})" ${hasPhoto ? "" : "disabled"}>Excluir</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+        const extraPhotos = fotos
+            .map((foto, index) => ({ foto, index }))
+            .filter(item => item.index >= slots.length && Boolean(item.foto));
+        const extraPhotosHtml = extraPhotos.map(({ foto, index }, extraIndex) => `
+            <div class="notebook-extra-photo-item">
+                <img src="${foto}" alt="Foto extra ${extraIndex + 1}">
+                <button type="button" class="btn-remove-photo" onclick="removerFoto('notebooks', ${index})">Excluir</button>
+            </div>
+        `).join("");
+        container.innerHTML = `
+            ${mainSlotsHtml}
+            <div class="notebook-photo-slot notebook-extra-photo-slot">
+                <div class="notebook-photo-slot-label">
+                    <strong>Fotos extras</strong>
+                </div>
+                <div class="notebook-photo-slot-preview notebook-extra-photo-previews">
+                    ${extraPhotosHtml || '<span>Nenhuma foto extra</span>'}
+                </div>
+                <div class="notebook-photo-slot-actions">
+                    <label for="foto-notebook-extra" class="notebook-photo-action">Adicionar</label>
+                    <input type="file" id="foto-notebook-extra" accept="image/*" multiple onchange="handleFotoUpload(this, 'notebooks')" style="display: none;">
+                </div>
+            </div>
+        `;
+        return;
     }
 
     container.innerHTML = fotos.map((foto, index) => `
@@ -2526,7 +2894,11 @@ function renderFotoPreviews(categoria) {
 function removerFoto(categoria, index) {
     const viaturaId = state.selectedViatura;
     if (state.fotosEvidencia?.[viaturaId]?.[categoria]) {
-        state.fotosEvidencia[viaturaId][categoria].splice(index, 1);
+        if (categoria === "notebooks") {
+            state.fotosEvidencia[viaturaId][categoria][index] = null;
+        } else {
+            state.fotosEvidencia[viaturaId][categoria].splice(index, 1);
+        }
         localStorage.setItem("fotosEvidencia", JSON.stringify(state.fotosEvidencia));
         renderFotoPreviews(categoria);
     }
@@ -2609,7 +2981,7 @@ async function finalizarVistoria(category) {
         const ca = category === "epis" ? document.getElementById(`ca-${category}-${i}`)?.value.trim() || "" : "";
         const dataEntrega = category === "epis" ? document.getElementById(`entrega-${category}-${i}`)?.value.trim() || "" : "";
         const itemName = getItemName(items[i]);
-        const defaults = category === "epis" ? items[i] : getChecklistItemDefaults(category, itemName, state.selectedViatura);
+        const defaults = resolveChecklistItemData(category, items[i], state.selectedViatura, i);
         const quantidadeOriginal = Number(defaults.quantidade || 1);
 
         if (quantidade > quantidadeOriginal) {
@@ -2696,7 +3068,7 @@ async function finalizarVistoria(category) {
         notebookModelo: category === "notebooks" ? notebookModelo : "",
         notebookNumeroSerie: category === "notebooks" ? notebookNumeroSerie : "",
         observacoesNotebook: category === "notebooks" ? (document.getElementById("notebook-observacoes")?.value.trim() || "") : "",
-        fotosEvidencia: state.fotosEvidencia?.[state.selectedViatura]?.[category] || []
+        fotosEvidencia: (state.fotosEvidencia?.[state.selectedViatura]?.[category] || []).filter(Boolean)
     };
 
     const pendentes = checklistResults.filter(r => r.status === "pendente");
@@ -3205,7 +3577,9 @@ function bindWindowFunctions() {
         selecionarVistoriadorAtivo,
         selecionarResponsavelTablet,
         selecionarResponsavelNotebook,
+        renderNotebookSelectOptions,
         selecionarNotebookCadastrado,
+        renderAnalistasSelectOptions,
         selecionarAnalistaCadastrado,
         alternarStatusAnalista,
         abrirGerenciadorAnalistas,
@@ -3231,6 +3605,10 @@ function bindWindowFunctions() {
         loginAdmin,
         logoutAdmin,
         limparHistoricoConfig,
+        toggleExibirTodosHistoricoConfig,
+        toggleExibirTodosHistoricoVistorias,
+        exibirMenosHistoricoVistorias,
+        limparFiltrosHistoricoVistorias,
         importarPDFs,
         processarPDFsImportados,
         verDetalhes,
@@ -3264,6 +3642,8 @@ function bindWindowFunctions() {
         showAdminPeopleTab,
         abrirPaginaHistoricoVistorias,
         adicionarItemChecklist,
+        atualizarTotalItemChecklistAdmin,
+        atualizarTotalNovoItemChecklist,
         adicionarVistoriador,
         editarItemChecklist,
         alternarItemChecklist,
@@ -3290,6 +3670,7 @@ function bindWindowFunctions() {
         mostrarSubstituicaoItem,
         fecharModalRevisao,
         sincronizarVistoriadorLogado,
+        sincronizarItemAdicionadoChecklist,
         setDamageType,
         marcarAvaria,
         handleFotoUpload,
@@ -3306,9 +3687,13 @@ function bindWindowFunctions() {
         removerFoto,
         reiniciarVistoria,
         reiniciarTodasVistorias,
-        toggleDarkMode,
         handleLongPressAction,
         toggleVistoriaActions,
+        definirModoVistoria,
+        selecionarTipoVistoriaModal,
+        confirmarTipoVistoriaModal,
+        fecharModalTipoVistoria,
+        toggleViaturasGrid,
         adicionarAuxiliarExtra,
         removerAuxiliarExtra
     });
@@ -3318,6 +3703,10 @@ window.onclick = function(event) {
     if (!event.target.matches(".menu-btn")) {
         const dropdown = document.getElementById("menu-list");
         if (dropdown.classList.contains("show")) dropdown.classList.remove("show");
+    }
+    if (!event.target.closest(".tech-field") && !event.target.closest(".search-field-wrapper")) {
+        hideResponsavelPicker(document.getElementById("tecnico-nome"));
+        hideResponsavelPicker(document.getElementById("responsavel-pesquisa"));
     }
     hideLongPressMenu();
 };
@@ -3330,7 +3719,6 @@ window.addEventListener('scroll', () => {
 document.addEventListener("DOMContentLoaded", async () => {
     try {
         await carregarConfiguracoes();
-        initDarkMode();
         const vistoriadorSalvo = localStorage.getItem("vistoriadorAtivo");
         renderVistoriadorOptions();
         const vistoriadorSelect = document.getElementById("vistoriador-atual");
@@ -3338,6 +3726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const checkingDate = document.getElementById("checking-date");
         if (checkingDate && !checkingDate.value) checkingDate.value = new Date().toLocaleDateString("sv-SE");
         renderTecnicoDatalist();
+        setupResponsavelPickers();
         preencherResponsaveisViatura();
         renderTeamList();
 
@@ -3359,6 +3748,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (vistoriadorAtual && vistoriadorSelect) vistoriadorSelect.value = vistoriadorAtual;
                 selecionarVistoriadorPorLogin();
                 renderTecnicoDatalist();
+                setupResponsavelPickers();
                 preencherResponsaveisViatura();
                 renderItems("ferramentas");
                 renderViaturaDashboard();
