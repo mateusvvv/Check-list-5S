@@ -383,15 +383,20 @@ function getResponsaveisLista(responsaveis = {}, tipo = "tecnico") {
 
 function syncResponsavelPrincipal(responsaveis, tipo = "tecnico") {
     const lista = getResponsaveisLista(responsaveis, tipo);
-    const first = lista[0] || {};
+    setResponsaveisLista(responsaveis, tipo, lista);
+}
+
+function setResponsaveisLista(responsaveis, tipo = "tecnico", lista = []) {
+    const normalized = lista.map(normalizePessoaResponsavel).filter(pessoa => pessoa.nome);
+    const first = normalized[0] || {};
     if (tipo === "tecnico") {
         responsaveis.tecnico = first.nome || "";
         responsaveis.tecnicoCpf = first.cpf || "";
-        responsaveis.tecnicos = lista;
+        responsaveis.tecnicos = normalized;
     } else {
         responsaveis.auxiliar = first.nome || "";
         responsaveis.auxiliarCpf = first.cpf || "";
-        responsaveis.auxiliares = lista;
+        responsaveis.auxiliares = normalized;
     }
 }
 
@@ -852,12 +857,7 @@ export async function removerResponsavelViatura(viaturaId, tipo, index) {
     if (!confirm(`Remover ${removido.nome} dos ${label} da ${getViaturaLabel(id)}?`)) return;
 
     lista.splice(itemIndex, 1);
-    if (tipo === "tecnico") {
-        responsaveis.tecnicos = lista;
-    } else {
-        responsaveis.auxiliares = lista;
-    }
-    syncResponsavelPrincipal(responsaveis, tipo);
+    setResponsaveisLista(responsaveis, tipo, lista);
     registrarHistoricoConfig(
         tipo === "tecnico" ? "Técnico removido" : "Auxiliar removido",
         `${removido.nome} foi removido de ${getViaturaLabel(id)}.`
