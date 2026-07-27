@@ -85,7 +85,9 @@ import {
     setAuthReadyCallback,
     showAdminConfigTab,
     showAdminPeopleTab,
+    toggleAcoesResponsavelViatura,
     toggleAdicionarResponsavelViatura,
+    toggleRemoverResponsavelViatura,
     substituirItemChecklist,
     adicionarVistoriador,
     alterarPermissoesVistoriador,
@@ -93,7 +95,7 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=22";
+} from "./js/admin.js?v=25";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
@@ -1221,11 +1223,8 @@ function confirmarResponsavelDuplicadoVistoria(nome, cpf) {
     const duplicado = findResponsavelEmOutraViatura(state.selectedViatura, nome, cpf);
     if (!duplicado) return true;
 
-    return confirm(
-        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
-        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
-        "Tem certeza que deseja cadastrar mesmo assim?"
-    );
+    alert(`${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}. Remova esse vínculo antes de adicionar em outra viatura.`);
+    return false;
 }
 
 function renderTecnicoDatalist() {
@@ -3853,7 +3852,9 @@ function bindWindowFunctions() {
         renderAdminHistory,
         showAdminConfigTab,
         showAdminPeopleTab,
+        toggleAcoesResponsavelViatura,
         toggleAdicionarResponsavelViatura,
+        toggleRemoverResponsavelViatura,
         abrirPaginaHistoricoVistorias,
         adicionarItemChecklist,
         atualizarTotalItemChecklistAdmin,

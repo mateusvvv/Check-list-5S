@@ -1716,15 +1716,25 @@
 .admin-add-person-btn {
     display: inline-grid;
     place-items: center;
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
+    width: 52px;
+    height: 34px;
+    min-width: 52px;
     padding: 0 !important;
-    border-radius: 4px !important;
-    background: var(--primary-blue) !important;
-    color: #ffffff !important;
-    font-size: 1rem !important;
+    border: 1px solid var(--primary-blue) !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    color: var(--primary-blue) !important;
+    font-size: 0.92rem !important;
+    font-weight: 900 !important;
     line-height: 1 !important;
+    touch-action: manipulation;
+}
+
+.admin-person-actions-btn span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
 }
 
 .admin-add-person-list {
@@ -1796,9 +1806,79 @@
     cursor: default;
 }
 
+.admin-action-menu-item {
+    display: grid !important;
+    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-areas: "icon title" "icon text";
+    align-items: center;
+    width: 100%;
+    gap: 2px 8px;
+    padding: 10px 12px !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e5edf7 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #0f52a0 !important;
+    text-align: left;
+}
+
+.admin-action-menu-title {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #e5edf7;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.admin-action-menu-item:hover,
+.admin-action-menu-item:focus {
+    background: #f1f7ff !important;
+}
+
+.admin-action-menu-item span {
+    grid-area: icon;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: #e8f1ff;
+    color: var(--primary-blue);
+    font-weight: 900;
+}
+
+.admin-action-menu-item strong {
+    grid-area: title;
+    color: inherit;
+    font-size: 0.82rem;
+    line-height: 1.2;
+}
+
+.admin-action-menu-item small {
+    grid-area: text;
+    color: #64748b;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
+.admin-action-menu-item.danger {
+    color: #be123c !important;
+}
+
+.admin-action-menu-item.danger span,
+.admin-remove-person-item span {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.admin-remove-person-item {
+    grid-template-areas: "icon name";
+}
+
 .admin-vehicle-person {
     display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto;
+    grid-template-columns: 18px minmax(0, 1fr);
     gap: 8px;
     align-items: start;
     min-width: 0;
@@ -2287,7 +2367,7 @@
     }
 
     .admin-vehicle-person {
-        grid-template-columns: 18px minmax(0, 1fr) 32px;
+        grid-template-columns: 18px minmax(0, 1fr);
         align-items: start;
         gap: 6px;
     }

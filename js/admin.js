@@ -466,11 +466,8 @@ function confirmarResponsavelDuplicado(viaturaId, campo, valor) {
 
     if (!duplicado) return true;
 
-    return confirm(
-        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
-        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
-        "Tem certeza que deseja cadastrar mesmo assim?"
-    );
+    alert(`${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}. Remova esse vínculo antes de adicionar em outra viatura.`);
+    return false;
 }
 
 export function setAuthReadyCallback(callback) {
@@ -620,7 +617,6 @@ export function renderAdminViaturas() {
                         <input type="text" value="${escapeHtml(cpf || "")}" placeholder="CPF não informado" ${cpfChange} ${readonlyAttrs}>
                     </label>
                 </div>
-                ${removable ? `<button type="button" class="admin-remove-person-btn" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}" data-index="${index}" aria-label="Remover ${tipo === "tecnico" ? "técnico" : "auxiliar"}">x</button>` : ""}
             </div>
         `;
     };
@@ -630,7 +626,9 @@ export function renderAdminViaturas() {
         return `
             <div class="admin-people-group-header">
                 <h4>${icon} ${label} (${count})</h4>
-                <button type="button" class="admin-add-person-btn" onclick="toggleAdicionarResponsavelViatura('${viaturaId}', '${tipo}')" aria-label="Adicionar ${label.toLowerCase()}">+</button>
+                <button type="button" class="admin-add-person-btn admin-person-actions-btn" onclick="toggleAcoesResponsavelViatura('${viaturaId}', '${tipo}')" aria-label="Ações de ${label.toLowerCase()}">
+                    <span aria-hidden="true">👤+ ×</span>
+                </button>
                 <div class="admin-add-person-list" id="admin-add-${tipo}-${viaturaId}" hidden></div>
             </div>
         `;
@@ -721,7 +719,13 @@ export function renderAdminViaturas() {
     if (adminAddResponsavelOpen) {
         const list = getAdminAddResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
         if (list) {
-            renderAdminAddResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+            if (adminAddResponsavelOpen.mode === "add") {
+                renderAdminAddResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+            } else if (adminAddResponsavelOpen.mode === "remove") {
+                renderAdminRemoveResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+            } else {
+                renderAdminResponsavelActionList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+            }
             list.hidden = false;
         }
     }
@@ -769,7 +773,7 @@ function renderAdminAddResponsavelList(viaturaId, tipo) {
             const key = getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf);
             const selected = atuais.has(key);
             return `
-                <button type="button" class="admin-add-person-item ${selected ? "selected" : ""}" onclick="adicionarResponsavelViatura('${viaturaId}', '${tipo}', '${escapeJsString(pessoa.nome)}')" ${selected ? "disabled" : ""}>
+                <button type="button" class="admin-add-person-item ${selected ? "selected" : ""}" data-admin-action="add-person" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}" data-nome="${escapeHtml(pessoa.nome)}" ${selected ? "disabled" : ""}>
                     <span>${selected ? "✓" : "+"}</span>
                     <strong>${escapeHtml(pessoa.nome)}</strong>
                     <small>${escapeHtml(pessoa.cpf || "CPF não informado")}</small>
@@ -779,22 +783,91 @@ function renderAdminAddResponsavelList(viaturaId, tipo) {
         : '<div class="responsavel-picker-empty">Nenhum funcionário cadastrado.</div>';
 }
 
+function renderAdminRemoveResponsavelList(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+
+    const responsaveis = viaturaResponsaveis[String(viaturaId)] || {};
+    const atuais = getResponsaveisLista(responsaveis, tipo);
+
+    list.innerHTML = atuais.length
+        ? atuais.map((pessoa, index) => `
+            <button type="button" class="admin-add-person-item admin-remove-person-item" data-admin-action="remove-person" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}" data-index="${index}">
+                <span aria-hidden="true">×</span>
+                <strong>${escapeHtml(pessoa.nome || "Sem nome")}</strong>
+            </button>
+        `).join("")
+        : '<div class="responsavel-picker-empty">Nenhum nome para remover.</div>';
+}
+
+function renderAdminResponsavelActionList(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+
+    const label = tipo === "tecnico" ? "técnico" : "auxiliar";
+    list.innerHTML = `
+        <div class="admin-action-menu-title">Ações de ${escapeHtml(label)}</div>
+        <button type="button" class="admin-action-menu-item" data-admin-action="show-add" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}">
+            <span aria-hidden="true">+</span>
+            <strong>Adicionar ${escapeHtml(label)}</strong>
+            <small>Mostrar lista de nomes cadastrados</small>
+        </button>
+        <button type="button" class="admin-action-menu-item danger" data-admin-action="show-remove" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}">
+            <span aria-hidden="true">×</span>
+            <strong>Remover ${escapeHtml(label)}</strong>
+            <small>Escolher um nome já vinculado</small>
+        </button>
+    `;
+}
+
 function setupAdminAddResponsavelLists(container = document) {
     container.querySelectorAll(".admin-add-person-list").forEach((list) => {
         const [, , tipo, viaturaId] = list.id.split("-");
-        renderAdminAddResponsavelList(viaturaId, tipo);
+        renderAdminResponsavelActionList(viaturaId, tipo);
     });
+}
+
+export function toggleAcoesResponsavelViatura(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+    const shouldOpen = list.hidden || adminAddResponsavelOpen?.mode !== "actions";
+    hideOtherAdminResponsavelPickers();
+    hideAdminAddResponsavelLists(list);
+    if (shouldOpen) {
+        adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo, mode: "actions" };
+        renderAdminResponsavelActionList(viaturaId, tipo);
+        list.hidden = false;
+    } else {
+        adminAddResponsavelOpen = null;
+        list.hidden = true;
+    }
 }
 
 export function toggleAdicionarResponsavelViatura(viaturaId, tipo) {
     const list = getAdminAddResponsavelList(viaturaId, tipo);
     if (!list) return;
-    const shouldOpen = list.hidden;
+    const shouldOpen = list.hidden || adminAddResponsavelOpen?.mode !== "add";
     hideOtherAdminResponsavelPickers();
     hideAdminAddResponsavelLists(list);
     if (shouldOpen) {
-        adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo };
+        adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo, mode: "add" };
         renderAdminAddResponsavelList(viaturaId, tipo);
+        list.hidden = false;
+    } else {
+        adminAddResponsavelOpen = null;
+        list.hidden = true;
+    }
+}
+
+export function toggleRemoverResponsavelViatura(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+    const shouldOpen = list.hidden || adminAddResponsavelOpen?.mode !== "remove";
+    hideOtherAdminResponsavelPickers();
+    hideAdminAddResponsavelLists(list);
+    if (shouldOpen) {
+        adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo, mode: "remove" };
+        renderAdminRemoveResponsavelList(viaturaId, tipo);
         list.hidden = false;
     } else {
         adminAddResponsavelOpen = null;
@@ -823,11 +896,8 @@ export async function adicionarResponsavelViatura(viaturaId, tipo, nome) {
     }
 
     const duplicado = findResponsavelEmOutraViatura(id, pessoaNome, pessoaCpf);
-    if (duplicado && !confirm(
-        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
-        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
-        "Tem certeza que deseja cadastrar mesmo assim?"
-    )) {
+    if (duplicado) {
+        alert(`${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}. Remova esse vínculo antes de adicionar em outra viatura.`);
         renderAdminAddResponsavelList(id, tipo);
         return;
     }
@@ -840,7 +910,7 @@ export async function adicionarResponsavelViatura(viaturaId, tipo, nome) {
     );
     await salvarConfiguracoes();
     refreshAppAfterConfigChange();
-    adminAddResponsavelOpen = { viaturaId: id, tipo };
+    adminAddResponsavelOpen = null;
     renderAdminViaturas();
 }
 
@@ -978,11 +1048,8 @@ export async function selecionarTecnicoViatura(id, nome) {
     const tecnicoCpf = tecnico?.cpf || viaturaResponsaveis[viaturaId].tecnicoCpf || "";
 
     const duplicado = findResponsavelEmOutraViatura(viaturaId, tecnicoNome, tecnicoCpf);
-    if (duplicado && !confirm(
-        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
-        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
-        "Tem certeza que deseja cadastrar mesmo assim?"
-    )) {
+    if (duplicado) {
+        alert(`${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}. Remova esse vínculo antes de adicionar em outra viatura.`);
         refreshAppAfterConfigChange();
         return;
     }
@@ -1023,11 +1090,8 @@ export async function selecionarAuxiliarViatura(id, nome) {
     const auxiliarCpf = auxiliar?.cpf || viaturaResponsaveis[viaturaId].auxiliarCpf || "";
 
     const duplicado = findResponsavelEmOutraViatura(viaturaId, auxiliarNome, auxiliarCpf);
-    if (duplicado && !confirm(
-        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
-        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
-        "Tem certeza que deseja cadastrar mesmo assim?"
-    )) {
+    if (duplicado) {
+        alert(`${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}. Remova esse vínculo antes de adicionar em outra viatura.`);
         refreshAppAfterConfigChange();
         return;
     }
@@ -1052,6 +1116,32 @@ export async function selecionarAuxiliarViatura(id, nome) {
 }
 
 document.addEventListener("click", (event) => {
+    const actionButton = event.target.closest("[data-admin-action]");
+    if (actionButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        const viaturaId = actionButton.dataset.viaturaId;
+        const tipo = actionButton.dataset.tipo;
+        const action = actionButton.dataset.adminAction;
+
+        if (action === "show-add") {
+            toggleAdicionarResponsavelViatura(viaturaId, tipo);
+            return;
+        }
+        if (action === "show-remove") {
+            toggleRemoverResponsavelViatura(viaturaId, tipo);
+            return;
+        }
+        if (action === "add-person") {
+            adicionarResponsavelViatura(viaturaId, tipo, actionButton.dataset.nome || "");
+            return;
+        }
+        if (action === "remove-person") {
+            removerResponsavelViatura(viaturaId, tipo, actionButton.dataset.index);
+            return;
+        }
+    }
+
     const removeButton = event.target.closest(".admin-remove-person-btn");
     if (removeButton) {
         event.preventDefault();
