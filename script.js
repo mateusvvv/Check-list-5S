@@ -95,7 +95,7 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=25";
+} from "./js/admin.js?v=27";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
@@ -2783,7 +2783,7 @@ function preencherModalTipoVistoria() {
     if (subtitle) subtitle.innerText = "Escolha completa ou parcial antes de iniciar a vistoria.";
 
     const mode = state.vistoriaMode[state.selectedViatura] === "parcial" ? "parcial" : "completa";
-    const categoriasAtuais = mode === "parcial" ? getCategoriasVistoria(state.selectedViatura) : ["tablets"];
+    const categoriasAtuais = mode === "parcial" ? getCategoriasVistoria(state.selectedViatura) : [];
 
     document.querySelectorAll("input[name='vistoria-mode-required']").forEach(input => {
         input.checked = input.value === mode;
@@ -3489,11 +3489,10 @@ async function enviarVistoriaAoFirebase() {
         alert("✅ Vistoria salva com sucesso!");
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        // Volta para a página inicial para mostrar o botão de PDF.
-        // Agora volta sempre se for modo parcial (mesmo que apenas 1 EPI tenha sido feito)
-        // ou se a categoria salva foi finalizada por completo.
         const ehParcial = isVistoriaParcial(viaturaSalva);
-        if (ehParcial || categoriaSalva !== "epis" || state.surveyStatus[viaturaSalva][categoriaSalva]) {
+        const episAindaPendente = categoriaSalva === "epis" && !state.surveyStatus[viaturaSalva][categoriaSalva];
+
+        if (!episAindaPendente && (ehParcial || categoriaSalva !== "epis" || state.surveyStatus[viaturaSalva][categoriaSalva])) {
             showHome();
         }
 
@@ -3502,9 +3501,10 @@ async function enviarVistoriaAoFirebase() {
         state.vistoriasCache = [];
         state.dadosTemporariosVistoria = null;
 
-        if (categoriaSalva === "epis" && !state.surveyStatus[state.selectedViatura][categoriaSalva]) {
+        if (episAindaPendente) {
             const pendentes = getEpiPessoasPendentes(viaturaSalva);
             const proximaPessoa = pendentes[0];
+            showPage("epis");
             if (proximaPessoa) {
                 const select = document.getElementById("epi-pessoa");
                 if (select) select.value = proximaPessoa.key;

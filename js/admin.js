@@ -562,18 +562,14 @@ export function showAdminConfigTab(tab) {
         return;
     }
     const tabs = ["viaturas", "itens", "funcionarios", "tec-externos", "notebooks", "historico"];
-    const targetButton = getAdminConfigTabButton(tab);
-    const isAlreadyOpen = targetButton?.classList.contains("active");
-    if (isAlreadyOpen) {
-        tabs.forEach(item => {
-            getAdminConfigTabButton(item)?.classList.remove("active");
-            document.getElementById(`admin-config-${item}`)?.classList.remove("active");
-        });
-        return;
-    }
 
     tabs.forEach(item => {
-        getAdminConfigTabButton(item)?.classList.toggle("active", tab === item);
+        const button = getAdminConfigTabButton(item);
+        if (button) {
+            const isActive = tab === item;
+            button.classList.toggle("active", isActive);
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
+        }
         document.getElementById(`admin-config-${item}`)?.classList.toggle("active", tab === item);
     });
 
@@ -648,7 +644,7 @@ export function renderAdminViaturas() {
             <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
                 <div class="admin-vehicle-main">
                     <div class="admin-vehicle-title">
-                        <span class="admin-vehicle-icon" aria-hidden="true">🚙</span>
+                        <span class="admin-vehicle-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13l2.2-5.2A3 3 0 0 1 8 6h8a3 3 0 0 1 2.8 1.8L21 13"></path><path d="M5 13h14v5H5z"></path><circle cx="8" cy="18" r="1.5"></circle><circle cx="16" cy="18" r="1.5"></circle><path d="M8 10h8"></path></svg></span>
                         <input type="text" value="${escapeHtml(viatura.nome)}" onchange="editarNomeViatura('${viatura.id}', this.value)" aria-label="Nome da viatura">
                     </div>
                     <div class="admin-config-actions">

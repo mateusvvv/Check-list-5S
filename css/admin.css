@@ -881,8 +881,8 @@
 .admin-config-tabs button.active {
     background: #ffffff;
     color: #0d1b34;
-    border-color: #b8cff3;
-    box-shadow: 0 18px 35px rgba(14, 84, 184, 0.16);
+    border-color: var(--primary-blue);
+    box-shadow: 0 18px 35px rgba(14, 84, 184, 0.18);
 }
 
 .admin-dashboard-cards {
@@ -919,6 +919,27 @@
     transform: translateY(-7px);
     border-color: #9fc0ef;
     box-shadow: 0 20px 42px rgba(14, 84, 184, 0.18);
+}
+
+.admin-dashboard-card.active {
+    transform: translateY(-5px);
+    border-color: var(--primary-blue) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #eef6ff 100%) !important;
+    box-shadow: 0 22px 44px rgba(14, 84, 184, 0.24);
+}
+
+.admin-dashboard-card.active::after {
+    height: 7px;
+    background: #0056b3;
+}
+
+.admin-dashboard-card.active .admin-dashboard-icon {
+    background: var(--primary-blue);
+    color: #ffffff;
+}
+
+.admin-dashboard-card.active strong {
+    color: var(--primary-blue);
 }
 
 .admin-dashboard-card.restricted {
@@ -1654,6 +1675,16 @@
     color: var(--primary-blue);
     font-size: 1.42rem;
     line-height: 1;
+}
+
+.admin-vehicle-icon svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .admin-vehicle-title input[type="text"] {
