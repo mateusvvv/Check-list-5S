@@ -93,7 +93,7 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=20";
+} from "./js/admin.js?v=21";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,
@@ -1276,9 +1276,17 @@ function hideResponsavelPicker(input) {
     if (picker) picker.hidden = true;
 }
 
+function hideOtherResponsavelPickers(activeInput) {
+    ["tecnico-nome", "responsavel-pesquisa"].forEach((id) => {
+        const input = document.getElementById(id);
+        if (input && input !== activeInput) hideResponsavelPicker(input);
+    });
+}
+
 function showResponsavelPicker(input, { showAll = false } = {}) {
     if (!input) return;
     renderTecnicoDatalist();
+    hideOtherResponsavelPickers(input);
     const picker = ensureResponsavelPicker(input);
     const options = getResponsavelPickerOptions(showAll ? "" : input.value);
 
@@ -1301,6 +1309,8 @@ function showResponsavelPicker(input, { showAll = false } = {}) {
             hideResponsavelPicker(input);
             if (input.id === "tecnico-nome") {
                 await selecionarTecnicoVistoriaAtual(nome);
+            } else if (input.id === "responsavel-pesquisa") {
+                await adicionarAuxiliarExtra(nome);
             }
         });
     });
@@ -1311,11 +1321,23 @@ function setupResponsavelPickers() {
         const input = document.getElementById(id);
         if (!input || input.dataset.responsavelPickerBound === "true") return;
         input.dataset.responsavelPickerBound = "true";
+        input.setAttribute("readonly", "readonly");
+        input.setAttribute("autocomplete", "off");
         input.addEventListener("focus", () => showResponsavelPicker(input, { showAll: true }));
         input.addEventListener("click", () => showResponsavelPicker(input, { showAll: true }));
-        input.addEventListener("input", () => showResponsavelPicker(input));
+        input.addEventListener("beforeinput", (event) => event.preventDefault());
+        input.addEventListener("input", () => showResponsavelPicker(input, { showAll: true }));
         input.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") hideResponsavelPicker(input);
+            if (event.key === "Escape") {
+                hideResponsavelPicker(input);
+                return;
+            }
+            if (["Tab", "Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
+                if (event.key !== "Tab") event.preventDefault();
+                showResponsavelPicker(input, { showAll: true });
+                return;
+            }
+            event.preventDefault();
         });
     });
 }
@@ -2159,7 +2181,7 @@ function refreshEquipeResponsavelUI() {
     updateMenuStatus();
 }
 
-async function adicionarAuxiliarExtra() {
+async function adicionarAuxiliarExtra(nomeSelecionado = "") {
     const viaturaId = state.selectedViatura;
     const responsaveis = ensureResponsaveisEquipe(viaturaId);
     const previous = cloneResponsaveisEquipe(responsaveis);
@@ -2167,9 +2189,9 @@ async function adicionarAuxiliarExtra() {
 
     try {
         const input = document.getElementById("responsavel-pesquisa");
-        const nome = input?.value.trim();
+        const nome = String(nomeSelecionado || input?.value || "").trim();
         if (!nome) {
-            alert("Digite um nome ou pesquise para adicionar um auxiliar.");
+            alert("Selecione um nome na lista para adicionar um auxiliar.");
             return;
         }
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Checklist 5S - DIGITAL</title>
-    <link rel="stylesheet" href="style.css?v=48">
+    <link rel="stylesheet" href="style.css?v=50">
     <style>
         /* Estilos Gerais para Gestão de Funcionários (Admin) */
         * {
@@ -1141,17 +1141,19 @@
             color: #ef4444;
             border: none;
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
+            width: 38px;
+            height: 38px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
             flex-shrink: 0;
+            padding: 0;
+            touch-action: manipulation;
         }
         .btn-remove-assistant:hover { background: #ef4444; color: white; }
-        .remove-icon { font-size: 1.2rem; line-height: 1; font-weight: bold; }
+        .remove-icon { font-size: 1.35rem; line-height: 1; font-weight: bold; pointer-events: none; }
 
         /* Ajustes visuais e de posicionamento EXCLUSIVOS para PC */
         @media (min-width: 601px) {
@@ -1252,6 +1254,9 @@
             .tech-field input, .cpf-field input { width: 100% !important; }
             .btn-add-auxiliar { width: 100%; justify-content: center; height: 44px; }
             .assistant-cards-container { grid-template-columns: 1fr; }
+            .assistant-card { align-items: center !important; gap: 10px !important; }
+            .assistant-card-info { min-width: 0 !important; }
+            .btn-remove-assistant { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
             .team-member-name { font-size: 0.62rem !important; } /* Reduzido para melhor visualização de nomes longos */
         }
     </style>
@@ -1347,9 +1352,9 @@
 
                 <div id="team-actions-container" class="checking-hidden-fields" hidden>
                     <input type="date" id="checking-date">
-                    <input type="text" id="tecnico-nome" list="tecnicos-list" onchange="selecionarTecnicoVistoriaAtual(this.value)">
+                    <input type="text" id="tecnico-nome" list="tecnicos-list" onchange="selecionarTecnicoVistoriaAtual(this.value)" readonly>
                     <input type="text" id="tecnico-cpf" onchange="salvarCpfTecnicoVistoriaAtual(this.value)">
-                    <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list">
+                    <input type="text" id="responsavel-pesquisa" list="tecnicos-auxiliares-list" readonly>
                     <input type="text" id="auxiliar-nome">
                     <input type="text" id="auxiliar-cpf">
                     <div id="lista-auxiliares-selecionados"></div>
@@ -2069,6 +2074,6 @@
             }, 3000);
         });
     </script>
-    <script type="module" src="script.js?v=81"></script>
+    <script type="module" src="script.js?v=83"></script>
 </body>
 </html>

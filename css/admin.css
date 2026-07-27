@@ -2154,7 +2154,9 @@
     margin: 6vh auto;
     max-width: 620px;
     max-height: 88vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .analysts-modal-list {
@@ -2162,7 +2164,12 @@
     gap: 0;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
-    overflow: hidden;
+    max-height: min(68vh, 620px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
 }
 
 .analyst-manager-row {
@@ -2237,6 +2244,24 @@
 }
 
 @media (max-width: 640px) {
+    .analysts-modal-content {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: calc(100vw - 24px) !important;
+        max-width: none;
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+        margin: 0;
+        padding: 16px 12px;
+    }
+
+    .analysts-modal-list {
+        max-height: calc(100dvh - 116px);
+        padding-right: 2px;
+    }
+
     .admin-analysts-cards,
     .admin-analyst-card,
     .analyst-manager-row {
@@ -2250,6 +2275,11 @@
     .admin-analyst-badge,
     .analyst-status-control {
         justify-self: start;
+    }
+
+    .analyst-manager-row {
+        gap: 8px;
+        padding: 10px;
     }
 }
 

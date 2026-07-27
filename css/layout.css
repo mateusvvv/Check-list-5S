@@ -275,6 +275,7 @@ body > main {
     border-radius: 8px;
     background: #ffffff;
     box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+    -webkit-overflow-scrolling: touch;
 }
 
 .responsavel-picker-list[hidden] {
@@ -293,6 +294,7 @@ body > main {
     cursor: pointer;
     font: inherit;
     text-align: left;
+    touch-action: manipulation;
 }
 
 .responsavel-picker-item:hover,

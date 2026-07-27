@@ -309,43 +309,6 @@
         min-height: 220px;
     }
 
-    #admin-tab-historico.admin-dashboard-card {
-        grid-column: 1 / -1;
-        grid-template-columns: 72px minmax(0, 1fr);
-        grid-template-areas:
-            "icon title"
-            "icon text";
-        align-content: center;
-        justify-items: start;
-        min-height: 148px;
-        padding: 22px;
-        column-gap: 18px;
-        row-gap: 6px;
-        text-align: left;
-    }
-
-    #admin-tab-historico .admin-dashboard-icon {
-        grid-area: icon;
-        width: 72px;
-        height: 72px;
-    }
-
-    #admin-tab-historico .admin-dashboard-icon svg {
-        width: 38px;
-        height: 38px;
-    }
-
-    #admin-tab-historico.admin-dashboard-card strong {
-        grid-area: title;
-        align-self: end;
-    }
-
-    #admin-tab-historico.admin-dashboard-card > span:last-child {
-        grid-area: text;
-        max-width: none;
-        align-self: start;
-    }
-
     .admin-vehicle-main {
         grid-template-columns: 1fr;
         align-items: stretch;

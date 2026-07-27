@@ -790,6 +790,7 @@ export function toggleAdicionarResponsavelViatura(viaturaId, tipo) {
     const list = getAdminAddResponsavelList(viaturaId, tipo);
     if (!list) return;
     const shouldOpen = list.hidden;
+    hideOtherAdminResponsavelPickers();
     hideAdminAddResponsavelLists(list);
     if (shouldOpen) {
         adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo };
@@ -882,8 +883,17 @@ function hideAdminResponsavelPicker(input) {
     if (picker) picker.hidden = true;
 }
 
+function hideOtherAdminResponsavelPickers(activeInput = null) {
+    document.querySelectorAll(".admin-responsavel-picker").forEach((picker) => {
+        if (activeInput?.parentElement?.contains(picker)) return;
+        picker.hidden = true;
+    });
+}
+
 function showAdminResponsavelPicker(input, { showAll = false } = {}) {
-    if (!input || input.readOnly) return;
+    if (!input) return;
+    hideOtherAdminResponsavelPickers(input);
+    hideAdminAddResponsavelLists();
     const picker = ensureAdminResponsavelPicker(input);
     const options = getAdminResponsavelOptions(showAll ? "" : input.value);
 
@@ -916,11 +926,23 @@ function setupAdminResponsavelPickers(container = document) {
     container.querySelectorAll('textarea[data-admin-responsavel="true"]').forEach((input) => {
         if (input.dataset.adminPickerBound === "true") return;
         input.dataset.adminPickerBound = "true";
+        input.setAttribute("readonly", "readonly");
+        input.setAttribute("autocomplete", "off");
         input.addEventListener("focus", () => showAdminResponsavelPicker(input, { showAll: true }));
         input.addEventListener("click", () => showAdminResponsavelPicker(input, { showAll: true }));
-        input.addEventListener("input", () => showAdminResponsavelPicker(input));
+        input.addEventListener("beforeinput", (event) => event.preventDefault());
+        input.addEventListener("input", () => showAdminResponsavelPicker(input, { showAll: true }));
         input.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") hideAdminResponsavelPicker(input);
+            if (event.key === "Escape") {
+                hideAdminResponsavelPicker(input);
+                return;
+            }
+            if (["Tab", "Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
+                if (event.key !== "Tab") event.preventDefault();
+                showAdminResponsavelPicker(input, { showAll: true });
+                return;
+            }
+            event.preventDefault();
         });
     });
 }
