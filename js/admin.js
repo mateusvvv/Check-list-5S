@@ -15,6 +15,7 @@ let historicoFiltradoAtual = [];
 let historicoVisibleCount = HISTORICO_INITIAL_VISIBLE;
 let historicoGroups = {};
 let configHistoryShowAll = false;
+let adminAddResponsavelOpen = null;
 
 function stringToSafeId(value = "") {
     return String(value)
@@ -347,6 +348,57 @@ function getTecnicoOptions() {
     return [...porChave.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
+function normalizePessoaResponsavel(pessoa = {}) {
+    return {
+        nome: String(pessoa.nome || "").trim(),
+        cpf: String(pessoa.cpf || "").trim()
+    };
+}
+
+function getResponsaveisLista(responsaveis = {}, tipo = "tecnico") {
+    const arrayField = tipo === "tecnico" ? "tecnicos" : "auxiliares";
+    const nomeField = tipo === "tecnico" ? "tecnico" : "auxiliar";
+    const cpfField = tipo === "tecnico" ? "tecnicoCpf" : "auxiliarCpf";
+    const emptyLabel = tipo === "tecnico" ? "Sem técnico" : "Sem auxiliar";
+    const lista = Array.isArray(responsaveis[arrayField])
+        ? responsaveis[arrayField].map(normalizePessoaResponsavel)
+        : [];
+
+    if (!isEmptyResponsavelName(responsaveis[nomeField], emptyLabel)) {
+        lista.unshift({
+            nome: String(responsaveis[nomeField] || "").trim(),
+            cpf: String(responsaveis[cpfField] || "").trim()
+        });
+    }
+
+    const seen = new Set();
+    return lista.filter((pessoa) => {
+        if (!pessoa.nome) return false;
+        const key = getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function syncResponsavelPrincipal(responsaveis, tipo = "tecnico") {
+    const lista = getResponsaveisLista(responsaveis, tipo);
+    const first = lista[0] || {};
+    if (tipo === "tecnico") {
+        responsaveis.tecnico = first.nome || "";
+        responsaveis.tecnicoCpf = first.cpf || "";
+        responsaveis.tecnicos = lista;
+    } else {
+        responsaveis.auxiliar = first.nome || "";
+        responsaveis.auxiliarCpf = first.cpf || "";
+        responsaveis.auxiliares = lista;
+    }
+}
+
+function getFuncionariosResponsaveisOptions() {
+    return getTecnicoOptions();
+}
+
 function findTecnicoByName(nome) {
     const termo = normalizeSearch(nome);
     if (!termo) return null;
@@ -370,7 +422,13 @@ function findResponsavelEmOutraViatura(viaturaIdAtual, nome, cpf) {
 
         const pessoas = [
             { tipo: "técnico", nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf },
-            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf }
+            { tipo: "auxiliar", nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf },
+            ...(Array.isArray(responsaveis.tecnicos)
+                ? responsaveis.tecnicos.map(tecnico => ({ tipo: "técnico", nome: tecnico.nome, cpf: tecnico.cpf }))
+                : []),
+            ...(Array.isArray(responsaveis.auxiliares)
+                ? responsaveis.auxiliares.map(auxiliar => ({ tipo: "auxiliar", nome: auxiliar.nome, cpf: auxiliar.cpf }))
+                : [])
         ];
 
         const encontrada = pessoas.find(pessoa => {
@@ -460,6 +518,10 @@ function renderAdminConfig() {
     renderAdminVistoriadores();
     renderAdminHistory();
     updateAdminTabsPermissions();
+
+    if (document.getElementById("admin-config-historico")?.classList.contains("active")) {
+        carregarHistorico();
+    }
 }
 
 /**
@@ -527,7 +589,7 @@ export function renderAdminViaturas() {
     if (!container) return;
 
     const tecnicoOptions = getTecnicoOptions();
-    const renderPessoaField = ({ viaturaId, tipo, nome, cpf, datalistId, index = 0, editable = true }) => {
+    const renderPessoaField = ({ viaturaId, tipo, nome, cpf, datalistId, index = 0, editable = true, removable = false }) => {
         const cpfCampo = tipo === "tecnico" ? "tecnicoCpf" : "auxiliarCpf";
         const nomeHandler = tipo === "tecnico" ? "selecionarTecnicoViatura" : "selecionarAuxiliarViatura";
         const emptyName = tipo === "tecnico" ? "Sem técnico" : "Sem auxiliar";
@@ -553,21 +615,32 @@ export function renderAdminViaturas() {
                         <input type="text" value="${escapeHtml(cpf || "")}" placeholder="CPF não informado" ${cpfChange} ${readonlyAttrs}>
                     </label>
                 </div>
+                ${removable ? `<button type="button" class="admin-remove-person-btn" onclick="removerResponsavelViatura('${viaturaId}', '${tipo}', ${index})" aria-label="Remover ${tipo === "tecnico" ? "técnico" : "auxiliar"}">x</button>` : ""}
+            </div>
+        `;
+    };
+    const renderGroupHeader = ({ viaturaId, tipo, count }) => {
+        const label = tipo === "tecnico" ? "Técnicos" : "Auxiliares";
+        const icon = tipo === "tecnico" ? "👥" : "👤";
+        return `
+            <div class="admin-people-group-header">
+                <h4>${icon} ${label} (${count})</h4>
+                <button type="button" class="admin-add-person-btn" onclick="toggleAdicionarResponsavelViatura('${viaturaId}', '${tipo}')" aria-label="Adicionar ${label.toLowerCase()}">+</button>
+                <div class="admin-add-person-list" id="admin-add-${tipo}-${viaturaId}" hidden></div>
             </div>
         `;
     };
 
     container.innerHTML = state.viaturas.map((viatura) => {
         const responsaveis = viaturaResponsaveis[viatura.id] || {};
-        const tecnicoTemNome = !isEmptyResponsavelName(responsaveis.tecnico, "Sem técnico");
-        const auxiliarTemNome = !isEmptyResponsavelName(responsaveis.auxiliar, "Sem auxiliar");
+        const tecnicos = getResponsaveisLista(responsaveis, "tecnico");
+        const auxiliares = getResponsaveisLista(responsaveis, "auxiliar");
+        const tecnicoTemNome = tecnicos.length > 0;
+        const auxiliarTemNome = auxiliares.length > 0;
         const tecnicoDatalistId = `tecnicos-viatura-${viatura.id}`;
         const auxiliarDatalistId = `auxiliares-viatura-${viatura.id}`;
-        const auxiliares = auxiliarTemNome
-            ? [{ nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf || "" }]
-            : [];
-        const tecnicoCount = tecnicoTemNome ? 1 : 0;
-        const auxiliarCount = auxiliares.filter(auxiliar => auxiliar?.nome).length;
+        const tecnicoCount = tecnicos.length;
+        const auxiliarCount = auxiliares.length;
         return `
             <div class="admin-config-row admin-vehicle-row ${viatura.ativa === false ? "inactive" : ""}">
                 <div class="admin-vehicle-main">
@@ -577,25 +650,38 @@ export function renderAdminViaturas() {
                     </div>
                     <div class="admin-config-actions">
                         <button type="button" class="${viatura.ativa === false ? "" : "btn-muted"}" onclick="alternarViaturaAtiva('${viatura.id}')">${viatura.ativa === false ? "Ativar" : "Desativar"}</button>
-                        <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover</button>
+                        <button type="button" class="btn-danger" onclick="removerViatura('${viatura.id}')">Remover viatura</button>
                     </div>
                 </div>
                 <div class="admin-responsaveis-grid">
                     <section class="admin-vehicle-people-group">
-                        <h4>👥 Técnicos (${tecnicoCount})</h4>
-                        ${renderPessoaField({
-                            viaturaId: viatura.id,
-                            tipo: "tecnico",
-                            nome: tecnicoTemNome ? responsaveis.tecnico : "",
-                            cpf: tecnicoTemNome ? responsaveis.tecnicoCpf || "" : "",
-                            datalistId: tecnicoDatalistId
-                        })}
+                        ${renderGroupHeader({ viaturaId: viatura.id, tipo: "tecnico", count: tecnicoCount })}
+                        ${
+                            tecnicoTemNome
+                                ? tecnicos.map((tecnico, index) => renderPessoaField({
+                                    viaturaId: viatura.id,
+                                    tipo: "tecnico",
+                                    nome: tecnico.nome || "",
+                                    cpf: tecnico.cpf || "",
+                                    datalistId: tecnicoDatalistId,
+                                    index,
+                                    editable: index === 0,
+                                    removable: true
+                                })).join("")
+                                : renderPessoaField({
+                                    viaturaId: viatura.id,
+                                    tipo: "tecnico",
+                                    nome: "",
+                                    cpf: "",
+                                    datalistId: tecnicoDatalistId
+                                })
+                        }
                         <datalist id="${tecnicoDatalistId}">
                             ${tecnicoOptions.map(tecnico => `<option value="${escapeHtml(tecnico.nome)}" label="${escapeHtml(tecnico.cpf)}"></option>`).join("")}
                         </datalist>
                     </section>
                     <section class="admin-vehicle-people-group">
-                        <h4>👤 Auxiliares (${auxiliarCount})</h4>
+                        ${renderGroupHeader({ viaturaId: viatura.id, tipo: "auxiliar", count: auxiliarCount })}
                         ${
                             auxiliares.length
                                 ? auxiliares.map((auxiliar, index) => renderPessoaField({
@@ -605,7 +691,8 @@ export function renderAdminViaturas() {
                                     cpf: auxiliar.cpf || "",
                                     datalistId: auxiliarDatalistId,
                                     index,
-                                    editable: index === 0
+                                    editable: index === 0,
+                                    removable: true
                                 })).join("")
                                 : renderPessoaField({
                                     viaturaId: viatura.id,
@@ -625,6 +712,14 @@ export function renderAdminViaturas() {
         `;
     }).join("");
     setupAdminResponsavelPickers(container);
+    setupAdminAddResponsavelLists(container);
+    if (adminAddResponsavelOpen) {
+        const list = getAdminAddResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+        if (list) {
+            renderAdminAddResponsavelList(adminAddResponsavelOpen.viaturaId, adminAddResponsavelOpen.tipo);
+            list.hidden = false;
+        }
+    }
 }
 
 function getAdminResponsavelOptions(term = "") {
@@ -643,6 +738,132 @@ function getAdminResponsavelOptions(term = "") {
             if (aStarts !== bStarts) return aStarts ? -1 : 1;
             return a.nome.localeCompare(b.nome, "pt-BR");
         });
+}
+
+function getAdminAddResponsavelList(viaturaId, tipo) {
+    return document.getElementById(`admin-add-${tipo}-${viaturaId}`);
+}
+
+function hideAdminAddResponsavelLists(except = null) {
+    document.querySelectorAll(".admin-add-person-list").forEach((list) => {
+        if (list !== except) list.hidden = true;
+    });
+    if (!except) adminAddResponsavelOpen = null;
+}
+
+function renderAdminAddResponsavelList(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+
+    const responsaveis = viaturaResponsaveis[String(viaturaId)] || {};
+    const atuais = new Set(getResponsaveisLista(responsaveis, tipo).map(pessoa => getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf)));
+    const options = getFuncionariosResponsaveisOptions();
+
+    list.innerHTML = options.length
+        ? options.map((pessoa) => {
+            const key = getFuncionarioKeyFromFields(pessoa.nome, pessoa.cpf);
+            const selected = atuais.has(key);
+            return `
+                <button type="button" class="admin-add-person-item ${selected ? "selected" : ""}" onclick="adicionarResponsavelViatura('${viaturaId}', '${tipo}', '${escapeJsString(pessoa.nome)}')" ${selected ? "disabled" : ""}>
+                    <span>${selected ? "✓" : "+"}</span>
+                    <strong>${escapeHtml(pessoa.nome)}</strong>
+                    <small>${escapeHtml(pessoa.cpf || "CPF não informado")}</small>
+                </button>
+            `;
+        }).join("")
+        : '<div class="responsavel-picker-empty">Nenhum funcionário cadastrado.</div>';
+}
+
+function setupAdminAddResponsavelLists(container = document) {
+    container.querySelectorAll(".admin-add-person-list").forEach((list) => {
+        const [, , tipo, viaturaId] = list.id.split("-");
+        renderAdminAddResponsavelList(viaturaId, tipo);
+    });
+}
+
+export function toggleAdicionarResponsavelViatura(viaturaId, tipo) {
+    const list = getAdminAddResponsavelList(viaturaId, tipo);
+    if (!list) return;
+    const shouldOpen = list.hidden;
+    hideAdminAddResponsavelLists(list);
+    if (shouldOpen) {
+        adminAddResponsavelOpen = { viaturaId: String(viaturaId), tipo };
+        renderAdminAddResponsavelList(viaturaId, tipo);
+        list.hidden = false;
+    } else {
+        adminAddResponsavelOpen = null;
+        list.hidden = true;
+    }
+}
+
+export async function adicionarResponsavelViatura(viaturaId, tipo, nome) {
+    const id = String(viaturaId);
+    if (!viaturaResponsaveis[id]) {
+        viaturaResponsaveis[id] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", tecnicos: [], auxiliares: [] };
+    }
+
+    const pessoa = findTecnicoByName(nome);
+    const pessoaNome = pessoa?.nome || String(nome || "").trim();
+    const pessoaCpf = pessoa?.cpf || "";
+    if (!pessoaNome) return;
+
+    const responsaveis = viaturaResponsaveis[id];
+    const arrayField = tipo === "tecnico" ? "tecnicos" : "auxiliares";
+    const atuais = getResponsaveisLista(responsaveis, tipo);
+    const key = getFuncionarioKeyFromFields(pessoaNome, pessoaCpf);
+    if (atuais.some(item => getFuncionarioKeyFromFields(item.nome, item.cpf) === key)) {
+        renderAdminAddResponsavelList(id, tipo);
+        return;
+    }
+
+    const duplicado = findResponsavelEmOutraViatura(id, pessoaNome, pessoaCpf);
+    if (duplicado && !confirm(
+        `Atenção: ${duplicado.nome} já está cadastrado como ${duplicado.tipo} em ${duplicado.viaturaNome}.\n\n` +
+        "Motivo: a mesma pessoa ficará vinculada a mais de uma viatura.\n\n" +
+        "Tem certeza que deseja cadastrar mesmo assim?"
+    )) {
+        renderAdminAddResponsavelList(id, tipo);
+        return;
+    }
+
+    responsaveis[arrayField] = [...atuais, { nome: pessoaNome, cpf: pessoaCpf }];
+    syncResponsavelPrincipal(responsaveis, tipo);
+    registrarHistoricoConfig(
+        tipo === "tecnico" ? "Técnico adicionado" : "Auxiliar adicionado",
+        `${pessoaNome} foi adicionado em ${getViaturaLabel(id)}.`
+    );
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
+    adminAddResponsavelOpen = { viaturaId: id, tipo };
+    renderAdminViaturas();
+}
+
+export async function removerResponsavelViatura(viaturaId, tipo, index) {
+    const id = String(viaturaId);
+    const responsaveis = viaturaResponsaveis[id];
+    if (!responsaveis) return;
+
+    const lista = getResponsaveisLista(responsaveis, tipo);
+    const itemIndex = Number(index);
+    if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= lista.length) return;
+
+    const label = tipo === "tecnico" ? "técnicos" : "auxiliares";
+    const removido = lista[itemIndex];
+    if (!confirm(`Remover ${removido.nome} dos ${label} da ${getViaturaLabel(id)}?`)) return;
+
+    lista.splice(itemIndex, 1);
+    if (tipo === "tecnico") {
+        responsaveis.tecnicos = lista;
+    } else {
+        responsaveis.auxiliares = lista;
+    }
+    syncResponsavelPrincipal(responsaveis, tipo);
+    registrarHistoricoConfig(
+        tipo === "tecnico" ? "Técnico removido" : "Auxiliar removido",
+        `${removido.nome} foi removido de ${getViaturaLabel(id)}.`
+    );
+    await salvarConfiguracoes();
+    refreshAppAfterConfigChange();
 }
 
 function ensureAdminResponsavelPicker(input) {
@@ -721,6 +942,7 @@ export async function selecionarTecnicoViatura(id, nome) {
         const anterior = viaturaResponsaveis[viaturaId].tecnico || "Sem técnico";
         viaturaResponsaveis[viaturaId].tecnico = "";
         viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+        viaturaResponsaveis[viaturaId].tecnicos = [];
         if (anterior !== "Sem técnico") {
             registrarHistoricoConfig("Técnico alterado", `${getViaturaLabel(viaturaId)}: técnico alterado de "${anterior}" para "Sem técnico".`);
         }
@@ -746,6 +968,7 @@ export async function selecionarTecnicoViatura(id, nome) {
     const anterior = viaturaResponsaveis[viaturaId].tecnico || "Sem técnico";
     viaturaResponsaveis[viaturaId].tecnico = tecnicoNome;
     if (tecnico) viaturaResponsaveis[viaturaId].tecnicoCpf = tecnicoCpf;
+    syncResponsavelPrincipal(viaturaResponsaveis[viaturaId], "tecnico");
 
     if (anterior !== tecnicoNome) {
         registrarHistoricoConfig("Técnico alterado", `${getViaturaLabel(viaturaId)}: técnico alterado de "${anterior}" para "${tecnicoNome || "Sem técnico"}".`);
@@ -807,10 +1030,12 @@ export async function selecionarAuxiliarViatura(id, nome) {
 }
 
 document.addEventListener("click", (event) => {
+    if (event.target.closest(".admin-people-group-header")) return;
     if (event.target.closest(".admin-person-fields label:first-child")) return;
     document.querySelectorAll(".admin-responsavel-picker").forEach((picker) => {
         picker.hidden = true;
     });
+    hideAdminAddResponsavelLists();
 });
 
 export function renderAdminHistory() {
@@ -819,24 +1044,41 @@ export function renderAdminHistory() {
 
     const toggleButton = document.getElementById("btn-toggle-config-history");
     const totalBadge = document.getElementById("history-alteracoes-count");
+    const searchTerm = normalizeSearch(document.getElementById("filter-config-history")?.value || "");
+    const filteredHistory = searchTerm
+        ? state.configHistory.filter((item) => {
+            const dateLabel = formatDateTimeBR(item.data);
+            const text = [
+                item.vistoriador,
+                item.email,
+                item.data,
+                dateLabel,
+                item.tipo,
+                item.descricao
+            ].join(" ");
+            return normalizeSearch(text).includes(searchTerm);
+        })
+        : state.configHistory;
+
     if (totalBadge) {
-        const total = state.configHistory.length;
-        totalBadge.innerText = `${total} ${total === 1 ? "registro" : "registros"}`;
+        const total = filteredHistory.length;
+        const suffix = searchTerm ? ` de ${state.configHistory.length}` : "";
+        totalBadge.innerText = `${total}${suffix} ${total === 1 ? "registro" : "registros"}`;
     }
 
     if (toggleButton) {
-        toggleButton.style.display = state.configHistory.length > CONFIG_HISTORY_COLLAPSED_LIMIT ? "inline-flex" : "none";
+        toggleButton.style.display = filteredHistory.length > CONFIG_HISTORY_COLLAPSED_LIMIT ? "inline-flex" : "none";
         toggleButton.textContent = configHistoryShowAll ? "Mostrar menos" : "Exibir todos";
     }
 
-    if (!state.configHistory.length) {
-        container.innerHTML = '<p class="admin-history-empty">Nenhuma alteração registrada.</p>';
+    if (!filteredHistory.length) {
+        container.innerHTML = `<p class="admin-history-empty">${searchTerm ? "Nenhuma alteração encontrada." : "Nenhuma alteração registrada."}</p>`;
         return;
     }
 
     const visibleHistory = configHistoryShowAll
-        ? state.configHistory
-        : state.configHistory.slice(0, CONFIG_HISTORY_COLLAPSED_LIMIT);
+        ? filteredHistory
+        : filteredHistory.slice(0, CONFIG_HISTORY_COLLAPSED_LIMIT);
 
     container.innerHTML = visibleHistory.map(item => `
         <div class="admin-history-row">
@@ -918,10 +1160,25 @@ export async function editarResponsavelViatura(id, campo, valor) {
     if (campo === "tecnico" && isEmptyResponsavelName(valorLimpo, "Sem técnico")) {
         viaturaResponsaveis[viaturaId].tecnico = "";
         viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+        viaturaResponsaveis[viaturaId].tecnicos = [];
     }
 
     if (campo === "tecnicoCpf" && isEmptyResponsavelName(viaturaResponsaveis[viaturaId].tecnico, "Sem técnico")) {
         viaturaResponsaveis[viaturaId].tecnicoCpf = "";
+    }
+
+    if (campo === "tecnico" || campo === "tecnicoCpf") {
+        const resp = viaturaResponsaveis[viaturaId];
+        if (!Array.isArray(resp.tecnicos)) resp.tecnicos = [];
+        if (isEmptyResponsavelName(resp.tecnico, "Sem técnico")) {
+            resp.tecnico = "";
+            resp.tecnicoCpf = "";
+            resp.tecnicos = [];
+        } else if (resp.tecnicos.length > 0) {
+            resp.tecnicos[0] = { nome: resp.tecnico, cpf: resp.tecnicoCpf };
+        } else if (resp.tecnico) {
+            resp.tecnicos.push({ nome: resp.tecnico, cpf: resp.tecnicoCpf });
+        }
     }
 
     if (campo === "auxiliar" || campo === "auxiliarCpf") {
@@ -2487,10 +2744,9 @@ export function initAdminAuthListener() {
         if (panelSec) panelSec.style.display = "block";
 
         try {
-            await carregarConfiguracoes();
             await authReadyCallback();
-            renderAdminConfig();
             if (auth.currentUser !== user) return;
+            setTimeout(renderAdminConfig, 0);
         } catch (error) {
             console.error("Erro ao preparar interface após login:", error);
             alert("Erro ao carregar dados iniciais. A tela será aberta com os dados locais disponíveis.");

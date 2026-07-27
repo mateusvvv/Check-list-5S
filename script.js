@@ -65,6 +65,7 @@ import {
     adicionarViatura,
     alternarItemChecklist,
     alternarViaturaAtiva,
+    adicionarResponsavelViatura,
     editarItemChecklist,
     editarEpiFuncionarioExtra,
     editarFuncionarioExtra,
@@ -75,6 +76,8 @@ import {
     removerFuncionarioExtra,
     removerVistoriador,
     removerItemChecklist,
+    removerResponsavelViatura,
+    renderAdminHistory,
     renderAdminVistoriadores,
     renderAdminChecklist,
     selecionarAuxiliarViatura,
@@ -82,6 +85,7 @@ import {
     setAuthReadyCallback,
     showAdminConfigTab,
     showAdminPeopleTab,
+    toggleAdicionarResponsavelViatura,
     substituirItemChecklist,
     adicionarVistoriador,
     alterarPermissoesVistoriador,
@@ -118,6 +122,8 @@ let menuJustOpened = false; // Trava para o menu não fechar rápido demais
 let isLongPressActive = false;
 let signatureCanvasInitialized = false;
 let signatureDrawing = false;
+let statusViaturasUnsubscribe = null;
+let analistasCadastradosUnsubscribe = null;
 let signatureTarget = { type: "tecnico", index: 0 };
 const DOUBLE_TAP_DELAY = 300; // Tempo máximo entre toques para considerar clique duplo
 const vistoriaCategoriaLabels = {
@@ -709,19 +715,34 @@ function selecionarAnalistaCadastrado(scope = "inspection", cpfSelecionado = nul
 }
 
 async function carregarAnalistasCadastrados() {
-    try {
-        const snapshot = await getDocs(query(collection(db, "analistasCadastrados"), orderBy("cpf", "asc")));
-        state.analistasCadastrados = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-            ativo: docSnap.data().ativo !== false
-        }));
-        renderAnalistasSelectOptions("inspection");
-        renderAnalistasSelectOptions("admin");
-        renderAnalistasGerenciamento();
-    } catch (error) {
-        console.error("Erro ao carregar CPFs de analistas:", error);
-    }
+    if (analistasCadastradosUnsubscribe) return;
+
+    return new Promise((resolve) => {
+        const q = query(collection(db, "analistasCadastrados"), orderBy("cpf", "asc"));
+        let resolved = false;
+
+        analistasCadastradosUnsubscribe = onSnapshot(q, (snapshot) => {
+            state.analistasCadastrados = snapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+                ativo: docSnap.data().ativo !== false
+            }));
+            renderAnalistasSelectOptions("inspection");
+            renderAnalistasSelectOptions("admin");
+            renderAnalistasGerenciamento();
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        }, (error) => {
+            analistasCadastradosUnsubscribe = null;
+            console.error("Erro ao carregar CPFs de analistas:", error);
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        });
+    });
 }
 
 async function salvarCpfAnalista(scope = "inspection") {
@@ -2027,6 +2048,9 @@ function renderAuxiliaresList() {
 function cloneResponsaveisEquipe(responsaveis = {}) {
     return {
         ...responsaveis,
+        tecnicos: Array.isArray(responsaveis.tecnicos)
+            ? responsaveis.tecnicos.map(tecnico => ({ ...tecnico }))
+            : [],
         auxiliares: Array.isArray(responsaveis.auxiliares)
             ? responsaveis.auxiliares.map(auxiliar => ({ ...auxiliar }))
             : []
@@ -2035,13 +2059,26 @@ function cloneResponsaveisEquipe(responsaveis = {}) {
 
 function ensureResponsaveisEquipe(viaturaId) {
     const id = String(viaturaId || state.selectedViatura || "");
-    if (!id) return { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+    if (!id) return { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", tecnicos: [], auxiliares: [] };
 
     if (!viaturaResponsaveis[id]) {
-        viaturaResponsaveis[id] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", auxiliares: [] };
+        viaturaResponsaveis[id] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", tecnicos: [], auxiliares: [] };
     }
 
     const responsaveis = viaturaResponsaveis[id];
+    if (!Array.isArray(responsaveis.tecnicos)) {
+        responsaveis.tecnicos = responsaveis.tecnico
+            ? [{ nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf || "" }]
+            : [];
+    }
+
+    responsaveis.tecnicos = responsaveis.tecnicos
+        .filter(tecnico => tecnico?.nome)
+        .map(tecnico => ({
+            nome: String(tecnico.nome || "").trim(),
+            cpf: String(tecnico.cpf || "").trim()
+        }));
+
     const hasExplicitAuxiliar = Object.prototype.hasOwnProperty.call(responsaveis, "auxiliar");
     if (hasExplicitAuxiliar && !String(responsaveis.auxiliar || "").trim()) {
         responsaveis.auxiliar = "";
@@ -2581,11 +2618,14 @@ function renderViaturaDashboard() {
         const isFullyConcluded = status.ferramentas && status.epis && status.viaturas && status.tablets;
         const isDisabled = viatura.ativa === false;
         const responsaveis = viaturaResponsaveis[id] || {};
-        const tecnico = responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico"
-            ? responsaveis.tecnico
-            : "Sem técnico";
-
-        const auxiliaresTexto = responsaveis.auxiliar ? responsaveis.auxiliar : "Sem auxiliar";
+        const tecnicos = Array.isArray(responsaveis.tecnicos) && responsaveis.tecnicos.length
+            ? responsaveis.tecnicos.map(tecnico => tecnico.nome).filter(Boolean)
+            : (responsaveis.tecnico && responsaveis.tecnico !== "Veículo sem Técnico" ? [responsaveis.tecnico] : []);
+        const auxiliares = Array.isArray(responsaveis.auxiliares) && responsaveis.auxiliares.length
+            ? responsaveis.auxiliares.map(auxiliar => auxiliar.nome).filter(Boolean)
+            : (responsaveis.auxiliar ? [responsaveis.auxiliar] : []);
+        const tecnico = tecnicos.length ? tecnicos.join(", ") : "Sem técnico";
+        const auxiliaresTexto = auxiliares.length ? auxiliares.join(", ") : "Sem auxiliar";
 
         const card = document.createElement("div");
         card.className = `viatura-card ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""} ${isFullyConcluded ? "fully-concluded" : ""}`;
@@ -2808,7 +2848,11 @@ function renderTeamList() {
     const resp = viaturaResponsaveis[viaturaId] || {};
     const team = [];
 
-    if (resp.tecnico && resp.tecnico !== "Veículo sem Técnico") {
+    if (Array.isArray(resp.tecnicos) && resp.tecnicos.length > 0) {
+        resp.tecnicos.forEach(tecnico => {
+            if (tecnico.nome) team.push({ nome: tecnico.nome, cpf: tecnico.cpf, tipo: "Técnico" });
+        });
+    } else if (resp.tecnico && resp.tecnico !== "Veículo sem Técnico") {
         team.push({ nome: resp.tecnico, cpf: resp.tecnicoCpf, tipo: "Técnico" });
     }
 
@@ -3475,6 +3519,8 @@ async function enviarVistoriaAoFirebase() {
  * de status no Dashboard em tempo real para todos os aparelhos.
  */
 function sincronizarStatusViaturasRealtime() {
+    if (statusViaturasUnsubscribe) return;
+
     const agora = new Date();
     const dataLimite = new Date(agora);
     // Busca vistorias das últimas 24 horas para evitar problemas de fuso horário ou virada de dia.
@@ -3489,7 +3535,7 @@ function sincronizarStatusViaturasRealtime() {
         orderBy("dataEnvio", "desc")
     );
 
-    onSnapshot(q, (snapshot) => {
+    statusViaturasUnsubscribe = onSnapshot(q, (snapshot) => {
         const newSurveyStatus = {};
         const newEpiSurveyStatus = {};
 
@@ -3555,6 +3601,7 @@ function sincronizarStatusViaturasRealtime() {
             renderEpiPessoaOptions();
         }
     }, (error) => {
+        statusViaturasUnsubscribe = null;
         console.warn("Não foi possível sincronizar o status das viaturas em tempo real.", error);
     });
 }
@@ -3771,15 +3818,19 @@ function bindWindowFunctions() {
         removerFuncionarioExtra,
         removerEpiFuncionarioExtra,
         removerVistoriador,
+        removerResponsavelViatura,
         editarNomeViatura,
         editarResponsavelViatura,
         selecionarTecnicoViatura,
         selecionarAuxiliarViatura,
         alternarViaturaAtiva,
+        adicionarResponsavelViatura,
         removerViatura,
         renderAdminChecklist,
+        renderAdminHistory,
         showAdminConfigTab,
         showAdminPeopleTab,
+        toggleAdicionarResponsavelViatura,
         abrirPaginaHistoricoVistorias,
         adicionarItemChecklist,
         atualizarTotalItemChecklistAdmin,
@@ -3882,7 +3933,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         setAuthReadyCallback(async () => {
             try {
                 await carregarConfiguracoes();
-                await carregarCadastrosAposAutenticacao();
                 const vistoriadorAtual = getVistoriadorAtivo();
                 renderVistoriadorOptions();
                 const vistoriadorSelect = document.getElementById("vistoriador-atual");
@@ -3897,8 +3947,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 updateMenuStatus();
                 updateVistoriaModeUI();
                 selecionarVistoriadorAtivo(true);
-                // Inicia a sincronização automática das bolinhas
-                sincronizarStatusViaturasRealtime();
+
+                const cadastrosPromise = carregarCadastrosAposAutenticacao()
+                    .then(() => {
+                        updateTabletInfo();
+                        renderViaturaDashboard();
+                    })
+                    .catch((error) => {
+                        console.error("Erro ao carregar cadastros após login:", error);
+                    });
+
                 sincronizarStatusViaturasRealtime();
                 if (sessionStorage.getItem("abrirPainelAdmin") === "1" && auth.currentUser) { // Verifica se há usuário logado antes de abrir o painel
                     sessionStorage.removeItem("abrirPainelAdmin");
@@ -3906,6 +3964,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } else {
                     showHome();
                 }
+                void cadastrosPromise;
             } catch (e) {
                 console.error('Erro durante inicialização de auth-ready:', e);
                 alert('Erro ao inicializar os dados do usuário. Verifique o console.');
@@ -3972,4 +4031,5 @@ window.refreshAppAfterConfigChange = function() {
     if (activeTab && activeTab.id !== "funcionarios") {
         renderItems(activeTab.id);
     }
+    renderAdminHistory();
 };

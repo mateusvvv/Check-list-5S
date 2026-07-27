@@ -5,6 +5,8 @@ import { setViaturas, state } from "./state.js?v=2";
 const SETTINGS_COLLECTION = "configuracoes";
 const SETTINGS_DOC = "app";
 let settingsUnsubscribe = null;
+let settingsLoaded = false;
+let settingsLoadPromise = null;
 
 function getChecklistCategories() {
     return Object.keys(checklistData);
@@ -68,6 +70,12 @@ function applyEmployeeEpisByPerson(data = {}) {
 }
 
 function mergeResponsaveisWithDefaults(defaults = {}, saved = {}) {
+    const savedTecnicos = Array.isArray(saved?.tecnicos)
+        ? saved.tecnicos.filter(tecnico => tecnico?.nome)
+        : [];
+    const defaultTecnicos = Array.isArray(defaults?.tecnicos)
+        ? defaults.tecnicos.filter(tecnico => tecnico?.nome)
+        : [];
     const savedAuxiliares = Array.isArray(saved?.auxiliares)
         ? saved.auxiliares.filter(auxiliar => auxiliar?.nome)
         : [];
@@ -82,7 +90,10 @@ function mergeResponsaveisWithDefaults(defaults = {}, saved = {}) {
     const hasSavedAuxiliar = Object.prototype.hasOwnProperty.call(saved || {}, "auxiliar");
     const tecnico = hasSavedTecnico
         ? saved?.tecnico
-        : (isEmptyResponsavel(defaults?.tecnico) ? "" : defaults?.tecnico);
+        : (savedTecnicos[0]?.nome || (isEmptyResponsavel(defaults?.tecnico) ? "" : defaults?.tecnico) || defaultTecnicos[0]?.nome || "");
+    const tecnicoCpf = hasSavedTecnico
+        ? saved?.tecnicoCpf
+        : (savedTecnicos[0]?.cpf || defaults?.tecnicoCpf || defaultTecnicos[0]?.cpf || "");
     const auxiliar = hasSavedAuxiliar
         ? saved?.auxiliar
         : (savedAuxiliares[0]?.nome || defaults?.auxiliar || defaultAuxiliares[0]?.nome || "");
@@ -92,10 +103,14 @@ function mergeResponsaveisWithDefaults(defaults = {}, saved = {}) {
     const auxiliares = hasSavedAuxiliar && !auxiliar
         ? []
         : (savedAuxiliares.length ? savedAuxiliares : defaultAuxiliares);
+    const tecnicos = hasSavedTecnico && !tecnico
+        ? []
+        : (savedTecnicos.length ? savedTecnicos : defaultTecnicos);
 
     return {
         tecnico: String(tecnico || ""),
-        tecnicoCpf: String((hasSavedTecnico && !tecnico) ? "" : (saved?.tecnicoCpf || defaults?.tecnicoCpf || "")),
+        tecnicoCpf: String((hasSavedTecnico && !tecnico) ? "" : (tecnicoCpf || "")),
+        tecnicos: tecnicos.map(tecnico => ({ ...tecnico })),
         auxiliar: String(auxiliar || ""),
         auxiliarCpf: String(auxiliarCpf || ""),
         auxiliares: auxiliares.map(auxiliar => ({ ...auxiliar }))
@@ -122,8 +137,14 @@ function applyViaturaResponsaveis(data = {}) {
     Object.entries(source).forEach(([viaturaId, responsaveis]) => {
         if (!knownIds.has(String(viaturaId))) return;
         if (!viaturaResponsaveis[String(viaturaId)]) {
-            viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "" };
+            viaturaResponsaveis[String(viaturaId)] = { tecnico: "", tecnicoCpf: "", auxiliar: "", auxiliarCpf: "", tecnicos: [], auxiliares: [] };
         }
+        const hasExplicitTecnico = Object.prototype.hasOwnProperty.call(responsaveis || {}, "tecnico");
+        const tecnicosArr = hasExplicitTecnico && !responsaveis?.tecnico
+            ? []
+            : (Array.isArray(responsaveis?.tecnicos) && responsaveis.tecnicos.length > 0
+                ? responsaveis.tecnicos.map(t => ({...t}))
+                : (responsaveis?.tecnico ? [{nome: responsaveis.tecnico, cpf: responsaveis.tecnicoCpf}] : []));
         const hasExplicitAuxiliar = Object.prototype.hasOwnProperty.call(responsaveis || {}, "auxiliar");
         const auxiliaresArr = hasExplicitAuxiliar && !responsaveis?.auxiliar
             ? []
@@ -132,8 +153,9 @@ function applyViaturaResponsaveis(data = {}) {
                 : (responsaveis?.auxiliar ? [{nome: responsaveis.auxiliar, cpf: responsaveis.auxiliarCpf}] : []));
 
         viaturaResponsaveis[String(viaturaId)] = {
-            tecnico: String(responsaveis?.tecnico || ""),
-            tecnicoCpf: String(responsaveis?.tecnicoCpf || ""),
+            tecnico: String(hasExplicitTecnico ? (responsaveis?.tecnico || "") : (tecnicosArr[0]?.nome || "")),
+            tecnicoCpf: String(hasExplicitTecnico ? (responsaveis?.tecnicoCpf || "") : (tecnicosArr[0]?.cpf || "")),
+            tecnicos: tecnicosArr,
             auxiliar: String(hasExplicitAuxiliar ? (responsaveis?.auxiliar || "") : (auxiliaresArr[0]?.nome || "")),
             auxiliarCpf: String(hasExplicitAuxiliar ? (responsaveis?.auxiliarCpf || "") : (auxiliaresArr[0]?.cpf || "")),
             auxiliares: auxiliaresArr
@@ -373,6 +395,17 @@ function applyLocalConfigFallback(error) {
 }
 
 export async function carregarConfiguracoes() {
+    if (settingsLoaded) return;
+    if (settingsLoadPromise) return settingsLoadPromise;
+
+    settingsLoadPromise = carregarConfiguracoesRemotas().finally(() => {
+        settingsLoadPromise = null;
+    });
+
+    return settingsLoadPromise;
+}
+
+async function carregarConfiguracoesRemotas() {
     const ref = firestoreDoc(db, SETTINGS_COLLECTION, SETTINGS_DOC);
 
     try {
@@ -404,6 +437,8 @@ export async function carregarConfiguracoes() {
             console.error("Não foi possível sincronizar configurações remotas.", error);
         });
     }
+
+    settingsLoaded = true;
 }
 
 function buildConfigPayload(atualizadoEm) {
@@ -437,6 +472,7 @@ function buildConfigPayload(atualizadoEm) {
                     {
                         tecnico: responsaveis.tecnico || "",
                         tecnicoCpf: responsaveis.tecnicoCpf || "",
+                        tecnicos: Array.isArray(responsaveis.tecnicos) ? responsaveis.tecnicos.map(t => ({ ...t })) : [],
                         auxiliar: responsaveis.auxiliar || "",
                         auxiliarCpf: responsaveis.auxiliarCpf || "",
                         auxiliares: Array.isArray(responsaveis.auxiliares) ? responsaveis.auxiliares.map(a => ({ ...a })) : []
