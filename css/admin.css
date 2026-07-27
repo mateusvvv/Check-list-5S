@@ -1807,17 +1807,21 @@
 .admin-remove-person-btn {
     display: inline-grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
-    min-width: 22px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
     padding: 0 !important;
     border: 1px solid #fecdd3 !important;
     border-radius: 4px !important;
     background: #fff1f2 !important;
     color: #be123c !important;
-    font-size: 0.82rem !important;
+    font-size: 1rem !important;
     font-weight: 900 !important;
     line-height: 1 !important;
+    cursor: pointer;
+    touch-action: manipulation;
+    position: relative;
+    z-index: 5;
 }
 
 .admin-remove-person-btn:hover,
@@ -2280,6 +2284,19 @@
     .analyst-manager-row {
         gap: 8px;
         padding: 10px;
+    }
+
+    .admin-vehicle-person {
+        grid-template-columns: 18px minmax(0, 1fr) 44px;
+        align-items: center;
+    }
+
+    .admin-remove-person-btn {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        justify-self: end;
     }
 }
 

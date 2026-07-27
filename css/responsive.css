@@ -410,11 +410,29 @@
 
 @media (max-width: 420px) {
     .admin-dashboard-cards {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
     }
 
     .admin-dashboard-card {
-        min-height: 205px;
+        min-height: 236px;
+        padding: 24px 10px 22px;
+        gap: 14px;
+    }
+
+    .admin-dashboard-icon {
+        width: 84px;
+        height: 84px;
+    }
+
+    .admin-dashboard-icon svg {
+        width: 42px;
+        height: 42px;
+    }
+
+    .admin-dashboard-card > span:last-child {
+        max-width: 130px;
+        font-size: 0.86rem;
     }
 }
 

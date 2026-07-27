@@ -93,7 +93,7 @@ import {
     toggleSelecionarTodasVistorias,
     toggleSelecionarVistoria,
     verDetalhes
-} from "./js/admin.js?v=21";
+} from "./js/admin.js?v=22";
 import {
     encerrarVistoriaCompleta,
     gerarRelatorioViatura,

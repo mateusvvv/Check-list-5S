@@ -620,7 +620,7 @@ export function renderAdminViaturas() {
                         <input type="text" value="${escapeHtml(cpf || "")}" placeholder="CPF não informado" ${cpfChange} ${readonlyAttrs}>
                     </label>
                 </div>
-                ${removable ? `<button type="button" class="admin-remove-person-btn" onclick="removerResponsavelViatura('${viaturaId}', '${tipo}', ${index})" aria-label="Remover ${tipo === "tecnico" ? "técnico" : "auxiliar"}">x</button>` : ""}
+                ${removable ? `<button type="button" class="admin-remove-person-btn" data-viatura-id="${escapeHtml(viaturaId)}" data-tipo="${escapeHtml(tipo)}" data-index="${index}" aria-label="Remover ${tipo === "tecnico" ? "técnico" : "auxiliar"}">x</button>` : ""}
             </div>
         `;
     };
@@ -1052,6 +1052,18 @@ export async function selecionarAuxiliarViatura(id, nome) {
 }
 
 document.addEventListener("click", (event) => {
+    const removeButton = event.target.closest(".admin-remove-person-btn");
+    if (removeButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        removerResponsavelViatura(
+            removeButton.dataset.viaturaId,
+            removeButton.dataset.tipo,
+            removeButton.dataset.index
+        );
+        return;
+    }
+
     if (event.target.closest(".admin-people-group-header")) return;
     if (event.target.closest(".admin-person-fields label:first-child")) return;
     document.querySelectorAll(".admin-responsavel-picker").forEach((picker) => {
