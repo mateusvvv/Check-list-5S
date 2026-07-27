@@ -749,6 +749,11 @@ textarea {
         border-color: rgba(191, 219, 254, 0.78);
     }
 
+    body.page-admin .header-selected-viatura,
+    body.page-notebooks .header-selected-viatura {
+        display: none;
+    }
+
     .menu-btn {
         display: inline-flex !important;
         min-width: 40px;

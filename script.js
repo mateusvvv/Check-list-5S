@@ -1075,6 +1075,7 @@ function showPage(pageId, options = {}) {
 
     const headerInfo = document.querySelector(".header-info");
     if (headerInfo) headerInfo.style.display = ["admin", "funcionarios", "notebooks"].includes(pageId) ? "none" : "block";
+    document.body.classList.toggle("page-admin", pageId === "admin");
     document.body.classList.toggle("page-funcionarios", pageId === "funcionarios");
     document.body.classList.toggle("page-notebooks", pageId === "notebooks");
 
