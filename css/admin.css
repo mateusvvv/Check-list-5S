@@ -2287,16 +2287,19 @@
     }
 
     .admin-vehicle-person {
-        grid-template-columns: 18px minmax(0, 1fr) 44px;
-        align-items: center;
+        grid-template-columns: 18px minmax(0, 1fr) 32px;
+        align-items: start;
+        gap: 6px;
     }
 
     .admin-remove-person-btn {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
         justify-self: end;
+        align-self: start;
+        margin-top: 2px;
     }
 }
 

@@ -233,15 +233,16 @@ function updateVistoriadorLogado() {
 }
 
 function syncSpecialVistoriadores() {
-    const vistoriador = getVistoriadorAtivo();
     const tabletSelect = document.getElementById("tablet-vistoriador");
     const notebookSelect = document.getElementById("notebook-vistoriador");
 
     if (tabletSelect) {
-        tabletSelect.value = (isTabletOnlyUser(vistoriador) || isAlissonVistoriador(vistoriador)) ? vistoriador : "";
+        const responsavelTablet = tabletSelect.value || "";
+        tabletSelect.value = vistoriadoresTablet.includes(responsavelTablet) ? responsavelTablet : "";
     }
     if (notebookSelect) {
-        notebookSelect.value = vistoriadoresAcessoNotebook.includes(vistoriador) ? vistoriador : "";
+        const responsavelNotebook = notebookSelect.value || "";
+        notebookSelect.value = vistoriadoresAcessoNotebook.includes(responsavelNotebook) ? responsavelNotebook : "";
     }
     updateTabletInfo();
 }

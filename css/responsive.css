@@ -109,6 +109,16 @@
         max-width: none;
     }
 
+    #viaturas .fuel-input {
+        max-width: none;
+    }
+
+    #viaturas .custom-file-upload {
+        width: 100% !important;
+        min-width: 0;
+        max-width: none;
+    }
+
     .tablet-association {
         min-height: 34px;
         padding: 5px 8px;
@@ -302,11 +312,35 @@
 
     .admin-dashboard-cards {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-top: 24px;
+        gap: 10px;
+        margin-top: 12px;
+        margin-bottom: 14px;
     }
 
     .admin-dashboard-card {
-        min-height: 220px;
+        min-height: 132px;
+        padding: 12px 8px 14px;
+        gap: 6px;
+    }
+
+    .admin-dashboard-icon {
+        width: 54px;
+        height: 54px;
+    }
+
+    .admin-dashboard-icon svg {
+        width: 28px;
+        height: 28px;
+    }
+
+    .admin-dashboard-card strong {
+        font-size: 0.86rem;
+    }
+
+    .admin-dashboard-card > span:last-child {
+        max-width: 116px;
+        font-size: 0.68rem;
+        line-height: 1.25;
     }
 
     .admin-vehicle-main {
@@ -411,28 +445,33 @@
 @media (max-width: 420px) {
     .admin-dashboard-cards {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 8px;
     }
 
     .admin-dashboard-card {
-        min-height: 236px;
-        padding: 24px 10px 22px;
-        gap: 14px;
+        min-height: 122px;
+        padding: 10px 6px 12px;
+        gap: 5px;
     }
 
     .admin-dashboard-icon {
-        width: 84px;
-        height: 84px;
+        width: 48px;
+        height: 48px;
     }
 
     .admin-dashboard-icon svg {
-        width: 42px;
-        height: 42px;
+        width: 25px;
+        height: 25px;
+    }
+
+    .admin-dashboard-card strong {
+        font-size: 0.8rem;
     }
 
     .admin-dashboard-card > span:last-child {
-        max-width: 130px;
-        font-size: 0.86rem;
+        max-width: 104px;
+        font-size: 0.62rem;
+        line-height: 1.2;
     }
 }
 
@@ -477,6 +516,16 @@
 
     .auth-card h1 {
         font-size: 1.75rem;
+    }
+
+    #admin.card,
+    #admin .card {
+        padding: 14px 10px;
+    }
+
+    #admin .card > h2 {
+        font-size: 1.05rem;
+        margin-bottom: 8px;
     }
 
     .auth-logo {

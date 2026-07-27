@@ -516,6 +516,23 @@ body > main {
     max-width: 200px;
 }
 
+#viaturas .fuel-input {
+    max-width: 280px;
+    margin-bottom: 10px;
+}
+
+#viaturas .fuel-input select {
+    width: 100%;
+    min-height: 38px;
+}
+
+#viaturas .custom-file-upload {
+    width: auto !important;
+    min-width: 210px;
+    max-width: 260px;
+    justify-content: center;
+}
+
 .card {
     background: var(--white);
     padding: 25px;
