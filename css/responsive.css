@@ -364,6 +364,14 @@
         padding-top: 14px;
     }
 
+    .admin-add-person-list {
+        left: 50%;
+        right: auto;
+        width: min(280px, calc(100vw - 48px));
+        max-width: calc(100vw - 48px);
+        transform: translateX(-50%);
+    }
+
     .admin-config-actions {
         width: 100%;
         justify-content: stretch;
